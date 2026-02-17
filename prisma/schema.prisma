@@ -1,0 +1,275 @@
+// Prisma Schema for Live Commerce Platform
+// 분양형 라이브 커머스 쇼핑몰 플랫폼
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 사용자 역할 (String으로 저장)
+// ADMIN: 플랫폼 관리자 (당신)
+// PARTNER: 파트너 스트리머
+// CUSTOMER: 일반 고객
+
+// 주문 상태 (String으로 저장)
+// PENDING: 주문 대기
+// CONFIRMED: 주문 확인
+// SHIPPING: 배송중
+// DELIVERED: 배송완료
+// CANCELLED: 취소됨
+// REFUNDED: 환불됨
+
+// 정산 상태 (String으로 저장)
+// PENDING: 정산 대기
+// PROCESSING: 정산 진행중
+// COMPLETED: 정산 완료
+// FAILED: 정산 실패
+
+// 사용자 테이블
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  phone         String?
+  role          String    @default("CUSTOMER") // ADMIN, PARTNER, CUSTOMER
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  partner       Partner?
+  orders        Order[]
+}
+
+// 파트너 (스트리머) 테이블
+model Partner {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id])
+  
+  storeName         String    // 상점 이름
+  storeSlug         String    @unique // URL slug (예: /store/streamer1)
+  description       String?   // 상점 설명
+  logo              String?   // 로고 이미지
+  banner            String?   // 배너 이미지
+  
+  // 수익 분배율 (기본 30%)
+  commissionRate    Float     @default(30.0)
+  
+  // 플랫폼 정보
+  youtubeUrl        String?
+  africaTvUrl       String?
+  instagramUrl      String?
+  
+  isActive          Boolean   @default(true)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  products          PartnerProduct[]
+  orders            Order[]
+  settlements       Settlement[]
+  liveStreams       LiveStream[]
+}
+
+// 제품 카테고리
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String?
+  parentId    String?
+  parent      Category? @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryToCategory")
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  products    Product[]
+}
+
+// 제품 테이블 (플랫폼이 보유한 제품)
+model Product {
+  id            String    @id @default(uuid())
+  name          String
+  slug          String    @unique
+  description   String
+  price         Float
+  comparePrice  Float?    // 정가 (할인 표시용)
+  
+  // 재고
+  stock         Int       @default(0)
+  sku           String?   @unique // 상품 코드
+  
+  // 이미지
+  images        String    // JSON array of image URLs
+  thumbnail     String
+  
+  // 카테고리
+  categoryId    String
+  category      Category  @relation(fields: [categoryId], references: [id])
+  
+  // 제품 상태
+  isActive      Boolean   @default(true)
+  isFeatured    Boolean   @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  partnerProducts PartnerProduct[]
+  orderItems      OrderItem[]
+}
+
+// 파트너가 판매하는 제품 (파트너-제품 연결 테이블)
+model PartnerProduct {
+  id          String    @id @default(uuid())
+  
+  partnerId   String
+  partner     Partner   @relation(fields: [partnerId], references: [id])
+  
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  
+  // 파트너별 가격 조정 가능
+  customPrice Float?
+  
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([partnerId, productId])
+}
+
+// 라이브 스트림 정보
+model LiveStream {
+  id              String    @id @default(uuid())
+  
+  partnerId       String
+  partner         Partner   @relation(fields: [partnerId], references: [id])
+  
+  title           String
+  description     String?
+  
+  // 라이브 URL
+  streamUrl       String?   // 유튜브, 아프리카TV 등 라이브 링크
+  platform        String?   // youtube, afreecatv, instagram 등
+  
+  // 라이브 시간
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  
+  isLive          Boolean   @default(false)
+  
+  // 라이브 중 특별 할인
+  specialDiscount Float?    // 할인율 (%)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  orders          Order[]
+}
+
+// 주문 테이블
+model Order {
+  id                String        @id @default(uuid())
+  orderNumber       String        @unique // 주문 번호
+  
+  // 고객 정보
+  userId            String
+  user              User          @relation(fields: [userId], references: [id])
+  
+  // 파트너 정보 (어떤 파트너의 스토어에서 구매했는지)
+  partnerId         String
+  partner           Partner       @relation(fields: [partnerId], references: [id])
+  
+  // 라이브 스트림 정보 (라이브 중 구매한 경우)
+  liveStreamId      String?
+  liveStream        LiveStream?   @relation(fields: [liveStreamId], references: [id])
+  
+  // 주문 금액
+  subtotal          Float         // 소계
+  discount          Float         @default(0) // 할인
+  shippingFee       Float         @default(0) // 배송비
+  total             Float         // 총액
+  
+  // 수익 분배
+  partnerRevenue    Float         // 파트너 수익
+  platformRevenue   Float         // 플랫폼 수익
+  
+  // 주문 상태
+  status            String        @default("PENDING") // PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED, REFUNDED
+  
+  // 배송 정보
+  shippingName      String
+  shippingPhone     String
+  shippingAddress   String
+  shippingZipCode   String?
+  shippingMemo      String?
+  
+  // 결제 정보
+  paymentMethod     String?       // card, bank, kakaopay 등
+  paidAt            DateTime?
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relations
+  items             OrderItem[]
+  settlement        Settlement?
+}
+
+// 주문 아이템
+model OrderItem {
+  id          String    @id @default(uuid())
+  
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id])
+  
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  
+  quantity    Int
+  price       Float     // 구매 당시 가격
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// 정산 테이블
+model Settlement {
+  id              String            @id @default(uuid())
+  
+  partnerId       String
+  partner         Partner           @relation(fields: [partnerId], references: [id])
+  
+  orderId         String            @unique
+  order           Order             @relation(fields: [orderId], references: [id])
+  
+  // 정산 금액
+  amount          Float
+  commissionRate  Float             // 정산 당시 수수료율
+  
+  // 정산 상태
+  status          String            @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  
+  // 정산 처리 시간
+  processedAt     DateTime?
+  completedAt     DateTime?
+  
+  // 정산 메모
+  memo            String?
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
