@@ -11,12 +11,14 @@
 
 ### 주요 기능
 - ✅ 멀티 테넌트 시스템 (파트너별 독립 쇼핑몰)
+- ✅ 파트너 회원가입 및 로그인
 - ✅ 파트너 대시보드 (판매 현황, 수익 확인)
+- ✅ 관리자 로그인 및 대시보드
 - ✅ 관리자 대시보드 (전체 통계, 파트너 관리)
-- ✅ 제품 관리 시스템
-- ✅ 주문 처리 시스템
 - ✅ 자동 수익 분배 및 정산
-- ✅ 라이브 스트림 연동
+- 🚧 제품 관리 시스템 (예정)
+- 🚧 주문 처리 시스템 (예정)
+- 🚧 라이브 스트림 연동 (예정)
 - ✅ 반응형 디자인 (모바일/PC)
 
 ## 🚀 빠른 시작
@@ -104,22 +106,23 @@ live-commerce-platform/
 
 ### 공개 페이지
 - `/` - 홈페이지
+- `/partner/register` - 파트너 회원가입
 - `/partner/login` - 파트너 로그인
 - `/admin/login` - 관리자 로그인
 
 ### 파트너 페이지 (인증 필요)
 - `/partner/dashboard` - 대시보드 (판매 통계)
-- `/partner/products` - 제품 관리
-- `/partner/orders` - 주문 관리
-- `/partner/settlement` - 정산 내역
-- `/partner/live` - 라이브 관리
+- `/partner/products` - 제품 관리 (예정)
+- `/partner/orders` - 주문 관리 (예정)
+- `/partner/settlement` - 정산 내역 (예정)
+- `/partner/live` - 라이브 관리 (예정)
 
 ### 관리자 페이지 (인증 필요)
-- `/admin/dashboard` - 전체 통계
-- `/admin/partners` - 파트너 관리
-- `/admin/products` - 제품 관리
-- `/admin/orders` - 주문 관리
-- `/admin/settlements` - 정산 관리
+- `/admin/dashboard` - 전체 통계 및 파트너 현황
+- `/admin/partners` - 파트너 관리 (예정)
+- `/admin/products` - 제품 관리 (예정)
+- `/admin/orders` - 주문 관리 (예정)
+- `/admin/settlements` - 정산 관리 (예정)
 
 ## 🔐 인증 시스템
 
@@ -211,8 +214,8 @@ NEXT_PUBLIC_API_URL="https://yourdomain.com"
 ## 📈 다음 단계
 
 ### 구현 예정 기능
-- [ ] 파트너 회원가입 페이지
-- [ ] 관리자 대시보드
+- [x] 파트너 회원가입 페이지 ✅
+- [x] 관리자 대시보드 ✅
 - [ ] 제품 관리 UI
 - [ ] 주문 관리 UI
 - [ ] 결제 시스템 연동 (토스페이먼츠, 아임포트)
