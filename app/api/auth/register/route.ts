@@ -15,7 +15,10 @@ export async function POST(request: NextRequest) {
       description,
       youtubeUrl,
       africaTvUrl,
-      instagramUrl
+      instagramUrl,
+      tiktokUrl,
+      naverShoppingUrl,
+      coupangUrl
     } = body
 
     // 필수 필드 확인
@@ -76,6 +79,9 @@ export async function POST(request: NextRequest) {
           youtubeUrl: youtubeUrl || null,
           africaTvUrl: africaTvUrl || null,
           instagramUrl: instagramUrl || null,
+          tiktokUrl: tiktokUrl || null,
+          naverShoppingUrl: naverShoppingUrl || null,
+          coupangUrl: coupangUrl || null,
           commissionRate: 30.0, // 기본 수수료율 30%
           isActive: true
         }

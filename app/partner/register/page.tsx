@@ -17,7 +17,10 @@ export default function PartnerRegisterPage() {
     description: '',
     youtubeUrl: '',
     africaTvUrl: '',
-    instagramUrl: ''
+    instagramUrl: '',
+    tiktokUrl: '',
+    naverShoppingUrl: '',
+    coupangUrl: ''
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -229,46 +232,87 @@ export default function PartnerRegisterPage() {
               </div>
             </div>
 
-            {/* 소셜 미디어 */}
+            {/* 소셜 미디어 & 라이브 쇼핑 플랫폼 */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-gray-900 border-b pb-2">
-                소셜 미디어 (선택)
+                라이브 쇼핑 플랫폼 (선택)
               </h2>
+              <p className="text-sm text-gray-600 -mt-2">
+                라이브 방송을 진행하는 플랫폼을 연결하세요
+              </p>
 
-              <div>
-                <label className="label">유튜브 채널</label>
-                <input
-                  type="url"
-                  name="youtubeUrl"
-                  className="input"
-                  value={formData.youtubeUrl}
-                  onChange={handleChange}
-                  placeholder="https://youtube.com/@yourhandle"
-                />
-              </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">📺 유튜브 채널</label>
+                  <input
+                    type="url"
+                    name="youtubeUrl"
+                    className="input"
+                    value={formData.youtubeUrl}
+                    onChange={handleChange}
+                    placeholder="https://youtube.com/@yourhandle"
+                  />
+                </div>
 
-              <div>
-                <label className="label">아프리카TV</label>
-                <input
-                  type="url"
-                  name="africaTvUrl"
-                  className="input"
-                  value={formData.africaTvUrl}
-                  onChange={handleChange}
-                  placeholder="https://afreecatv.com/yourhandle"
-                />
-              </div>
+                <div>
+                  <label className="label">🎬 아프리카TV</label>
+                  <input
+                    type="url"
+                    name="africaTvUrl"
+                    className="input"
+                    value={formData.africaTvUrl}
+                    onChange={handleChange}
+                    placeholder="https://afreecatv.com/yourhandle"
+                  />
+                </div>
 
-              <div>
-                <label className="label">인스타그램</label>
-                <input
-                  type="url"
-                  name="instagramUrl"
-                  className="input"
-                  value={formData.instagramUrl}
-                  onChange={handleChange}
-                  placeholder="https://instagram.com/yourhandle"
-                />
+                <div>
+                  <label className="label">📸 인스타그램</label>
+                  <input
+                    type="url"
+                    name="instagramUrl"
+                    className="input"
+                    value={formData.instagramUrl}
+                    onChange={handleChange}
+                    placeholder="https://instagram.com/yourhandle"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">🎵 틱톡 (TikTok)</label>
+                  <input
+                    type="url"
+                    name="tiktokUrl"
+                    className="input"
+                    value={formData.tiktokUrl}
+                    onChange={handleChange}
+                    placeholder="https://tiktok.com/@yourhandle"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">🛒 네이버 쇼핑 라이브</label>
+                  <input
+                    type="url"
+                    name="naverShoppingUrl"
+                    className="input"
+                    value={formData.naverShoppingUrl}
+                    onChange={handleChange}
+                    placeholder="https://shopping.naver.com/..."
+                  />
+                </div>
+
+                <div>
+                  <label className="label">📦 쿠팡 라이브</label>
+                  <input
+                    type="url"
+                    name="coupangUrl"
+                    className="input"
+                    value={formData.coupangUrl}
+                    onChange={handleChange}
+                    placeholder="https://www.coupang.com/..."
+                  />
+                </div>
               </div>
             </div>
 

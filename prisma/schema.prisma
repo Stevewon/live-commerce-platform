@@ -65,6 +65,9 @@ model Partner {
   youtubeUrl        String?
   africaTvUrl       String?
   instagramUrl      String?
+  tiktokUrl         String?
+  naverShoppingUrl  String?
+  coupangUrl        String?
   
   isActive          Boolean   @default(true)
   
