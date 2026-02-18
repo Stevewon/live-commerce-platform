@@ -34,8 +34,7 @@ export async function GET(request: NextRequest) {
     const orders = await prisma.order.findMany({
       where: { partnerId },
       include: {
-        items: true,
-        settlement: true
+        items: true
       }
     })
 
@@ -43,13 +42,18 @@ export async function GET(request: NextRequest) {
     const totalSales = orders.reduce((sum, order) => sum + order.total, 0)
     const totalOrders = orders.length
     
+    // 정산 통계 (별도로 조회)
+    const settlements = await prisma.settlement.findMany({
+      where: { partnerId }
+    })
+    
     const pendingSettlement = orders
-      .filter(order => !order.settlement || order.settlement.status === 'PENDING')
+      .filter(order => !settlements.some(s => s.status === 'COMPLETED'))
       .reduce((sum, order) => sum + order.partnerRevenue, 0)
     
-    const completedSettlement = orders
-      .filter(order => order.settlement?.status === 'COMPLETED')
-      .reduce((sum, order) => sum + order.partnerRevenue, 0)
+    const completedSettlement = settlements
+      .filter(s => s.status === 'COMPLETED')
+      .reduce((sum, settlement) => sum + settlement.amount, 0)
 
     // 오늘 매출
     const today = new Date()

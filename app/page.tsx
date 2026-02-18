@@ -3,13 +3,150 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 
+// 호스트 프로필 데이터 (20개)
+const hostProfiles = [
+  { name: '김민지', category: '패션', emoji: '👩‍💼', viewers: 8900, chats: 1520, likes: 4200, product: '👗' },
+  { name: '박준혁', category: '전자기기', emoji: '👨‍💼', viewers: 5200, chats: 890, likes: 2300, product: '📱' },
+  { name: '이수진', category: '뷰티', emoji: '👩‍🦰', viewers: 7800, chats: 1340, likes: 3900, product: '💄' },
+  { name: '최동욱', category: '홈인테리어', emoji: '👨‍🦱', viewers: 3400, chats: 560, likes: 1800, product: '🛋️' },
+  { name: '정예린', category: '키친웨어', emoji: '👩‍🦱', viewers: 4100, chats: 720, likes: 2100, product: '🍳' },
+  { name: '강태우', category: '스포츠', emoji: '👨‍🦰', viewers: 6300, chats: 1100, likes: 3200, product: '⚽' },
+  { name: '윤서아', category: '악세서리', emoji: '👩‍💻', viewers: 5900, chats: 980, likes: 2800, product: '💍' },
+  { name: '임준서', category: '가전', emoji: '👨‍💻', viewers: 4800, chats: 810, likes: 2400, product: '🎧' },
+  { name: '한지우', category: '아동용품', emoji: '👩', viewers: 3900, chats: 670, likes: 1900, product: '🧸' },
+  { name: '송민호', category: '식품', emoji: '👨', viewers: 7200, chats: 1280, likes: 3600, product: '🍔' },
+  { name: '조유나', category: '헬스케어', emoji: '👩‍⚕️', viewers: 4500, chats: 760, likes: 2200, product: '💊' },
+  { name: '배성준', category: '자동차용품', emoji: '👨‍🔧', viewers: 5600, chats: 920, likes: 2700, product: '🚗' },
+  { name: '신하은', category: '반려동물', emoji: '👩‍🎨', viewers: 6700, chats: 1150, likes: 3400, product: '🐶' },
+  { name: '오재현', category: '문구/완구', emoji: '👨‍🎨', viewers: 3200, chats: 540, likes: 1600, product: '🎨' },
+  { name: '황서연', category: '여행용품', emoji: '👩‍✈️', viewers: 5100, chats: 860, likes: 2500, product: '✈️' },
+  { name: '전수민', category: '도서', emoji: '👩‍🏫', viewers: 2800, chats: 480, likes: 1400, product: '📚' },
+  { name: '남궁민', category: '게임/취미', emoji: '👨‍🎮', viewers: 8500, chats: 1480, likes: 4100, product: '🎮' },
+  { name: '서지안', category: '명품', emoji: '👩‍💼', viewers: 9200, chats: 1680, likes: 4600, product: '👜' },
+  { name: '권도윤', category: '음향기기', emoji: '👨‍🎤', viewers: 4200, chats: 710, likes: 2000, product: '🎵' },
+  { name: '안유진', category: '화장품', emoji: '👩‍🎤', viewers: 8100, chats: 1420, likes: 4000, product: '💅' }
+]
+
+// HostCard 컴포넌트
+function HostCard({ host, index }: { host: typeof hostProfiles[0], index: number }) {
+  const [currentViewers, setCurrentViewers] = useState(host.viewers)
+  const [currentChats, setCurrentChats] = useState(host.chats)
+  const [currentLikes, setCurrentLikes] = useState(host.likes)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentViewers(prev => prev + Math.floor(Math.random() * 20) - 5)
+      setCurrentChats(prev => prev + Math.floor(Math.random() * 10))
+      setCurrentLikes(prev => prev + Math.floor(Math.random() * 30))
+    }, 2000 + index * 100) // 각 카드마다 다른 업데이트 주기
+
+    return () => clearInterval(interval)
+  }, [index])
+
+  const gradients = [
+    'from-pink-600/50 via-purple-600/50 to-blue-600/50',
+    'from-blue-600/50 via-cyan-600/50 to-teal-600/50',
+    'from-orange-600/50 via-red-600/50 to-pink-600/50',
+    'from-purple-600/50 via-indigo-600/50 to-blue-600/50',
+    'from-green-600/50 via-emerald-600/50 to-teal-600/50'
+  ]
+
+  return (
+    <div
+      className="relative aspect-[9/16] overflow-hidden rounded-lg group"
+      style={{
+        animation: `floating ${5 + (index % 3)}s ease-in-out infinite`,
+        animationDelay: `${index * 0.1}s`
+      }}
+    >
+      {/* Gradient Background */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradients[index % 5]}`}></div>
+      
+      {/* Host Emoji */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="text-6xl opacity-30 transform scale-150 group-hover:scale-175 transition-transform duration-500">
+          {host.emoji}
+        </div>
+      </div>
+
+      {/* Product Floating */}
+      <div className="absolute top-3 right-3 text-2xl animate-bounce-slow opacity-70">
+        {host.product}
+      </div>
+
+      {/* LIVE Badge */}
+      {index % 3 === 0 && (
+        <div className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600/90 px-2 py-1 rounded-md text-xs font-bold text-white backdrop-blur-sm">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+          </span>
+          <span>LIVE</span>
+        </div>
+      )}
+
+      {/* Host Info */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 pt-8">
+        <div className="text-white">
+          <div className="font-bold text-sm mb-1">{host.name}</div>
+          <div className="text-xs text-gray-300 mb-2">{host.category}</div>
+          
+          {/* Live Stats */}
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center space-x-1">
+              <span>👁️</span>
+              <span className="font-mono tabular-nums">{currentViewers.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span>💬</span>
+              <span className="font-mono tabular-nums">{currentChats.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <span>❤️</span>
+              <span className="font-mono tabular-nums">{currentLikes.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scan Line Effect */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-b from-transparent via-white/10 to-transparent pointer-events-none"
+        style={{
+          animation: `scan ${4 + (index % 2)}s linear infinite`,
+          animationDelay: `${index * 0.15}s`
+        }}
+      ></div>
+    </div>
+  )
+}
+
 export default function HomePage() {
   const [scrollY, setScrollY] = useState(0)
+  // 실시간 카운터 상태
+  const [liveStats, setLiveStats] = useState({
+    totalViewers: 112000,
+    totalOrders: 847,
+    totalRevenue: 28500000
+  })
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  // 실시간 통계 업데이트
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLiveStats(prev => ({
+        totalViewers: prev.totalViewers + Math.floor(Math.random() * 50) + 10,
+        totalOrders: prev.totalOrders + Math.floor(Math.random() * 3),
+        totalRevenue: prev.totalRevenue + (Math.floor(Math.random() * 50) + 10) * 1000
+      }))
+    }, 3000) // 3초마다 업데이트
+
+    return () => clearInterval(interval)
   }, [])
 
   return (
@@ -43,88 +180,24 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Live Shopping Background Video */}
+        {/* Live Shopping Background - 20 Real Host Profiles */}
         <div className="absolute inset-0 bg-black">
-          {/* Video/Image Grid - Simulating Live Shopping Hosts */}
-          <div className="absolute inset-0">
-            {/* Main Background Grid */}
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 grid-rows-3 h-full gap-1">
-              {[...Array(15)].map((_, i) => (
-                <div
-                  key={i}
-                  className="relative overflow-hidden"
-                  style={{
-                    animation: `fadeInOut ${8 + (i % 4) * 2}s ease-in-out infinite`,
-                    animationDelay: `${i * 0.3}s`
-                  }}
-                >
-                  {/* Simulated Video Frame with Gradient Overlay */}
-                  <div 
-                    className={`absolute inset-0 ${
-                      i % 5 === 0 ? 'bg-gradient-to-br from-pink-600/40 via-purple-600/40 to-blue-600/40' :
-                      i % 5 === 1 ? 'bg-gradient-to-br from-blue-600/40 via-cyan-600/40 to-teal-600/40' :
-                      i % 5 === 2 ? 'bg-gradient-to-br from-orange-600/40 via-red-600/40 to-pink-600/40' :
-                      i % 5 === 3 ? 'bg-gradient-to-br from-purple-600/40 via-indigo-600/40 to-blue-600/40' :
-                      'bg-gradient-to-br from-green-600/40 via-emerald-600/40 to-teal-600/40'
-                    }`}
-                  >
-                    {/* Shopping Host Placeholder */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-6xl md:text-8xl opacity-20 transform scale-150">
-                        {i % 7 === 0 ? '👩‍💼' :
-                         i % 7 === 1 ? '👨‍💼' :
-                         i % 7 === 2 ? '👩‍🦰' :
-                         i % 7 === 3 ? '👨‍🦱' :
-                         i % 7 === 4 ? '👩‍🦱' :
-                         i % 7 === 5 ? '👨‍🦰' :
-                         '👩‍💻'}
-                      </div>
-                    </div>
-                    
-                    {/* Product Items Floating */}
-                    <div className="absolute top-4 right-4 text-3xl animate-bounce-slow opacity-60">
-                      {i % 4 === 0 ? '💄' :
-                       i % 4 === 1 ? '👗' :
-                       i % 4 === 2 ? '👟' :
-                       '⌚'}
-                    </div>
-
-                    {/* Live Badge */}
-                    {i % 4 === 0 && (
-                      <div className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600/90 px-2 py-1 rounded-md text-xs font-bold text-white backdrop-blur-sm">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                        </span>
-                        <span>LIVE</span>
-                      </div>
-                    )}
-
-                    {/* Viewer Count */}
-                    {i % 3 === 0 && (
-                      <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-1 rounded text-xs text-white font-bold">
-                        👁️ {(Math.floor(Math.random() * 50) + 10) * 100}
-                      </div>
-                    )}
-
-                    {/* Price Tag */}
-                    {i % 5 === 0 && (
-                      <div className="absolute bottom-2 right-2 bg-yellow-500/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-black font-bold">
-                        🏷️ {(Math.floor(Math.random() * 5) + 1) * 10}% OFF
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Scan Line Effect */}
-                  <div 
-                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent"
-                    style={{
-                      animation: `scan ${3 + (i % 3)}s linear infinite`,
-                      animationDelay: `${i * 0.2}s`
-                    }}
-                  ></div>
-                </div>
-              ))}
+          {/* Host Profile Grid */}
+          <div className="absolute inset-0 overflow-hidden">
+            {/* Scrolling Grid Effect */}
+            <div className="relative h-[200vh]" style={{
+              animation: 'infiniteScroll 60s linear infinite'
+            }}>
+              <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1 p-1">
+                {/* 20개 호스트 프로필 반복 */}
+                {[...hostProfiles, ...hostProfiles].map((host, i) => (
+                  <HostCard 
+                    key={i}
+                    host={host}
+                    index={i}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
@@ -268,19 +341,25 @@ export default function HomePage() {
               </Link>
             </div>
 
-            {/* Stats */}
+            {/* Stats - Real-time Counter */}
             <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto">
               <div className="text-center">
-                <div className="text-4xl font-bold text-white mb-2">30%</div>
-                <div className="text-gray-400 text-sm">파트너 수수료</div>
+                <div className="text-4xl font-bold text-white mb-2 tabular-nums">
+                  {liveStats.totalViewers.toLocaleString()}
+                </div>
+                <div className="text-gray-400 text-sm">실시간 시청자</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-white mb-2">100+</div>
-                <div className="text-gray-400 text-sm">판매 가능 제품</div>
+                <div className="text-4xl font-bold text-white mb-2 tabular-nums">
+                  {liveStats.totalOrders.toLocaleString()}
+                </div>
+                <div className="text-gray-400 text-sm">오늘의 주문</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-white mb-2">24/7</div>
-                <div className="text-gray-400 text-sm">실시간 지원</div>
+                <div className="text-4xl font-bold text-white mb-2 tabular-nums">
+                  ₩{(liveStats.totalRevenue / 1000000).toFixed(1)}M
+                </div>
+                <div className="text-gray-400 text-sm">실시간 매출</div>
               </div>
             </div>
           </div>
@@ -556,6 +635,18 @@ export default function HomePage() {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-20px); }
         }
+        @keyframes floating {
+          0%, 100% { 
+            transform: translateY(0px) scale(1); 
+          }
+          50% { 
+            transform: translateY(-15px) scale(1.02); 
+          }
+        }
+        @keyframes infiniteScroll {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(-50%); }
+        }
         @keyframes float-slow {
           0%, 100% { transform: translateY(0px) translateX(0px); }
           50% { transform: translateY(-30px) translateX(10px); }
@@ -588,6 +679,9 @@ export default function HomePage() {
         }
         .animate-float {
           animation: float 3s ease-in-out infinite;
+        }
+        .animate-floating {
+          animation: floating 5s ease-in-out infinite;
         }
         .animate-float-slow {
           animation: float-slow 4s ease-in-out infinite;

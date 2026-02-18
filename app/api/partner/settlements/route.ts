@@ -85,18 +85,27 @@ export async function POST(request: NextRequest) {
     const availableAmount = await prisma.order.aggregate({
       where: {
         partnerId: partner.id,
-        status: 'DELIVERED',
-        // 아직 정산되지 않은 주문
-        Settlement: {
-          none: {}
-        }
+        status: 'DELIVERED'
       },
       _sum: {
         partnerProfit: true
       }
     })
 
-    const availableTotal = availableAmount._sum.partnerProfit || 0
+    // 이미 정산된 금액 확인
+    const completedSettlements = await prisma.settlement.aggregate({
+      where: {
+        partnerId: partner.id,
+        status: { in: ['COMPLETED', 'APPROVED'] }
+      },
+      _sum: {
+        amount: true
+      }
+    })
+
+    const totalEarned = availableAmount._sum.partnerProfit || 0
+    const alreadySettled = completedSettlements._sum.amount || 0
+    const availableTotal = totalEarned - alreadySettled
 
     if (amount > availableTotal) {
       return NextResponse.json(
