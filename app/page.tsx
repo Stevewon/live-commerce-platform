@@ -24,7 +24,7 @@ export default function HomePage() {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">L</span>
               </div>
-              <span className="text-white text-xl font-bold">LiveCommerce</span>
+              <span className="text-white text-xl font-bold">Live Commerce</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-300 hover:text-white transition">기능</a>
@@ -156,7 +156,7 @@ export default function HomePage() {
         <div className="container mx-auto px-6">
           <div className="text-center mb-20">
             <h2 className="text-5xl font-bold text-white mb-6">
-              왜 LiveCommerce인가?
+              왜 Live Commerce인가?
             </h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
               스트리머를 위한 올인원 커머스 솔루션
@@ -334,7 +334,7 @@ export default function HomePage() {
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-xl">L</span>
                 </div>
-                <span className="text-white text-xl font-bold">LiveCommerce</span>
+                <span className="text-white text-xl font-bold">Live Commerce</span>
               </div>
               <p className="text-gray-400 text-sm">
                 스트리머를 위한 분양형 쇼핑몰 플랫폼
