@@ -43,101 +43,185 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Video Grid Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-          {/* Simulated Live Stream Grid */}
-          <div className="absolute inset-0 opacity-30">
-            <div className="grid grid-cols-4 grid-rows-3 h-full gap-2 p-4">
-              {[...Array(12)].map((_, i) => (
+        {/* Live Shopping Background Video */}
+        <div className="absolute inset-0 bg-black">
+          {/* Video/Image Grid - Simulating Live Shopping Hosts */}
+          <div className="absolute inset-0">
+            {/* Main Background Grid */}
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 grid-rows-3 h-full gap-1">
+              {[...Array(15)].map((_, i) => (
                 <div
                   key={i}
-                  className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-lg overflow-hidden border border-blue-500/10"
+                  className="relative overflow-hidden"
                   style={{
-                    animation: `pulse ${2 + (i % 3)}s ease-in-out infinite`,
-                    animationDelay: `${i * 0.2}s`
+                    animation: `fadeInOut ${8 + (i % 4) * 2}s ease-in-out infinite`,
+                    animationDelay: `${i * 0.3}s`
                   }}
                 >
-                  {/* Live Badge */}
-                  {i % 3 === 0 && (
-                    <div className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600 px-2 py-1 rounded text-xs font-bold text-white">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                      </span>
-                      <span>LIVE</span>
+                  {/* Simulated Video Frame with Gradient Overlay */}
+                  <div 
+                    className={`absolute inset-0 ${
+                      i % 5 === 0 ? 'bg-gradient-to-br from-pink-600/40 via-purple-600/40 to-blue-600/40' :
+                      i % 5 === 1 ? 'bg-gradient-to-br from-blue-600/40 via-cyan-600/40 to-teal-600/40' :
+                      i % 5 === 2 ? 'bg-gradient-to-br from-orange-600/40 via-red-600/40 to-pink-600/40' :
+                      i % 5 === 3 ? 'bg-gradient-to-br from-purple-600/40 via-indigo-600/40 to-blue-600/40' :
+                      'bg-gradient-to-br from-green-600/40 via-emerald-600/40 to-teal-600/40'
+                    }`}
+                  >
+                    {/* Shopping Host Placeholder */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-6xl md:text-8xl opacity-20 transform scale-150">
+                        {i % 7 === 0 ? '👩‍💼' :
+                         i % 7 === 1 ? '👨‍💼' :
+                         i % 7 === 2 ? '👩‍🦰' :
+                         i % 7 === 3 ? '👨‍🦱' :
+                         i % 7 === 4 ? '👩‍🦱' :
+                         i % 7 === 5 ? '👨‍🦰' :
+                         '👩‍💻'}
+                      </div>
                     </div>
-                  )}
-                  {/* Viewer Count */}
-                  {i % 2 === 0 && (
-                    <div className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-xs text-white">
-                      👁️ {Math.floor(Math.random() * 5000 + 100)}
+                    
+                    {/* Product Items Floating */}
+                    <div className="absolute top-4 right-4 text-3xl animate-bounce-slow opacity-60">
+                      {i % 4 === 0 ? '💄' :
+                       i % 4 === 1 ? '👗' :
+                       i % 4 === 2 ? '👟' :
+                       '⌚'}
                     </div>
-                  )}
-                  {/* Simulated Video Content */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+
+                    {/* Live Badge */}
+                    {i % 4 === 0 && (
+                      <div className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600/90 px-2 py-1 rounded-md text-xs font-bold text-white backdrop-blur-sm">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                        </span>
+                        <span>LIVE</span>
+                      </div>
+                    )}
+
+                    {/* Viewer Count */}
+                    {i % 3 === 0 && (
+                      <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-1 rounded text-xs text-white font-bold">
+                        👁️ {(Math.floor(Math.random() * 50) + 10) * 100}
+                      </div>
+                    )}
+
+                    {/* Price Tag */}
+                    {i % 5 === 0 && (
+                      <div className="absolute bottom-2 right-2 bg-yellow-500/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-black font-bold">
+                        🏷️ {(Math.floor(Math.random() * 5) + 1) * 10}% OFF
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Scan Line Effect */}
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent"
+                    style={{
+                      animation: `scan ${3 + (i % 3)}s linear infinite`,
+                      animationDelay: `${i * 0.2}s`
+                    }}
+                  ></div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Floating Elements */}
+          {/* Overlay Gradients for Depth */}
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/80 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-gray-900/50 via-transparent to-gray-900"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-900/30 via-transparent to-gray-900/30"></div>
+
+          {/* Floating Shopping Interactions */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {/* Chat Bubbles */}
-            <div className="absolute top-20 left-10 animate-float-slow">
-              <div className="bg-white/10 backdrop-blur-md rounded-full px-4 py-2 text-white text-sm">
-                💬 "이거 정말 좋네요!"
-              </div>
+            {/* Hearts */}
+            <div className="absolute bottom-20 left-10 animate-float-up text-4xl opacity-70">
+              ❤️
             </div>
-            <div className="absolute top-40 right-20 animate-float-slow" style={{ animationDelay: '1s' }}>
-              <div className="bg-white/10 backdrop-blur-md rounded-full px-4 py-2 text-white text-sm">
-                🎁 "구매했어요!"
-              </div>
+            <div className="absolute bottom-32 left-24 animate-float-up text-3xl opacity-60" style={{ animationDelay: '1s' }}>
+              💝
             </div>
-            <div className="absolute bottom-40 left-1/4 animate-float-slow" style={{ animationDelay: '2s' }}>
-              <div className="bg-white/10 backdrop-blur-md rounded-full px-4 py-2 text-white text-sm">
-                ❤️ "최고예요!"
-              </div>
+            <div className="absolute bottom-16 left-40 animate-float-up text-4xl opacity-50" style={{ animationDelay: '2s' }}>
+              💖
             </div>
 
-            {/* Floating Icons */}
-            <div className="absolute top-1/3 right-10 animate-float text-4xl" style={{ animationDelay: '0.5s' }}>
-              📺
-            </div>
-            <div className="absolute bottom-1/3 left-10 animate-float text-4xl" style={{ animationDelay: '1.5s' }}>
-              🎥
-            </div>
-            <div className="absolute top-1/2 right-1/4 animate-float text-4xl" style={{ animationDelay: '2.5s' }}>
-              🛒
-            </div>
-
-            {/* Sales Notifications */}
-            <div className="absolute bottom-20 right-10 animate-slide-in">
-              <div className="bg-green-500/90 backdrop-blur-md rounded-lg px-4 py-3 text-white shadow-lg">
-                <div className="flex items-center space-x-2">
-                  <span className="text-2xl">✅</span>
+            {/* Chat Messages */}
+            <div className="absolute top-32 right-10 animate-slide-left">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl px-4 py-3 text-white shadow-xl border border-white/20">
+                <div className="flex items-start space-x-2">
+                  <span className="text-2xl">👩</span>
                   <div>
-                    <div className="font-bold text-sm">새로운 주문!</div>
-                    <div className="text-xs opacity-90">김**님이 제품을 구매했습니다</div>
+                    <div className="font-bold text-sm">김소희님</div>
+                    <div className="text-xs opacity-90">"이거 진짜 예뻐요! 바로 구매합니다!"</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="absolute bottom-40 right-10 animate-slide-in" style={{ animationDelay: '3s' }}>
-              <div className="bg-blue-500/90 backdrop-blur-md rounded-lg px-4 py-3 text-white shadow-lg">
-                <div className="flex items-center space-x-2">
-                  <span className="text-2xl">💰</span>
+            <div className="absolute top-52 right-10 animate-slide-left" style={{ animationDelay: '2s' }}>
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl px-4 py-3 text-white shadow-xl border border-white/20">
+                <div className="flex items-start space-x-2">
+                  <span className="text-2xl">👨</span>
                   <div>
-                    <div className="font-bold text-sm">수익 발생!</div>
-                    <div className="text-xs opacity-90">+₩45,000</div>
+                    <div className="font-bold text-sm">박준혁님</div>
+                    <div className="text-xs opacity-90">"가격 대비 퀄리티 최고네요!"</div>
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="absolute top-72 right-10 animate-slide-left" style={{ animationDelay: '4s' }}>
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl px-4 py-3 text-white shadow-xl border border-white/20">
+                <div className="flex items-start space-x-2">
+                  <span className="text-2xl">👩‍🦰</span>
+                  <div>
+                    <div className="font-bold text-sm">이민지님</div>
+                    <div className="text-xs opacity-90">"2개 구매했어요 ㅎㅎ"</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Order Notifications */}
+            <div className="absolute bottom-24 left-10 animate-slide-up">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-500 backdrop-blur-md rounded-xl px-5 py-3 text-white shadow-2xl">
+                <div className="flex items-center space-x-3">
+                  <span className="text-3xl">🛒</span>
+                  <div>
+                    <div className="font-bold">신규 주문 발생!</div>
+                    <div className="text-sm opacity-90">방금 전 · 3개 제품</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute bottom-40 left-10 animate-slide-up" style={{ animationDelay: '3s' }}>
+              <div className="bg-gradient-to-r from-blue-500 to-purple-500 backdrop-blur-md rounded-xl px-5 py-3 text-white shadow-2xl">
+                <div className="flex items-center space-x-3">
+                  <span className="text-3xl">💰</span>
+                  <div>
+                    <div className="font-bold">수익 달성!</div>
+                    <div className="text-sm opacity-90">+₩127,000</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Floating Products */}
+            <div className="absolute top-1/4 left-1/4 animate-float text-5xl opacity-40" style={{ animationDelay: '0.5s' }}>
+              👜
+            </div>
+            <div className="absolute top-1/3 right-1/3 animate-float text-5xl opacity-40" style={{ animationDelay: '1.5s' }}>
+              💄
+            </div>
+            <div className="absolute bottom-1/3 left-1/3 animate-float text-5xl opacity-40" style={{ animationDelay: '2.5s' }}>
+              👗
+            </div>
+            <div className="absolute bottom-1/4 right-1/4 animate-float text-5xl opacity-40" style={{ animationDelay: '3.5s' }}>
+              👟
             </div>
           </div>
-
-          {/* Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-900/50 to-gray-900"></div>
         </div>
 
         <div className="relative container mx-auto px-6 py-32 text-center">
@@ -460,11 +544,13 @@ export default function HomePage() {
 
       {/* CSS Animations */}
       <style jsx>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
+        @keyframes fadeInOut {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 0.7; }
+        }
+        @keyframes scan {
+          0% { transform: translateY(-100%); }
+          100% { transform: translateY(100%); }
         }
         @keyframes float {
           0%, 100% { transform: translateY(0px); }
@@ -474,14 +560,31 @@ export default function HomePage() {
           0%, 100% { transform: translateY(0px) translateX(0px); }
           50% { transform: translateY(-30px) translateX(10px); }
         }
-        @keyframes slide-in {
+        @keyframes float-up {
+          0% { 
+            transform: translateY(0px) scale(1);
+            opacity: 1;
+          }
+          100% { 
+            transform: translateY(-200px) scale(1.5);
+            opacity: 0;
+          }
+        }
+        @keyframes slide-left {
           0% { transform: translateX(100%); opacity: 0; }
           10% { transform: translateX(0); opacity: 1; }
           90% { transform: translateX(0); opacity: 1; }
-          100% { transform: translateX(100%); opacity: 0; }
+          100% { transform: translateX(-100%); opacity: 0; }
         }
-        .animate-blob {
-          animation: blob 7s infinite;
+        @keyframes slide-up {
+          0% { transform: translateY(100%); opacity: 0; }
+          10% { transform: translateY(0); opacity: 1; }
+          90% { transform: translateY(0); opacity: 1; }
+          100% { transform: translateY(-100%); opacity: 0; }
+        }
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
         }
         .animate-float {
           animation: float 3s ease-in-out infinite;
@@ -489,14 +592,17 @@ export default function HomePage() {
         .animate-float-slow {
           animation: float-slow 4s ease-in-out infinite;
         }
-        .animate-slide-in {
-          animation: slide-in 6s ease-in-out infinite;
+        .animate-float-up {
+          animation: float-up 4s ease-out infinite;
         }
-        .animation-delay-2000 {
-          animation-delay: 2s;
+        .animate-slide-left {
+          animation: slide-left 8s ease-in-out infinite;
         }
-        .animation-delay-4000 {
-          animation-delay: 4s;
+        .animate-slide-up {
+          animation: slide-up 6s ease-in-out infinite;
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 2s ease-in-out infinite;
         }
       `}</style>
     </div>
