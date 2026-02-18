@@ -199,7 +199,7 @@ export default function HomePage() {
         <div className="bg-gray-800/40 backdrop-blur-sm border-b border-gray-700/30">
           <div className="container mx-auto px-6">
             <div className="flex items-center space-x-8 overflow-x-auto py-3">
-              <Link href="#popular" className="text-yellow-400 hover:text-yellow-300 transition whitespace-nowrap font-semibold flex items-center gap-1">
+              <Link href="/shop" className="text-yellow-400 hover:text-yellow-300 transition whitespace-nowrap font-semibold flex items-center gap-1">
                 🔥 베스트
               </Link>
               <Link href="#electronics" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
