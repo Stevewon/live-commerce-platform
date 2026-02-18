@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { toggleWishlist, isInWishlist, getWishlistCount } from '@/lib/utils/wishlist';
 
 const categories = [
   { id: 'all', name: '전체', icon: '🔥', color: 'from-yellow-500 to-orange-500' },
@@ -169,11 +170,39 @@ const products = [
 export default function ShopPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState<'popular' | 'low-price' | 'high-price' | 'rating'>('popular');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [wishlistItems, setWishlistItems] = useState<Set<string>>(new Set());
+  const [wishlistCount, setWishlistCount] = useState(0);
 
-  const filteredProducts =
-    selectedCategory === 'all'
-      ? products
-      : products.filter((p) => p.category === selectedCategory);
+  // 찜 목록 초기화 및 업데이트 감지
+  useEffect(() => {
+    const updateWishlist = () => {
+      const items = new Set<string>();
+      products.forEach(p => {
+        if (isInWishlist(p.id)) {
+          items.add(p.id);
+        }
+      });
+      setWishlistItems(items);
+      setWishlistCount(getWishlistCount());
+    };
+
+    updateWishlist();
+    window.addEventListener('wishlistUpdated', updateWishlist);
+    
+    return () => {
+      window.removeEventListener('wishlistUpdated', updateWishlist);
+    };
+  }, []);
+
+  // 검색 및 카테고리 필터링
+  const filteredProducts = products.filter(p => {
+    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
+    const matchesSearch = searchQuery === '' || 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.category && p.category.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesCategory && matchesSearch;
+  });
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     switch (sortBy) {
@@ -194,6 +223,25 @@ export default function ShopPage() {
       ? Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)
       : 0;
 
+  // 찜하기 토글 핸들러
+  const handleWishlistToggle = (e: React.MouseEvent, product: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const wishlistItem = {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      price: product.price,
+      comparePrice: product.comparePrice,
+      thumbnail: product.thumbnail,
+      category: product.category,
+      addedAt: new Date().toISOString(),
+    };
+    
+    toggleWishlist(wishlistItem);
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* 헤더 */}
@@ -210,7 +258,15 @@ export default function ShopPage() {
               <Link href="/shop" className="text-blue-400 font-semibold text-sm">
                 🛍️ 쇼핑몰
               </Link>
-              <Link href="/cart" className="relative">
+              <Link href="/wishlist" className="relative text-gray-300 hover:text-white transition">
+                <span className="text-2xl">💖</span>
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+              <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
                 <span className="text-2xl">🛒</span>
               </Link>
             </div>
@@ -223,6 +279,35 @@ export default function ShopPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">🛍️ 쇼핑몰</h1>
           <p className="text-gray-400 text-lg">라이브 방송에서 판매하는 모든 상품</p>
+        </div>
+
+        {/* 검색바 */}
+        <div className="mb-8">
+          <div className="relative max-w-2xl">
+            <input
+              type="text"
+              placeholder="상품명 또는 카테고리를 검색하세요..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-800/50 border-2 border-gray-700 rounded-xl px-6 py-4 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition text-lg"
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+              🔍
+            </div>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-12 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <div className="mt-3 text-sm text-gray-400">
+              <span className="text-blue-400 font-semibold">{filteredProducts.length}개</span>의 검색 결과
+            </div>
+          )}
         </div>
 
         {/* 카테고리 필터 */}
@@ -280,13 +365,26 @@ export default function ShopPage() {
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                 />
+                {/* 찜하기 버튼 */}
+                <button
+                  onClick={(e) => handleWishlistToggle(e, product)}
+                  className="absolute top-3 left-3 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all transform hover:scale-110"
+                >
+                  <span className={`text-2xl transition-all ${
+                    wishlistItems.has(product.id) 
+                      ? 'animate-pulse' 
+                      : ''
+                  }`}>
+                    {wishlistItems.has(product.id) ? '💖' : '🤍'}
+                  </span>
+                </button>
                 {discount(product) > 0 && (
                   <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
                     {discount(product)}% OFF
                   </div>
                 )}
                 {product.badge && (
-                  <div className="absolute top-3 left-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                  <div className="absolute top-14 left-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
                     {product.badge}
                   </div>
                 )}
