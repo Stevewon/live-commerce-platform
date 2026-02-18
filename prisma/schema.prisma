@@ -209,6 +209,7 @@ model Order {
   // 수익 분배
   partnerRevenue    Float         // 파트너 수익
   platformRevenue   Float         // 플랫폼 수익
+  partnerProfit     Float         @default(0) // 파트너 순수익 (정산용)
   
   // 주문 상태
   status            String        @default("PENDING") // PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED, REFUNDED
@@ -229,7 +230,6 @@ model Order {
   
   // Relations
   items             OrderItem[]
-  settlement        Settlement?
 }
 
 // 주문 아이템
@@ -256,19 +256,23 @@ model Settlement {
   partnerId       String
   partner         Partner           @relation(fields: [partnerId], references: [id])
   
-  orderId         String            @unique
-  order           Order             @relation(fields: [orderId], references: [id])
-  
   // 정산 금액
   amount          Float
-  commissionRate  Float             // 정산 당시 수수료율
+  
+  // 계좌 정보
+  bankAccount     String?
+  accountHolder   String?
   
   // 정산 상태
-  status          String            @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  status          String            @default("PENDING") // PENDING, APPROVED, REJECTED, COMPLETED
   
-  // 정산 처리 시간
+  // 정산 요청/처리 시간
+  requestDate     DateTime          @default(now())
   processedAt     DateTime?
   completedAt     DateTime?
+  
+  // 거절 사유
+  rejectReason    String?
   
   // 정산 메모
   memo            String?
