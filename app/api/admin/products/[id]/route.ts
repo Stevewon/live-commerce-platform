@@ -20,7 +20,7 @@ function verifyToken(request: NextRequest) {
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const decoded = verifyToken(request)
@@ -32,6 +32,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
+    const params = await context.params
     const productId = params.id
 
     const updatedProduct = await prisma.product.update({
