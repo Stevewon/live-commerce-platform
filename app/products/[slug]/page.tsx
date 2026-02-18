@@ -452,8 +452,188 @@ export default function ProductDetailPage() {
           {/* 탭 컨텐츠 */}
           <div>
             {selectedTab === 'description' && (
-              <div className="prose prose-invert max-w-none">
-                <p className="text-lg text-gray-300 leading-relaxed">{product.description}</p>
+              <div className="space-y-12">
+                {/* 상품 소개 */}
+                <div className="bg-gray-800/30 rounded-2xl p-8">
+                  <h3 className="text-3xl font-bold mb-6">상품 소개</h3>
+                  <p className="text-lg text-gray-300 leading-relaxed mb-8">{product.description}</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {product.features.map((feature: string, idx: number) => (
+                      <div key={idx} className="flex items-start gap-3 bg-gray-700/30 p-4 rounded-xl">
+                        <span className="text-2xl">✓</span>
+                        <div>
+                          <p className="font-bold text-white mb-1">{feature}</p>
+                          <p className="text-sm text-gray-400">최고 수준의 성능을 제공합니다</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 상세 이미지 1 - 제품 전체 샷 */}
+                <div className="relative aspect-[16/9] rounded-2xl overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1484704849700-f032a568e944?w=1200" 
+                    alt="상품 상세 이미지 1"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent flex items-end">
+                    <div className="p-8">
+                      <h4 className="text-3xl font-bold text-white mb-2">프리미엄 디자인</h4>
+                      <p className="text-lg text-gray-300">세련된 디자인과 편안한 착용감</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 기능 설명 섹션 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-2xl p-8 border border-blue-500/30">
+                    <div className="text-5xl mb-4">🎧</div>
+                    <h4 className="text-2xl font-bold mb-3">탁월한 음질</h4>
+                    <p className="text-gray-300 leading-relaxed">
+                      10mm 다이나믹 드라이버가 제공하는 깊고 풍부한 베이스와 
+                      선명한 고음역대를 경험하세요. AAC, aptX 코덱 지원으로 
+                      무손실에 가까운 고품질 오디오를 즐길 수 있습니다.
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-2xl p-8 border border-purple-500/30">
+                    <div className="text-5xl mb-4">🔇</div>
+                    <h4 className="text-2xl font-bold mb-3">액티브 노이즈 캔슬링</h4>
+                    <p className="text-gray-300 leading-relaxed">
+                      최신 ANC 기술로 주변 소음을 최대 95%까지 차단합니다. 
+                      지하철, 카페, 사무실 등 어디서나 완벽한 몰입감을 제공하며, 
+                      투명 모드로 주변 소리를 들을 수도 있습니다.
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-green-600/20 to-teal-600/20 rounded-2xl p-8 border border-green-500/30">
+                    <div className="text-5xl mb-4">🔋</div>
+                    <h4 className="text-2xl font-bold mb-3">장시간 배터리</h4>
+                    <p className="text-gray-300 leading-relaxed">
+                      이어폰 단독 8시간, 충전 케이스 포함 최대 30시간 재생이 가능합니다. 
+                      급속 충전 기능으로 5분 충전만으로도 1시간 사용할 수 있어 
+                      바쁜 일상에서도 걱정 없습니다.
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-orange-600/20 to-red-600/20 rounded-2xl p-8 border border-orange-500/30">
+                    <div className="text-5xl mb-4">💧</div>
+                    <h4 className="text-2xl font-bold mb-3">생활방수 IPX4</h4>
+                    <p className="text-gray-300 leading-relaxed">
+                      IPX4 등급 방수로 땀과 물방울로부터 안전합니다. 
+                      운동 중이나 갑작스러운 비에도 걱정 없이 사용할 수 있으며, 
+                      내구성 있는 설계로 오래도록 사용할 수 있습니다.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 상세 이미지 2 - 기능 설명 */}
+                <div className="relative aspect-[16/9] rounded-2xl overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1200" 
+                    alt="상품 상세 이미지 2"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent flex items-end">
+                    <div className="p-8">
+                      <h4 className="text-3xl font-bold text-white mb-2">최고의 편안함</h4>
+                      <p className="text-lg text-gray-300">장시간 착용해도 편안한 인체공학적 디자인</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 사용 시나리오 */}
+                <div className="bg-gray-800/30 rounded-2xl p-8">
+                  <h3 className="text-3xl font-bold mb-8 text-center">이런 분들께 추천합니다</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="text-center">
+                      <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-4xl">🎵</span>
+                      </div>
+                      <h4 className="font-bold text-lg mb-2">음악 애호가</h4>
+                      <p className="text-sm text-gray-400">고음질 음악을 즐기고 싶은 분</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-4xl">💼</span>
+                      </div>
+                      <h4 className="font-bold text-lg mb-2">직장인</h4>
+                      <p className="text-sm text-gray-400">출퇴근 시간을 알차게 보내고 싶은 분</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-4xl">🏃</span>
+                      </div>
+                      <h4 className="font-bold text-lg mb-2">운동 마니아</h4>
+                      <p className="text-sm text-gray-400">운동 중에도 음악을 즐기고 싶은 분</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 패키지 구성품 */}
+                <div className="bg-gray-800/30 rounded-2xl p-8">
+                  <h3 className="text-3xl font-bold mb-6">패키지 구성</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <div className="text-center">
+                      <div className="bg-gray-700/30 rounded-xl p-6 mb-3">
+                        <span className="text-4xl">🎧</span>
+                      </div>
+                      <p className="font-bold">이어폰 본체</p>
+                      <p className="text-sm text-gray-400">좌/우 1쌍</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="bg-gray-700/30 rounded-xl p-6 mb-3">
+                        <span className="text-4xl">📦</span>
+                      </div>
+                      <p className="font-bold">충전 케이스</p>
+                      <p className="text-sm text-gray-400">USB-C 포트</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="bg-gray-700/30 rounded-xl p-6 mb-3">
+                        <span className="text-4xl">🔌</span>
+                      </div>
+                      <p className="font-bold">USB-C 케이블</p>
+                      <p className="text-sm text-gray-400">고속 충전</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="bg-gray-700/30 rounded-xl p-6 mb-3">
+                        <span className="text-4xl">📄</span>
+                      </div>
+                      <p className="font-bold">사용 설명서</p>
+                      <p className="text-sm text-gray-400">한글 포함</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 상세 이미지 3 - 마지막 */}
+                <div className="relative aspect-[16/9] rounded-2xl overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1545127398-14699f92334b?w=1200" 
+                    alt="상품 상세 이미지 3"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent flex items-end">
+                    <div className="p-8">
+                      <h4 className="text-3xl font-bold text-white mb-2">지금 바로 경험하세요</h4>
+                      <p className="text-lg text-gray-300">최고의 오디오 경험이 시작됩니다</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 주의사항 */}
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-6">
+                  <h4 className="font-bold text-orange-400 mb-3 flex items-center gap-2">
+                    <span>⚠️</span> 사용 시 주의사항
+                  </h4>
+                  <ul className="space-y-2 text-sm text-gray-300">
+                    <li>• 과도한 음량으로 장시간 사용 시 청력에 손상을 줄 수 있습니다.</li>
+                    <li>• 운전 중이나 위험한 작업 시에는 사용을 자제해 주세요.</li>
+                    <li>• 고온 다습한 환경에서는 제품이 손상될 수 있습니다.</li>
+                    <li>• 어린이의 손이 닿지 않는 곳에 보관해 주세요.</li>
+                  </ul>
+                </div>
               </div>
             )}
 
