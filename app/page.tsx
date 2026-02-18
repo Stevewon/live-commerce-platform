@@ -64,19 +64,19 @@ function HostCard({ host, index }: { host: typeof hostProfiles[0], index: number
       
       {/* Host Emoji */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-6xl opacity-30 transform scale-150 group-hover:scale-175 transition-transform duration-500">
+        <div className="text-5xl sm:text-6xl md:text-7xl opacity-30 transform scale-150 group-hover:scale-175 transition-transform duration-500">
           {host.emoji}
         </div>
       </div>
 
       {/* Product Floating */}
-      <div className="absolute top-3 right-3 text-2xl animate-bounce-slow opacity-70">
+      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 text-xl sm:text-2xl animate-bounce-slow opacity-70">
         {host.product}
       </div>
 
       {/* LIVE Badge */}
       {index % 3 === 0 && (
-        <div className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600/90 px-2 py-1 rounded-md text-xs font-bold text-white backdrop-blur-sm">
+        <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 flex items-center space-x-1 bg-red-600/90 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[10px] sm:text-xs font-bold text-white backdrop-blur-sm">
           <span className="relative flex h-1.5 w-1.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
@@ -86,22 +86,22 @@ function HostCard({ host, index }: { host: typeof hostProfiles[0], index: number
       )}
 
       {/* Host Info */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 pt-8">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-2 sm:p-3 pt-6 sm:pt-8">
         <div className="text-white">
-          <div className="font-bold text-sm mb-1">{host.name}</div>
-          <div className="text-xs text-gray-300 mb-2">{host.category}</div>
+          <div className="font-bold text-xs sm:text-sm mb-0.5 sm:mb-1">{host.name}</div>
+          <div className="text-[10px] sm:text-xs text-gray-300 mb-1 sm:mb-2">{host.category}</div>
           
           {/* Live Stats */}
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center space-x-1">
+          <div className="flex items-center justify-between text-[10px] sm:text-xs">
+            <div className="flex items-center space-x-0.5 sm:space-x-1">
               <span>👁️</span>
               <span className="font-mono tabular-nums">{currentViewers.toLocaleString()}</span>
             </div>
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-0.5 sm:space-x-1">
               <span>💬</span>
               <span className="font-mono tabular-nums">{currentChats.toLocaleString()}</span>
             </div>
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-0.5 sm:space-x-1">
               <span>❤️</span>
               <span className="font-mono tabular-nums">{currentLikes.toLocaleString()}</span>
             </div>
@@ -215,7 +215,7 @@ export default function HomePage() {
             <div className="relative h-[200vh]" style={{
               animation: 'infiniteScroll 60s linear infinite'
             }}>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-0.5 sm:gap-1 p-0.5 sm:p-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1 sm:gap-2 p-1 sm:p-2">
                 {/* 20개 호스트 프로필 반복 */}
                 {[...hostProfiles, ...hostProfiles].map((host, i) => (
                   <HostCard 
