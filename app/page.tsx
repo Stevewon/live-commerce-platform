@@ -213,16 +213,16 @@ export default function HomePage() {
         <div className="relative container mx-auto px-4 py-12 sm:py-16 text-center">
           <div className="max-w-5xl mx-auto">
             {/* Badge */}
-            <div className="inline-flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-2 mb-8">
-              <span className="relative flex h-2 w-2">
+            <div className="inline-flex items-center space-x-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 lg:px-6 py-2 lg:py-3 mb-8">
+              <span className="relative flex h-2 w-2 lg:h-3 lg:w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 lg:h-3 lg:w-3 bg-blue-500"></span>
               </span>
-              <span className="text-blue-400 text-sm font-medium">6개 라이브 플랫폼 지원</span>
+              <span className="text-blue-400 text-sm lg:text-xl font-medium">6개 라이브 플랫폼 지원</span>
             </div>
 
             {/* Main Heading */}
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold text-white mb-3 sm:mb-4 leading-tight px-4">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-7xl xl:text-8xl font-extrabold text-white mb-3 sm:mb-4 lg:mb-8 leading-tight px-4">
               라이브 방송으로
               <br />
               <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
@@ -231,48 +231,48 @@ export default function HomePage() {
               하세요
             </h1>
 
-            <p className="text-sm sm:text-base md:text-lg text-gray-300 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed px-4">
+            <p className="text-sm sm:text-base md:text-lg lg:text-2xl xl:text-3xl text-gray-300 mb-6 sm:mb-8 lg:mb-12 max-w-4xl mx-auto leading-relaxed px-4">
               스트리머를 위한 분양형 쇼핑몰. 구독자를 고객으로 전환하고,
               <br className="hidden md:block" />
               실시간으로 수익을 확인하세요.
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center items-center mb-6 sm:mb-8 px-4">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 lg:gap-6 justify-center items-center mb-6 sm:mb-8 lg:mb-16 px-4">
               <Link 
                 href="/partner/register"
-                className="w-full sm:w-auto group relative px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm sm:text-base font-semibold rounded-lg hover:shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-1 text-center"
+                className="w-full sm:w-auto group relative px-4 sm:px-6 lg:px-10 py-2 sm:py-3 lg:py-5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm sm:text-base lg:text-2xl font-semibold rounded-lg lg:rounded-2xl hover:shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-1 text-center"
               >
                 <span className="relative z-10">무료로 시작하기</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity blur"></div>
               </Link>
               <Link 
                 href="/partner/login"
-                className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-3 bg-white/10 backdrop-blur-lg text-white text-sm sm:text-base font-semibold rounded-lg border border-white/20 hover:bg-white/20 transition-all duration-300 text-center"
+                className="w-full sm:w-auto px-4 sm:px-6 lg:px-10 py-2 sm:py-3 lg:py-5 bg-white/10 backdrop-blur-lg text-white text-sm sm:text-base lg:text-2xl font-semibold rounded-lg lg:rounded-2xl border border-white/20 hover:bg-white/20 transition-all duration-300 text-center"
               >
                 파트너 로그인
               </Link>
             </div>
 
             {/* Stats - Real-time Counter */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 max-w-xl mx-auto px-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 lg:gap-8 max-w-xl lg:max-w-4xl mx-auto px-4">
               <div className="text-center">
-                <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-white mb-0.5 sm:mb-1 tabular-nums">
+                <div className="text-lg sm:text-2xl lg:text-5xl xl:text-6xl font-bold text-white mb-0.5 sm:mb-1 lg:mb-3 tabular-nums">
                   {liveStats.totalViewers.toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-xs sm:text-sm">실시간 시청자</div>
+                <div className="text-gray-400 text-xs sm:text-sm lg:text-xl">실시간 시청자</div>
               </div>
               <div className="text-center">
-                <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-white mb-0.5 sm:mb-1 tabular-nums">
+                <div className="text-lg sm:text-2xl lg:text-5xl xl:text-6xl font-bold text-white mb-0.5 sm:mb-1 lg:mb-3 tabular-nums">
                   {liveStats.totalOrders.toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-xs sm:text-sm">오늘의 주문</div>
+                <div className="text-gray-400 text-xs sm:text-sm lg:text-xl">오늘의 주문</div>
               </div>
               <div className="text-center">
-                <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-white mb-0.5 sm:mb-1 tabular-nums">
+                <div className="text-lg sm:text-2xl lg:text-5xl xl:text-6xl font-bold text-white mb-0.5 sm:mb-1 lg:mb-3 tabular-nums">
                   ₩{(liveStats.totalRevenue / 1000000).toFixed(1)}M
                 </div>
-                <div className="text-gray-400 text-xs sm:text-sm">실시간 매출</div>
+                <div className="text-gray-400 text-xs sm:text-sm lg:text-xl">실시간 매출</div>
               </div>
             </div>
           </div>
