@@ -153,78 +153,35 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-900">
       {/* Navigation */}
       <nav className={`fixed w-full z-50 transition-all duration-300 ${
-        scrollY > 50 ? 'bg-gray-900/95 backdrop-blur-lg shadow-lg' : 'bg-gray-900/80 backdrop-blur-md'
+        scrollY > 50 ? 'bg-gray-900/95 backdrop-blur-lg shadow-lg' : 'bg-transparent'
       }`}>
-        {/* 메인 헤더 */}
-        <div className="border-b border-gray-700/50">
-          <div className="container mx-auto px-6 py-4">
-            <div className="flex items-center justify-between">
-              <Link href="/" className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">L</span>
-                </div>
-                <span className="text-white text-xl font-bold">Live Commerce</span>
-              </Link>
-              
-              {/* 검색바 */}
-              <div className="hidden md:flex flex-1 max-w-xl mx-8">
-                <div className="relative w-full">
-                  <input 
-                    type="text" 
-                    placeholder="상품을 검색하세요..." 
-                    className="w-full bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 transition"
-                  />
-                  <button className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition">
-                    🔍
-                  </button>
-                </div>
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center space-x-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-xl">L</span>
               </div>
-
-              <div className="flex items-center space-x-6">
-                <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
-                  <span className="text-2xl">🛒</span>
-                </Link>
-                <Link 
-                  href="/partner/login" 
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-semibold"
-                >
-                  로그인
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 카테고리 메뉴 */}
-        <div className="bg-gray-800/40 backdrop-blur-sm border-b border-gray-700/30">
-          <div className="container mx-auto px-6">
-            <div className="flex items-center space-x-8 overflow-x-auto py-3">
-              <Link href="/shop" className="text-yellow-400 hover:text-yellow-300 transition whitespace-nowrap font-semibold flex items-center gap-1">
-                🔥 베스트
+              <span className="text-white text-xl font-bold">Live Commerce</span>
+            </Link>
+            
+            <div className="flex items-center space-x-8">
+              <Link href="#features" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                주요 기능
               </Link>
-              <Link href="#electronics" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                📱 전자기기
+              <Link href="#how" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                시작하기
               </Link>
-              <Link href="#fashion" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                👕 패션의류
+              <Link href="#platforms" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                플랫폼
               </Link>
-              <Link href="#beauty" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                💄 뷰티
+              <Link href="/shop" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                🛍️ 쇼핑몰
               </Link>
-              <Link href="#home" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                🏠 홈인테리어
-              </Link>
-              <Link href="#food" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                🍱 식품
-              </Link>
-              <Link href="#sports" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                ⚽ 스포츠
-              </Link>
-              <Link href="#kids" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                🧸 유아동
-              </Link>
-              <Link href="#books" className="text-gray-300 hover:text-white transition whitespace-nowrap flex items-center gap-1">
-                📚 도서
+              <Link 
+                href="/partner/login" 
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-semibold"
+              >
+                로그인
               </Link>
             </div>
           </div>
@@ -423,167 +380,6 @@ export default function HomePage() {
           <svg className="w-6 h-6 text-white/50" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" stroke="currentColor">
             <path d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
           </svg>
-        </div>
-      </section>
-
-      {/* 🔥 오늘의 베스트 상품 (Hero 바로 아래) */}
-      <section id="popular" className="py-20 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-12">
-            <div className="inline-block bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-full px-6 py-2 mb-4">
-              <span className="text-yellow-400 font-bold">🔥 HOT DEAL</span>
-            </div>
-            <h2 className="text-5xl font-bold text-white mb-4">오늘의 베스트</h2>
-            <p className="text-xl text-gray-400">
-              라이브 방송에서 가장 많이 팔린 인기 상품
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {/* 베스트 1위 */}
-            <Link href="/products/premium-wireless-earbuds" className="group relative">
-              <div className="absolute -top-3 -left-3 z-10 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold px-4 py-2 rounded-full shadow-lg">
-                🏆 1위
-              </div>
-              <div className="bg-gray-800/50 rounded-2xl overflow-hidden border-2 border-yellow-500/50 hover:border-yellow-500 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl hover:shadow-yellow-500/20">
-                <div className="relative aspect-square overflow-hidden bg-gray-700">
-                  <img src="https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500" alt="프리미엄 무선 이어폰" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                  <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
-                    28% OFF
-                  </div>
-                  <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full text-white text-sm">
-                    ⚡ 1,234명 구매중
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-1 rounded">전자기기</span>
-                    <span className="text-yellow-400 text-sm">★★★★★ 4.8</span>
-                  </div>
-                  <h3 className="text-white font-bold text-lg mb-3 group-hover:text-blue-400 transition-colors line-clamp-2">
-                    프리미엄 무선 이어폰
-                  </h3>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <p className="text-3xl font-bold text-yellow-400">₩129,000</p>
-                    <p className="text-sm text-gray-500 line-through">₩179,000</p>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-gray-400">
-                    <span>🚚 무료배송</span>
-                    <span>⏰ 오늘출발</span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            {/* 베스트 2위 */}
-            <Link href="/products/smart-watch-pro" className="group relative">
-              <div className="absolute -top-3 -left-3 z-10 bg-gradient-to-r from-gray-400 to-gray-500 text-white font-bold px-4 py-2 rounded-full shadow-lg">
-                🥈 2위
-              </div>
-              <div className="bg-gray-800/50 rounded-2xl overflow-hidden border-2 border-gray-500/30 hover:border-gray-400 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl">
-                <div className="relative aspect-square overflow-hidden bg-gray-700">
-                  <img src="https://images.unsplash.com/photo-1579586337278-3befd40fd17a?w=500" alt="스마트 워치 프로" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                  <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                    17% OFF
-                  </div>
-                  <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full text-white text-sm">
-                    ⚡ 892명 구매중
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-purple-500/20 text-purple-400 text-xs px-2 py-1 rounded">웨어러블</span>
-                    <span className="text-yellow-400 text-sm">★★★★★ 5.0</span>
-                  </div>
-                  <h3 className="text-white font-bold text-lg mb-3 group-hover:text-blue-400 transition-colors line-clamp-2">
-                    스마트 워치 프로
-                  </h3>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <p className="text-3xl font-bold text-blue-400">₩289,000</p>
-                    <p className="text-sm text-gray-500 line-through">₩349,000</p>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-gray-400">
-                    <span>🚚 무료배송</span>
-                    <span>⏰ 오늘출발</span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            {/* 베스트 3위 */}
-            <Link href="/products/bluetooth-speaker" className="group relative">
-              <div className="absolute -top-3 -left-3 z-10 bg-gradient-to-r from-orange-600 to-orange-700 text-white font-bold px-4 py-2 rounded-full shadow-lg">
-                🥉 3위
-              </div>
-              <div className="bg-gray-800/50 rounded-2xl overflow-hidden border-2 border-orange-500/30 hover:border-orange-400 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl">
-                <div className="relative aspect-square overflow-hidden bg-gray-700">
-                  <img src="https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=500" alt="블루투스 스피커" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                  <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                    25% OFF
-                  </div>
-                  <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full text-white text-sm">
-                    ⚡ 657명 구매중
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded">오디오</span>
-                    <span className="text-yellow-400 text-sm">★★★★☆ 4.5</span>
-                  </div>
-                  <h3 className="text-white font-bold text-lg mb-3 group-hover:text-blue-400 transition-colors line-clamp-2">
-                    블루투스 스피커
-                  </h3>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <p className="text-3xl font-bold text-blue-400">₩89,000</p>
-                    <p className="text-sm text-gray-500 line-through">₩119,000</p>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-gray-400">
-                    <span>🚚 무료배송</span>
-                    <span>⏰ 오늘출발</span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            {/* 베스트 4위 */}
-            <Link href="/products/keyboard-pro" className="group">
-              <div className="bg-gray-800/50 rounded-2xl overflow-hidden border-2 border-gray-700 hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-2xl">
-                <div className="relative aspect-square overflow-hidden bg-gray-700">
-                  <img src="https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=500" alt="키보드 프로" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
-                  <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                    20% OFF
-                  </div>
-                  <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm px-3 py-1 rounded-full text-white text-sm">
-                    ⚡ 523명 구매중
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-1 rounded">PC주변기기</span>
-                    <span className="text-yellow-400 text-sm">★★★★★ 4.9</span>
-                  </div>
-                  <h3 className="text-white font-bold text-lg mb-3 group-hover:text-blue-400 transition-colors line-clamp-2">
-                    키보드 프로
-                  </h3>
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <p className="text-3xl font-bold text-blue-400">₩159,000</p>
-                    <p className="text-sm text-gray-500 line-through">₩199,000</p>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-gray-400">
-                    <span>🚚 무료배송</span>
-                    <span>⏰ 오늘출발</span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </div>
-
-          {/* 더보기 버튼 */}
-          <div className="text-center">
-            <Link href="/products/premium-wireless-earbuds" className="inline-block bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-10 py-4 rounded-xl font-bold text-lg transition-all hover:scale-105 shadow-lg">
-              전체 상품 보러가기 →
-            </Link>
-          </div>
         </div>
       </section>
 
