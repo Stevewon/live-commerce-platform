@@ -321,13 +321,13 @@ export default function ShopPage() {
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-lg font-semibold transition-all transform hover:scale-105 text-xs ${
+                className={`px-3 sm:px-4 lg:px-6 py-2 sm:py-3 rounded-lg font-semibold transition-all transform hover:scale-105 text-sm sm:text-base ${
                   selectedCategory === cat.id
                     ? `bg-gradient-to-r ${cat.color} text-white shadow-lg`
                     : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
                 }`}
               >
-                <span className="mr-1 sm:mr-2">{cat.icon}</span>
+                <span className="mr-2 text-2xl sm:text-3xl">{cat.icon}</span>
                 <span className="hidden xs:inline">{cat.name}</span>
               </button>
             ))}

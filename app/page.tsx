@@ -359,10 +359,10 @@ export default function HomePage() {
       <section id="features" className="py-32 bg-gradient-to-b from-gray-900 to-gray-800">
         <div className="container mx-auto px-6">
           <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold text-white mb-6">
+            <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6">
               왜 Live Commerce인가?
             </h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            <p className="text-2xl sm:text-3xl text-gray-400 max-w-3xl mx-auto">
               스트리머를 위한 올인원 커머스 솔루션
             </p>
           </div>
@@ -412,13 +412,13 @@ export default function HomePage() {
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`}></div>
                 <div className="relative">
-                  <div className="text-6xl mb-6 transform group-hover:scale-110 transition-transform">
+                  <div className="text-7xl sm:text-8xl mb-6 transform group-hover:scale-110 transition-transform">
                     {feature.icon}
                   </div>
-                  <h3 className="text-2xl font-bold text-white mb-4">
+                  <h3 className="text-3xl sm:text-4xl font-bold text-white mb-4">
                     {feature.title}
                   </h3>
-                  <p className="text-gray-400 leading-relaxed">
+                  <p className="text-lg sm:text-xl text-gray-400 leading-relaxed">
                     {feature.description}
                   </p>
                 </div>
@@ -432,10 +432,10 @@ export default function HomePage() {
       <section id="how" className="py-32 bg-gray-800">
         <div className="container mx-auto px-6">
           <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold text-white mb-6">
+            <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6">
               시작하는 방법
             </h2>
-            <p className="text-xl text-gray-400">
+            <p className="text-2xl sm:text-3xl text-gray-400">
               단 4단계로 바로 시작할 수 있습니다
             </p>
           </div>
