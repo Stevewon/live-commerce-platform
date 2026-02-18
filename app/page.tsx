@@ -382,19 +382,59 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 max-w-6xl mx-auto">
             {[
-              { name: 'YouTube', icon: '🎥', color: 'from-red-500 to-red-600' },
-              { name: 'AfreecaTV', icon: '📺', color: 'from-blue-500 to-blue-600' },
-              { name: 'Instagram', icon: '📷', color: 'from-pink-500 to-purple-600' },
-              { name: 'TikTok', icon: '🎵', color: 'from-black to-gray-800' },
-              { name: 'Naver', icon: '🟢', color: 'from-green-500 to-green-600' },
-              { name: 'Coupang', icon: '🛍️', color: 'from-yellow-500 to-orange-600' }
+              { 
+                name: 'YouTube', 
+                logo: '/logos/youtube.svg',
+                bgColor: 'bg-red-600/5',
+                borderColor: 'hover:border-red-500'
+              },
+              { 
+                name: 'AfreecaTV', 
+                icon: '📺',
+                bgColor: 'bg-blue-600/5',
+                borderColor: 'hover:border-blue-500'
+              },
+              { 
+                name: 'Instagram', 
+                logo: '/logos/instagram.svg',
+                bgColor: 'bg-pink-600/5',
+                borderColor: 'hover:border-pink-500'
+              },
+              { 
+                name: 'TikTok', 
+                logo: '/logos/tiktok.svg',
+                bgColor: 'bg-gray-900/5',
+                borderColor: 'hover:border-gray-500'
+              },
+              { 
+                name: 'Naver Shopping', 
+                logo: '/logos/naver.svg',
+                bgColor: 'bg-green-600/5',
+                borderColor: 'hover:border-green-500'
+              },
+              { 
+                name: 'Coupang', 
+                icon: '🛍️',
+                bgColor: 'bg-orange-600/5',
+                borderColor: 'hover:border-orange-500'
+              }
             ].map((platform) => (
               <div key={platform.name} className="group">
-                <div className="bg-gray-700/50 backdrop-blur-lg p-8 rounded-2xl border border-gray-600 hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-2 hover:shadow-xl">
-                  <div className="text-5xl mb-4 text-center transform group-hover:scale-110 transition-transform">
-                    {platform.icon}
+                <div className={`${platform.bgColor} bg-gray-700/30 backdrop-blur-lg p-6 rounded-2xl border border-gray-600 ${platform.borderColor} transition-all duration-300 transform hover:-translate-y-2 hover:shadow-xl`}>
+                  <div className="h-20 flex items-center justify-center mb-4">
+                    {'logo' in platform ? (
+                      <img 
+                        src={platform.logo} 
+                        alt={`${platform.name} 로고`}
+                        className="max-h-14 max-w-full object-contain transform group-hover:scale-110 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="text-5xl transform group-hover:scale-110 transition-transform">
+                        {platform.icon}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-white text-center font-semibold">{platform.name}</div>
+                  <div className="text-white text-center font-semibold text-sm">{platform.name}</div>
                 </div>
               </div>
             ))}
