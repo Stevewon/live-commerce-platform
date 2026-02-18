@@ -75,6 +75,12 @@ export default function CartPage() {
               Live Commerce
             </Link>
             <div className="flex items-center gap-6">
+              <Link href="/" className="text-gray-300 hover:text-white transition text-sm">
+                홈
+              </Link>
+              <Link href="/products/premium-wireless-earbuds" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                🛍️ 쇼핑몰
+              </Link>
               <Link href="/cart" className="relative">
                 <span className="text-2xl">🛒</span>
                 {cartItems.length > 0 && (

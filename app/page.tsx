@@ -168,6 +168,12 @@ export default function HomePage() {
               <a href="#how" className="text-gray-300 hover:text-white transition">시작하기</a>
               <a href="#platforms" className="text-gray-300 hover:text-white transition">플랫폼</a>
               <Link 
+                href="/products/premium-wireless-earbuds" 
+                className="text-gray-300 hover:text-white transition font-semibold"
+              >
+                🛍️ 쇼핑몰
+              </Link>
+              <Link 
                 href="/partner/login" 
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
               >
