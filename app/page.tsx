@@ -43,13 +43,101 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Animated Background */}
+        {/* Video Grid Background */}
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-0 -left-4 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
-            <div className="absolute top-0 -right-4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-            <div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+          {/* Simulated Live Stream Grid */}
+          <div className="absolute inset-0 opacity-30">
+            <div className="grid grid-cols-4 grid-rows-3 h-full gap-2 p-4">
+              {[...Array(12)].map((_, i) => (
+                <div
+                  key={i}
+                  className="relative bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-lg overflow-hidden border border-blue-500/10"
+                  style={{
+                    animation: `pulse ${2 + (i % 3)}s ease-in-out infinite`,
+                    animationDelay: `${i * 0.2}s`
+                  }}
+                >
+                  {/* Live Badge */}
+                  {i % 3 === 0 && (
+                    <div className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600 px-2 py-1 rounded text-xs font-bold text-white">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                      </span>
+                      <span>LIVE</span>
+                    </div>
+                  )}
+                  {/* Viewer Count */}
+                  {i % 2 === 0 && (
+                    <div className="absolute top-2 right-2 bg-black/50 px-2 py-1 rounded text-xs text-white">
+                      👁️ {Math.floor(Math.random() * 5000 + 100)}
+                    </div>
+                  )}
+                  {/* Simulated Video Content */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Floating Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {/* Chat Bubbles */}
+            <div className="absolute top-20 left-10 animate-float-slow">
+              <div className="bg-white/10 backdrop-blur-md rounded-full px-4 py-2 text-white text-sm">
+                💬 "이거 정말 좋네요!"
+              </div>
+            </div>
+            <div className="absolute top-40 right-20 animate-float-slow" style={{ animationDelay: '1s' }}>
+              <div className="bg-white/10 backdrop-blur-md rounded-full px-4 py-2 text-white text-sm">
+                🎁 "구매했어요!"
+              </div>
+            </div>
+            <div className="absolute bottom-40 left-1/4 animate-float-slow" style={{ animationDelay: '2s' }}>
+              <div className="bg-white/10 backdrop-blur-md rounded-full px-4 py-2 text-white text-sm">
+                ❤️ "최고예요!"
+              </div>
+            </div>
+
+            {/* Floating Icons */}
+            <div className="absolute top-1/3 right-10 animate-float text-4xl" style={{ animationDelay: '0.5s' }}>
+              📺
+            </div>
+            <div className="absolute bottom-1/3 left-10 animate-float text-4xl" style={{ animationDelay: '1.5s' }}>
+              🎥
+            </div>
+            <div className="absolute top-1/2 right-1/4 animate-float text-4xl" style={{ animationDelay: '2.5s' }}>
+              🛒
+            </div>
+
+            {/* Sales Notifications */}
+            <div className="absolute bottom-20 right-10 animate-slide-in">
+              <div className="bg-green-500/90 backdrop-blur-md rounded-lg px-4 py-3 text-white shadow-lg">
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">✅</span>
+                  <div>
+                    <div className="font-bold text-sm">새로운 주문!</div>
+                    <div className="text-xs opacity-90">김**님이 제품을 구매했습니다</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute bottom-40 right-10 animate-slide-in" style={{ animationDelay: '3s' }}>
+              <div className="bg-blue-500/90 backdrop-blur-md rounded-lg px-4 py-3 text-white shadow-lg">
+                <div className="flex items-center space-x-2">
+                  <span className="text-2xl">💰</span>
+                  <div>
+                    <div className="font-bold text-sm">수익 발생!</div>
+                    <div className="text-xs opacity-90">+₩45,000</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-900/50 to-gray-900"></div>
         </div>
 
         <div className="relative container mx-auto px-6 py-32 text-center">
@@ -378,8 +466,31 @@ export default function HomePage() {
           66% { transform: translate(-20px, 20px) scale(0.9); }
           100% { transform: translate(0px, 0px) scale(1); }
         }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
+        }
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0px) translateX(0px); }
+          50% { transform: translateY(-30px) translateX(10px); }
+        }
+        @keyframes slide-in {
+          0% { transform: translateX(100%); opacity: 0; }
+          10% { transform: translateX(0); opacity: 1; }
+          90% { transform: translateX(0); opacity: 1; }
+          100% { transform: translateX(100%); opacity: 0; }
+        }
         .animate-blob {
           animation: blob 7s infinite;
+        }
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+        .animate-float-slow {
+          animation: float-slow 4s ease-in-out infinite;
+        }
+        .animate-slide-in {
+          animation: slide-in 6s ease-in-out infinite;
         }
         .animation-delay-2000 {
           animation-delay: 2s;
