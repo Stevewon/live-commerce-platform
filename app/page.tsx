@@ -207,15 +207,18 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Live Shopping Background - 20 Real Host Profiles */}
-        <div className="absolute inset-0 bg-black">
+        {/* 모바일: 깔끔한 그라데이션 배경 */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-purple-900/30 to-blue-900/30 md:hidden"></div>
+        
+        {/* 데스크탑: Live Shopping Background - 20 Real Host Profiles */}
+        <div className="absolute inset-0 bg-black hidden md:block">
           {/* Host Profile Grid */}
           <div className="absolute inset-0 overflow-hidden">
             {/* Scrolling Grid Effect */}
             <div className="relative h-[200vh]" style={{
               animation: 'infiniteScroll 60s linear infinite'
             }}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-1 sm:gap-2 p-1 sm:p-2">
+              <div className="grid grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 p-2">
                 {/* 20개 호스트 프로필 반복 */}
                 {[...hostProfiles, ...hostProfiles].map((host, i) => (
                   <HostCard 
@@ -234,7 +237,7 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-r from-gray-900/30 via-transparent to-gray-900/30"></div>
 
           {/* Floating Shopping Interactions */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none hidden md:block">
             {/* Hearts */}
             <div className="absolute bottom-20 left-10 animate-float-up text-4xl opacity-70">
               ❤️
