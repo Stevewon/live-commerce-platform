@@ -59,44 +59,44 @@ export default function WishlistPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* 헤더 */}
+      {/* 헤더 - 모바일 최적화 */}
       <header className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+            <Link href="/" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
               Live Commerce
             </Link>
-            <div className="flex items-center gap-6">
-              <Link href="/" className="text-gray-300 hover:text-white transition text-sm">
+            <div className="flex items-center gap-3 sm:gap-6">
+              <Link href="/" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
                 홈
               </Link>
-              <Link href="/shop" className="text-gray-300 hover:text-white transition text-sm">
+              <Link href="/shop" className="text-gray-300 hover:text-white transition text-xs sm:text-sm">
                 🛍️ 쇼핑몰
               </Link>
-              <Link href="/wishlist" className="text-pink-400 font-semibold text-sm">
+              <Link href="/wishlist" className="text-pink-400 font-semibold text-xs sm:text-sm">
                 💖 찜목록
               </Link>
               <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
-                <span className="text-2xl">🛒</span>
+                <span className="text-xl sm:text-2xl">🛒</span>
               </Link>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-6 py-8">
-        {/* 페이지 제목 */}
-        <div className="flex items-center justify-between mb-8">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* 페이지 제목 - 모바일 최적화 */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-4xl font-bold mb-2">💖 찜한 상품</h1>
-            <p className="text-gray-400 text-lg">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">💖 찜한 상품</h1>
+            <p className="text-gray-400 text-base sm:text-lg">
               총 <span className="text-pink-400 font-bold">{wishlistItems.length}</span>개의 상품
             </p>
           </div>
           {wishlistItems.length > 0 && (
             <button
               onClick={handleClearAll}
-              className="px-6 py-3 bg-red-600/20 border border-red-500 text-red-400 rounded-xl hover:bg-red-600/30 transition font-semibold"
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600/20 border border-red-500 text-red-400 rounded-xl hover:bg-red-600/30 transition font-semibold text-sm sm:text-base self-end sm:self-auto"
             >
               전체 삭제
             </button>
@@ -105,15 +105,15 @@ export default function WishlistPage() {
 
         {/* 찜 목록이 비어있을 때 */}
         {wishlistItems.length === 0 && (
-          <div className="text-center py-24">
-            <div className="text-8xl mb-6">💔</div>
-            <h2 className="text-3xl font-bold text-white mb-4">찜한 상품이 없습니다</h2>
-            <p className="text-gray-400 text-lg mb-8">
+          <div className="text-center py-16 sm:py-24">
+            <div className="text-6xl sm:text-8xl mb-4 sm:mb-6">💔</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">찜한 상품이 없습니다</h2>
+            <p className="text-gray-400 text-base sm:text-lg mb-6 sm:mb-8">
               마음에 드는 상품을 찜해보세요!
             </p>
             <Link
               href="/shop"
-              className="inline-block px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-bold text-lg transition-all transform hover:scale-105 shadow-lg"
+              className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-bold text-base sm:text-lg transition-all transform hover:scale-105 shadow-lg"
             >
               쇼핑하러 가기 →
             </Link>
@@ -160,12 +160,12 @@ export default function WishlistPage() {
                     </div>
                   </div>
 
-                  <div className="p-5">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div className="p-4 sm:p-5">
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <span className="bg-pink-500/20 text-pink-400 text-xs px-2 py-1 rounded">
                         {item.category}
                       </span>
-                      <span className="text-pink-400 text-lg">💖</span>
+                      <span className="text-pink-400 text-base sm:text-lg">💖</span>
                     </div>
 
                     <h3 className="text-white font-bold text-lg mb-3 group-hover:text-pink-400 transition-colors line-clamp-2">
@@ -173,9 +173,9 @@ export default function WishlistPage() {
                     </h3>
 
                     <div className="flex items-baseline gap-2 mb-3">
-                      <p className="text-2xl font-bold text-pink-400">₩{item.price.toLocaleString()}</p>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-pink-400">₩{item.price.toLocaleString()}</p>
                       {item.comparePrice && (
-                        <p className="text-sm text-gray-500 line-through">₩{item.comparePrice.toLocaleString()}</p>
+                        <p className="text-xs sm:text-sm text-gray-500 line-through">₩{item.comparePrice.toLocaleString()}</p>
                       )}
                     </div>
 

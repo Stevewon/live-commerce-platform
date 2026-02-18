@@ -155,16 +155,17 @@ export default function HomePage() {
       <nav className={`fixed w-full z-50 transition-all duration-300 ${
         scrollY > 50 ? 'bg-gray-900/95 backdrop-blur-lg shadow-lg' : 'bg-transparent'
       }`}>
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">L</span>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg sm:text-xl">L</span>
               </div>
-              <span className="text-white text-xl font-bold">Live Commerce</span>
+              <span className="text-white text-lg sm:text-xl font-bold hidden xs:inline">Live Commerce</span>
             </Link>
             
-            <div className="flex items-center space-x-8">
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
               <Link href="#features" className="text-gray-300 hover:text-white transition text-sm font-semibold">
                 주요 기능
               </Link>
@@ -179,7 +180,23 @@ export default function HomePage() {
               </Link>
               <Link 
                 href="/partner/login" 
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-semibold"
+                className="px-4 lg:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-semibold"
+              >
+                로그인
+              </Link>
+            </div>
+
+            {/* Mobile Navigation */}
+            <div className="flex md:hidden items-center space-x-3">
+              <Link href="/shop" className="text-2xl">
+                🛍️
+              </Link>
+              <Link href="/my" className="text-2xl">
+                👤
+              </Link>
+              <Link 
+                href="/partner/login" 
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold"
               >
                 로그인
               </Link>
@@ -198,7 +215,7 @@ export default function HomePage() {
             <div className="relative h-[200vh]" style={{
               animation: 'infiniteScroll 60s linear infinite'
             }}>
-              <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-1 p-1">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-0.5 sm:gap-1 p-0.5 sm:p-1">
                 {/* 20개 호스트 프로필 반복 */}
                 {[...hostProfiles, ...hostProfiles].map((host, i) => (
                   <HostCard 
@@ -319,7 +336,7 @@ export default function HomePage() {
             </div>
 
             {/* Main Heading */}
-            <h1 className="text-6xl md:text-7xl lg:text-8xl font-extrabold text-white mb-8 leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-extrabold text-white mb-6 sm:mb-8 leading-tight px-4">
               라이브 방송으로
               <br />
               <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
@@ -328,48 +345,48 @@ export default function HomePage() {
               하세요
             </h1>
 
-            <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-8 sm:mb-12 max-w-3xl mx-auto leading-relaxed px-4">
               스트리머를 위한 분양형 쇼핑몰. 구독자를 고객으로 전환하고,
               <br className="hidden md:block" />
               실시간으로 수익을 확인하세요.
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-12 sm:mb-16 px-4">
               <Link 
                 href="/partner/register"
-                className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-lg font-semibold rounded-xl hover:shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-1"
+                className="w-full sm:w-auto group relative px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-base sm:text-lg font-semibold rounded-xl hover:shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-1 text-center"
               >
                 <span className="relative z-10">무료로 시작하기</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity blur"></div>
               </Link>
               <Link 
                 href="/partner/login"
-                className="px-8 py-4 bg-white/10 backdrop-blur-lg text-white text-lg font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-lg text-white text-base sm:text-lg font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300 text-center"
               >
                 파트너 로그인
               </Link>
             </div>
 
             {/* Stats - Real-time Counter */}
-            <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto">
+            <div className="grid grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-2xl mx-auto px-4">
               <div className="text-center">
-                <div className="text-4xl font-bold text-white mb-2 tabular-nums">
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 tabular-nums">
                   {liveStats.totalViewers.toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">실시간 시청자</div>
+                <div className="text-gray-400 text-xs sm:text-sm">실시간 시청자</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-white mb-2 tabular-nums">
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 tabular-nums">
                   {liveStats.totalOrders.toLocaleString()}
                 </div>
-                <div className="text-gray-400 text-sm">오늘의 주문</div>
+                <div className="text-gray-400 text-xs sm:text-sm">오늘의 주문</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-white mb-2 tabular-nums">
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1 sm:mb-2 tabular-nums">
                   ₩{(liveStats.totalRevenue / 1000000).toFixed(1)}M
                 </div>
-                <div className="text-gray-400 text-sm">실시간 매출</div>
+                <div className="text-gray-400 text-xs sm:text-sm">실시간 매출</div>
               </div>
             </div>
           </div>

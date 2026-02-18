@@ -321,22 +321,22 @@ export default function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* 헤더 */}
+      {/* 헤더 - 모바일 최적화 */}
       <header className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+            <Link href="/" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
               Live Commerce
             </Link>
-            <div className="flex items-center gap-6">
-              <Link href="/" className="text-gray-300 hover:text-white transition text-sm">
+            <div className="flex items-center gap-3 sm:gap-6">
+              <Link href="/" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
                 홈
               </Link>
-              <Link href="/shop" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+              <Link href="/shop" className="text-gray-300 hover:text-white transition text-xs sm:text-sm font-semibold">
                 🛍️ 쇼핑몰
               </Link>
               <Link href="/cart" className="relative">
-                <span className="text-2xl">🛒</span>
+                <span className="text-xl sm:text-2xl">🛒</span>
                 {cartCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                     {cartCount}
@@ -348,27 +348,27 @@ export default function ProductDetailPage() {
         </div>
       </header>
 
-      {/* 상품 상세 메인 */}
-      <div className="container mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* 왼쪽: 이미지 갤러리 */}
+      {/* 상품 상세 메인 - 모바일 최적화 */}
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-12">
+          {/* 왼쪽: 이미지 갤러리 - 모바일 최적화 */}
           <div>
             {/* 메인 이미지 */}
-            <div className="relative aspect-square bg-gray-800 rounded-2xl overflow-hidden mb-4 group">
+            <div className="relative aspect-square bg-gray-800 rounded-xl sm:rounded-2xl overflow-hidden mb-3 sm:mb-4 group">
               <img
                 src={product.images[selectedImage]}
                 alt={product.name}
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               />
               {discount > 0 && (
-                <div className="absolute top-4 left-4 bg-red-500 text-white px-4 py-2 rounded-full font-bold text-lg">
+                <div className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-red-500 text-white px-3 sm:px-4 py-1 sm:py-2 rounded-full font-bold text-sm sm:text-lg">
                   {discount}% OFF
                 </div>
               )}
             </div>
 
-            {/* 썸네일 이미지 */}
-            <div className="grid grid-cols-4 gap-4">
+            {/* 썸네일 이미지 - 모바일 최적화 */}
+            <div className="grid grid-cols-4 gap-2 sm:gap-4">
               {product.images.map((img: string, idx: number) => (
                 <button
                   key={idx}
@@ -385,132 +385,132 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* 오른쪽: 상품 정보 */}
-          <div>
+          {/* 오른쪽: 상품 정보 - 모바일 최적화 */}
+          <div className="px-2 sm:px-0">
             {/* 카테고리 */}
-            <p className="text-blue-400 text-sm font-medium mb-2">{product.category.name}</p>
+            <p className="text-blue-400 text-xs sm:text-sm font-medium mb-2">{product.category.name}</p>
 
             {/* 상품명 */}
-            <h1 className="text-4xl font-bold mb-4">{product.name}</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">{product.name}</h1>
 
-            {/* 평점 */}
-            <div className="flex items-center gap-3 mb-6">
+            {/* 평점 - 모바일 최적화 */}
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <div className="flex items-center gap-1">
                 {[...Array(5)].map((_, i) => (
-                  <span key={i} className={`text-xl ${i < Math.round(averageRating) ? 'text-yellow-400' : 'text-gray-600'}`}>
+                  <span key={i} className={`text-base sm:text-xl ${i < Math.round(averageRating) ? 'text-yellow-400' : 'text-gray-600'}`}>
                     ★
                   </span>
                 ))}
               </div>
-              <span className="text-gray-400">
+              <span className="text-sm sm:text-base text-gray-400">
                 {averageRating.toFixed(1)} ({product.reviews.length}개 리뷰)
               </span>
             </div>
 
-            {/* 가격 */}
-            <div className="mb-8">
+            {/* 가격 - 모바일 최적화 */}
+            <div className="mb-6 sm:mb-8">
               {product.comparePrice && (
-                <p className="text-gray-500 line-through text-lg mb-1">
+                <p className="text-gray-500 line-through text-base sm:text-lg mb-1">
                   ₩{product.comparePrice.toLocaleString()}
                 </p>
               )}
-              <div className="flex items-baseline gap-3">
-                <p className="text-4xl font-bold text-blue-400">₩{product.price.toLocaleString()}</p>
-                {discount > 0 && <span className="text-red-400 text-xl font-bold">{discount}% 할인</span>}
+              <div className="flex items-baseline gap-2 sm:gap-3">
+                <p className="text-3xl sm:text-4xl font-bold text-blue-400">₩{product.price.toLocaleString()}</p>
+                {discount > 0 && <span className="text-red-400 text-lg sm:text-xl font-bold">{discount}% 할인</span>}
               </div>
             </div>
 
-            {/* 주요 특징 */}
-            <div className="bg-gray-800/50 rounded-xl p-6 mb-8">
-              <h3 className="text-lg font-bold mb-4">주요 특징</h3>
+            {/* 주요 특징 - 모바일 최적화 */}
+            <div className="bg-gray-800/50 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8">
+              <h3 className="text-base sm:text-lg font-bold mb-3 sm:mb-4">주요 특징</h3>
               <ul className="space-y-2">
                 {product.features.map((feature: string, idx: number) => (
                   <li key={idx} className="flex items-start gap-2">
                     <span className="text-green-400 mt-1">✓</span>
-                    <span className="text-gray-300">{feature}</span>
+                    <span className="text-sm sm:text-base text-gray-300">{feature}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* 재고 */}
-            <div className="mb-6">
-              <p className="text-sm text-gray-400 mb-2">재고</p>
-              <p className={`font-bold ${product.stock > 10 ? 'text-green-400' : 'text-orange-400'}`}>
+            {/* 재고 - 모바일 최적화 */}
+            <div className="mb-4 sm:mb-6">
+              <p className="text-xs sm:text-sm text-gray-400 mb-2">재고</p>
+              <p className={`text-sm sm:text-base font-bold ${product.stock > 10 ? 'text-green-400' : 'text-orange-400'}`}>
                 {product.stock > 10 ? `재고 충분 (${product.stock}개)` : `재고 얼마 남지 않음 (${product.stock}개)`}
               </p>
             </div>
 
-            {/* 수량 선택 */}
-            <div className="mb-8">
-              <p className="text-sm text-gray-400 mb-2">수량</p>
-              <div className="flex items-center gap-4">
+            {/* 수량 선택 - 모바일 최적화 */}
+            <div className="mb-6 sm:mb-8">
+              <p className="text-xs sm:text-sm text-gray-400 mb-2">수량</p>
+              <div className="flex items-center gap-3 sm:gap-4">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-12 h-12 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold text-xl transition-colors"
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold text-lg sm:text-xl transition-colors"
                 >
                   -
                 </button>
-                <span className="text-2xl font-bold w-12 text-center">{quantity}</span>
+                <span className="text-xl sm:text-2xl font-bold w-10 sm:w-12 text-center">{quantity}</span>
                 <button
                   onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  className="w-12 h-12 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold text-xl transition-colors"
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold text-lg sm:text-xl transition-colors"
                 >
                   +
                 </button>
               </div>
             </div>
 
-            {/* 구매 버튼 */}
-            <div className="flex gap-4 mb-8">
+            {/* 구매 버튼 - 모바일 최적화 */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6 sm:mb-8">
               <button
                 onClick={addToCart}
-                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-4 rounded-xl font-bold text-lg transition-all hover:scale-105"
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105"
               >
                 장바구니 담기
               </button>
               <button
                 onClick={buyNow}
-                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white py-4 rounded-xl font-bold text-lg transition-all hover:scale-105"
+                className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105"
               >
                 바로 구매
               </button>
             </div>
 
-            {/* 배송 정보 */}
-            <div className="bg-gray-800/30 rounded-xl p-6 space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🚚</span>
+            {/* 배송 정보 - 모바일 최적화 */}
+            <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 space-y-2 sm:space-y-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="text-xl sm:text-2xl">🚚</span>
                 <div>
-                  <p className="font-bold">무료 배송</p>
-                  <p className="text-sm text-gray-400">평균 2-3일 소요</p>
+                  <p className="font-bold text-sm sm:text-base">무료 배송</p>
+                  <p className="text-xs sm:text-sm text-gray-400">평균 2-3일 소요</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">↩️</span>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="text-xl sm:text-2xl">↩️</span>
                 <div>
-                  <p className="font-bold">무료 반품</p>
-                  <p className="text-sm text-gray-400">30일 이내 무료 반품</p>
+                  <p className="font-bold text-sm sm:text-base">무료 반품</p>
+                  <p className="text-xs sm:text-sm text-gray-400">30일 이내 무료 반품</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🛡️</span>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="text-xl sm:text-2xl">🛡️</span>
                 <div>
-                  <p className="font-bold">품질 보증</p>
-                  <p className="text-sm text-gray-400">1년 제조사 보증</p>
+                  <p className="font-bold text-sm sm:text-base">품질 보증</p>
+                  <p className="text-xs sm:text-sm text-gray-400">1년 제조사 보증</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 탭 섹션 */}
-        <div className="mt-16">
-          {/* 탭 버튼 */}
-          <div className="flex gap-4 border-b border-gray-700 mb-8">
+        {/* 탭 섹션 - 모바일 최적화 */}
+        <div className="mt-8 sm:mt-16">
+          {/* 탭 버튼 - 모바일 최적화 */}
+          <div className="flex gap-2 sm:gap-4 border-b border-gray-700 mb-6 sm:mb-8 overflow-x-auto">
             <button
               onClick={() => setSelectedTab('description')}
-              className={`px-6 py-3 font-bold transition-colors relative ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 font-bold transition-colors relative whitespace-nowrap text-sm sm:text-base ${
                 selectedTab === 'description' ? 'text-blue-400' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -521,7 +521,7 @@ export default function ProductDetailPage() {
             </button>
             <button
               onClick={() => setSelectedTab('specs')}
-              className={`px-6 py-3 font-bold transition-colors relative ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 font-bold transition-colors relative whitespace-nowrap text-sm sm:text-base ${
                 selectedTab === 'specs' ? 'text-blue-400' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -530,7 +530,7 @@ export default function ProductDetailPage() {
             </button>
             <button
               onClick={() => setSelectedTab('reviews')}
-              className={`px-6 py-3 font-bold transition-colors relative ${
+              className={`px-4 sm:px-6 py-2 sm:py-3 font-bold transition-colors relative whitespace-nowrap text-sm sm:text-base ${
                 selectedTab === 'reviews' ? 'text-blue-400' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -1113,10 +1113,10 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {/* 관련 상품 */}
-        <div className="mt-16">
-          <h2 className="text-3xl font-bold mb-8">관련 상품</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* 관련 상품 - 모바일 최적화 */}
+        <div className="mt-12 sm:mt-16">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">관련 상품</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {RELATED_PRODUCTS.map((relatedProduct) => {
               const relatedDiscount = relatedProduct.comparePrice
                 ? Math.round(
@@ -1136,19 +1136,19 @@ export default function ProductDetailPage() {
                       className="w-full h-full object-cover"
                     />
                     {relatedDiscount > 0 && (
-                      <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-sm font-bold">
+                      <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs sm:text-sm font-bold">
                         {relatedDiscount}%
                       </div>
                     )}
                   </div>
-                  <div className="p-4">
-                    <h3 className="font-bold mb-2 group-hover:text-blue-400 transition-colors">
+                  <div className="p-3 sm:p-4">
+                    <h3 className="font-bold text-sm sm:text-base mb-2 group-hover:text-blue-400 transition-colors line-clamp-2">
                       {relatedProduct.name}
                     </h3>
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-lg font-bold text-blue-400">₩{relatedProduct.price.toLocaleString()}</p>
+                    <div className="flex items-baseline gap-1 sm:gap-2">
+                      <p className="text-base sm:text-lg font-bold text-blue-400">₩{relatedProduct.price.toLocaleString()}</p>
                       {relatedProduct.comparePrice && (
-                        <p className="text-sm text-gray-500 line-through">
+                        <p className="text-xs sm:text-sm text-gray-500 line-through">
                           ₩{relatedProduct.comparePrice.toLocaleString()}
                         </p>
                       )}
