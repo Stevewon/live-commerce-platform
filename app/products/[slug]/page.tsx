@@ -754,6 +754,281 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
+        {/* 상품 정보 고시 */}
+        <div className="mt-16 bg-gray-800/30 rounded-2xl p-8">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            📋 상품정보제공고시
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="flex border-b border-gray-700 pb-3">
+              <span className="text-gray-400 w-40 flex-shrink-0">제품명</span>
+              <span className="text-white">{product.name}</span>
+            </div>
+            <div className="flex border-b border-gray-700 pb-3">
+              <span className="text-gray-400 w-40 flex-shrink-0">모델명</span>
+              <span className="text-white">{product.sku || 'EAR-PRO-2024'}</span>
+            </div>
+            <div className="flex border-b border-gray-700 pb-3">
+              <span className="text-gray-400 w-40 flex-shrink-0">제조국</span>
+              <span className="text-white">중국</span>
+            </div>
+            <div className="flex border-b border-gray-700 pb-3">
+              <span className="text-gray-400 w-40 flex-shrink-0">제조연월</span>
+              <span className="text-white">2024년 1월</span>
+            </div>
+            <div className="flex border-b border-gray-700 pb-3">
+              <span className="text-gray-400 w-40 flex-shrink-0">A/S 책임자와 전화번호</span>
+              <span className="text-white">고객센터 1588-0000</span>
+            </div>
+            <div className="flex border-b border-gray-700 pb-3">
+              <span className="text-gray-400 w-40 flex-shrink-0">품질보증기준</span>
+              <span className="text-white">구매일로부터 1년 무상 A/S</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 배송/교환/반품 안내 */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* 배송 안내 */}
+          <div className="bg-gray-800/30 rounded-2xl p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              🚚 배송 안내
+            </h3>
+            <ul className="space-y-3 text-sm text-gray-300">
+              <li className="flex items-start gap-2">
+                <span className="text-blue-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">배송비</p>
+                  <p>전 지역 무료배송</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">배송 기간</p>
+                  <p>평균 2-3일 소요 (주말/공휴일 제외)</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">배송 방법</p>
+                  <p>CJ대한통운, 로젠택배</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">도서산간 지역</p>
+                  <p>추가 배송비 없음</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          {/* 교환 안내 */}
+          <div className="bg-gray-800/30 rounded-2xl p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              🔄 교환 안내
+            </h3>
+            <ul className="space-y-3 text-sm text-gray-300">
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">교환 기간</p>
+                  <p>상품 수령 후 7일 이내</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">교환 비용</p>
+                  <p>무료 (단순 변심 시 왕복 배송비 6,000원)</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">교환 방법</p>
+                  <p>고객센터 또는 마이페이지에서 신청</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">교환 불가</p>
+                  <p>제품 훼손, 사용 흔적, 7일 경과 시</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          {/* 반품 안내 */}
+          <div className="bg-gray-800/30 rounded-2xl p-6">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              ↩️ 반품 안내
+            </h3>
+            <ul className="space-y-3 text-sm text-gray-300">
+              <li className="flex items-start gap-2">
+                <span className="text-orange-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">반품 기간</p>
+                  <p>상품 수령 후 7일 이내</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">반품 비용</p>
+                  <p>무료 (단순 변심 시 왕복 배송비 6,000원)</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">환불 처리</p>
+                  <p>상품 회수 후 3-5 영업일 이내</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-400 mt-1">•</span>
+                <div>
+                  <p className="font-semibold text-white">반품 불가</p>
+                  <p>제품 훼손, 포장 훼손, 사용 흔적</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* 판매자/공급자 정보 */}
+        <div className="mt-8 bg-gray-800/30 rounded-2xl p-8">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+            🏢 판매자 정보
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="font-bold text-lg mb-4 text-blue-400">판매자</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex">
+                  <span className="text-gray-400 w-32">상호명</span>
+                  <span className="text-white">Live Commerce</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">대표자</span>
+                  <span className="text-white">김라이브</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">사업자등록번호</span>
+                  <span className="text-white">123-45-67890</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">통신판매업</span>
+                  <span className="text-white">제2024-서울강남-0000호</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">주소</span>
+                  <span className="text-white">서울시 강남구 테헤란로 123</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">이메일</span>
+                  <span className="text-white">support@livecommerce.com</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">전화번호</span>
+                  <span className="text-white">1588-0000</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-lg mb-4 text-purple-400">제조/공급자</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex">
+                  <span className="text-gray-400 w-32">제조사</span>
+                  <span className="text-white">Audio Tech Co., Ltd.</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">제조국</span>
+                  <span className="text-white">중국</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">공급자</span>
+                  <span className="text-white">글로벌테크 유한회사</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">A/S 센터</span>
+                  <span className="text-white">서울시 마포구 상암동 456</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">A/S 전화</span>
+                  <span className="text-white">1588-1234</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">수입자</span>
+                  <span className="text-white">Live Commerce</span>
+                </div>
+                <div className="flex">
+                  <span className="text-gray-400 w-32">KC 인증번호</span>
+                  <span className="text-white">R-R-AAA-2024-0000</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 고객센터 안내 */}
+        <div className="mt-8 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-2xl p-8">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-3 flex items-center gap-2">
+                📞 고객센터
+              </h2>
+              <p className="text-gray-300 mb-2">상품 문의, 주문/배송 문의, 교환/반품 문의</p>
+              <p className="text-sm text-gray-400">평일 09:00 - 18:00 (점심시간 12:00 - 13:00)</p>
+              <p className="text-sm text-gray-400">주말 및 공휴일 휴무</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <a 
+                href="tel:1588-0000" 
+                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-center transition-colors"
+              >
+                📞 1588-0000
+              </a>
+              <a 
+                href="mailto:support@livecommerce.com"
+                className="px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold text-center transition-colors"
+              >
+                📧 이메일 문의
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* 소비자 보호 안내 */}
+        <div className="mt-8 bg-gray-800/30 rounded-2xl p-6">
+          <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+            🛡️ 소비자 보호 및 법적 고지
+          </h3>
+          <div className="space-y-3 text-sm text-gray-400">
+            <p>
+              • 전자상거래 등에서의 소비자보호에 관한 법률에 의거하여 소비자의 청약철회 가능 기간은 상품 수령 후 7일 이내입니다.
+            </p>
+            <p>
+              • 디지털 콘텐츠 또는 용역의 경우 소비자의 요청에 의하여 개별적으로 생산되는 재화로서 「청약철회등의 제한」 사유에 해당됩니다.
+            </p>
+            <p>
+              • 소비자피해보상보험 가입: 고객님의 안전거래를 위해 소비자피해보상보험에 가입되어 있습니다.
+            </p>
+            <p>
+              • 구매안전서비스 가입: 고객님의 안전한 구매를 위해 구매안전서비스에 가입되어 있습니다.
+            </p>
+            <p>
+              • 개인정보보호: 고객님의 개인정보는 개인정보처리방침에 따라 안전하게 관리됩니다.
+            </p>
+          </div>
+        </div>
+
         {/* 관련 상품 */}
         <div className="mt-16">
           <h2 className="text-3xl font-bold mb-8">관련 상품</h2>
