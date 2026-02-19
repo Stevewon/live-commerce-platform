@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
   });
 }
 
-// DELETE /api/cart - 장바구니에서 삭제
+// DELETE /api/cart - 장바구니에서 삭제 (특정 상품 또는 전체)
 export async function DELETE(request: NextRequest) {
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
@@ -143,27 +143,32 @@ export async function DELETE(request: NextRequest) {
       const { searchParams } = new URL(req.url);
       const productId = searchParams.get('productId');
       
-      if (!productId) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Product ID is required',
+      if (productId) {
+        // 특정 상품 삭제
+        await prisma.cartItem.deleteMany({
+          where: {
+            userId,
+            productId,
           },
-          { status: 400 }
-        );
+        });
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Item removed from cart',
+        });
+      } else {
+        // 전체 삭제 (장바구니 비우기)
+        await prisma.cartItem.deleteMany({
+          where: {
+            userId,
+          },
+        });
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Cart cleared',
+        });
       }
-      
-      await prisma.cartItem.deleteMany({
-        where: {
-          userId,
-          productId,
-        },
-      });
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Item removed from cart',
-      });
     } catch (error) {
       console.error('[CART_DELETE]', error);
       return NextResponse.json(

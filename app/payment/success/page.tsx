@@ -26,30 +26,50 @@ function PaymentSuccessContent() {
 
   const verifyPayment = async () => {
     try {
-      // TODO: 결제 검증 API 호출
-      // const response = await fetch('/api/payments/verify', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ orderId, paymentKey, amount })
-      // });
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        alert('로그인이 필요합니다');
+        router.push('/partner/login');
+        return;
+      }
 
-      // 임시로 성공 처리
+      // 결제 검증 API 호출
+      const response = await fetch('/api/payments/verify', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ orderId, paymentKey, amount: parseInt(amount || '0') })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '결제 검증에 실패했습니다');
+      }
+
       setOrderInfo({
-        orderNumber: orderId,
-        amount: parseInt(amount || '0'),
-        paymentKey
+        orderNumber: data.order.orderNumber,
+        amount: data.order.total,
+        paymentKey: data.payment.paymentKey,
+        method: data.payment.method,
+        approvedAt: data.payment.approvedAt
       });
       
       setIsVerifying(false);
 
       // 장바구니 비우기
-      const token = localStorage.getItem('token');
-      if (token) {
-        // TODO: 장바구니 초기화 API 호출
-      }
-    } catch (error) {
+      await fetch('/api/cart', {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    } catch (error: any) {
       console.error('Payment verification error:', error);
-      alert('결제 검증에 실패했습니다');
+      alert(error.message || '결제 검증에 실패했습니다');
       router.push('/cart');
     }
   };

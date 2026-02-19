@@ -3,54 +3,134 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 interface CartItem {
   id: string;
-  name: string;
-  price: number;
-  thumbnail: string;
+  productId: string;
   quantity: number;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+    thumbnail: string;
+    slug: string;
+  };
 }
 
 export default function CartPage() {
   const router = useRouter();
+  const { user, token } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadCart();
-  }, []);
+    if (user && token) {
+      loadCart();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user, token]);
 
-  const loadCart = () => {
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    setCartItems(cart);
-    setIsLoading(false);
-  };
+  const loadCart = async () => {
+    if (!token) return;
 
-  const updateQuantity = (id: string, newQuantity: number) => {
-    if (newQuantity < 1) return;
+    setIsLoading(true);
+    setError('');
 
-    const updatedCart = cartItems.map((item) =>
-      item.id === id ? { ...item, quantity: newQuantity } : item
-    );
-    setCartItems(updatedCart);
-    localStorage.setItem('cart', JSON.stringify(updatedCart));
-  };
+    try {
+      const response = await fetch('/api/cart', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-  const removeItem = (id: string) => {
-    const updatedCart = cartItems.filter((item) => item.id !== id);
-    setCartItems(updatedCart);
-    localStorage.setItem('cart', JSON.stringify(updatedCart));
-  };
+      const data = await response.json();
 
-  const clearCart = () => {
-    if (confirm('장바구니를 비우시겠습니까?')) {
-      setCartItems([]);
-      localStorage.setItem('cart', JSON.stringify([]));
+      if (!response.ok) {
+        throw new Error(data.error || '장바구니를 불러올 수 없습니다');
+      }
+
+      setCartItems(data.data || []);
+    } catch (err: any) {
+      console.error('Load cart error:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const totalPrice = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const updateQuantity = async (productId: string, newQuantity: number) => {
+    if (newQuantity < 1 || !token) return;
+
+    try {
+      const response = await fetch('/api/cart', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ productId, quantity: newQuantity })
+      });
+
+      if (!response.ok) {
+        throw new Error('수량 변경에 실패했습니다');
+      }
+
+      // 로컬 상태 업데이트
+      setCartItems(cartItems.map(item =>
+        item.productId === productId ? { ...item, quantity: newQuantity } : item
+      ));
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const removeItem = async (productId: string) => {
+    if (!token) return;
+
+    try {
+      const response = await fetch(`/api/cart?productId=${productId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('상품 삭제에 실패했습니다');
+      }
+
+      setCartItems(cartItems.filter(item => item.productId !== productId));
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const clearCart = async () => {
+    if (!token) return;
+    if (!confirm('장바구니를 비우시겠습니까?')) return;
+
+    try {
+      const response = await fetch('/api/cart', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('장바구니 비우기에 실패했습니다');
+      }
+
+      setCartItems([]);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const totalPrice = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const shippingFee = totalPrice >= 50000 ? 0 : 3000;
   const finalPrice = totalPrice + shippingFee;
 
@@ -60,6 +140,25 @@ export default function CartPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-gray-400">장바구니를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인하지 않은 경우
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="text-8xl mb-6">🔒</div>
+          <h2 className="text-3xl font-bold mb-4">로그인이 필요합니다</h2>
+          <p className="text-gray-400 mb-8">장바구니를 사용하려면 로그인해주세요</p>
+          <Link
+            href="/partner/login"
+            className="inline-block px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-xl font-bold text-lg transition-all transform hover:scale-105 shadow-lg"
+          >
+            로그인하기
+          </Link>
         </div>
       </div>
     );
@@ -127,28 +226,28 @@ export default function CartPage() {
                 <div key={item.id} className="bg-gray-800/30 rounded-xl p-4 sm:p-6 flex gap-4 sm:gap-6">
                   {/* 상품 이미지 */}
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
-                    <img src={item.thumbnail} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={item.product.thumbnail} alt={item.product.name} className="w-full h-full object-cover" />
                   </div>
 
                   {/* 상품 정보 - 모바일 최적화 */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-sm sm:text-base lg:text-lg mb-2 line-clamp-2">{item.name}</h3>
+                    <h3 className="font-bold text-sm sm:text-base lg:text-lg mb-2 line-clamp-2">{item.product.name}</h3>
                     <p className="text-blue-400 font-bold text-base sm:text-lg lg:text-xl mb-3 sm:mb-4">
-                      ₩{(item.price * item.quantity).toLocaleString()}
+                      ₩{(item.product.price * item.quantity).toLocaleString()}
                     </p>
 
                     <div className="flex items-center gap-3 sm:gap-4">
                       {/* 수량 조절 - 모바일 최적화 */}
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.productId, item.quantity - 1)}
                           className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition-colors text-sm"
                         >
                           -
                         </button>
                         <span className="font-bold w-6 sm:w-8 text-center text-sm sm:text-base">{item.quantity}</span>
                         <button
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                           className="w-7 h-7 sm:w-8 sm:h-8 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold transition-colors text-sm"
                         >
                           +
@@ -157,7 +256,7 @@ export default function CartPage() {
 
                       {/* 삭제 버튼 */}
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(item.productId)}
                         className="ml-auto text-red-400 hover:text-red-300 transition-colors text-xs sm:text-sm"
                       >
                         삭제
