@@ -315,8 +315,8 @@ export default function ShopPage() {
 
         {/* 카테고리 필터 */}
         <div className="mb-3 sm:mb-4">
-          <h2 className="text-base sm:text-lg font-bold mb-2 sm:mb-3">카테고리</h2>
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+          <h2 className="text-base sm:text-lg font-bold mb-2 sm:mb-3 text-center">카테고리</h2>
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 lg:gap-4">
             {categories.map((cat) => (
               <button
                 key={cat.id}
