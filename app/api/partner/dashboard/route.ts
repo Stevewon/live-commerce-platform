@@ -1,34 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-  try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch {
-    return null
-  }
-}
+import { verifyAuthToken } from '@/lib/auth/middleware'
+import prisma from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    const decoded = verifyToken(request)
-    if (!decoded || !decoded.partnerId) {
+    // 인증 확인
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const { userId, role } = authResult;
+
+    // 파트너 권한 확인
+    if (role !== 'PARTNER') {
       return NextResponse.json(
-        { error: '인증이 필요합니다' },
-        { status: 401 }
-      )
+        { success: false, error: '파트너 권한이 필요합니다' },
+        { status: 403 }
+      );
     }
 
-    const partnerId = decoded.partnerId
+    // 파트너 정보 조회
+    const partner = await prisma.partner.findUnique({
+      where: { userId }
+    });
+
+    if (!partner) {
+      return NextResponse.json(
+        { success: false, error: '파트너 정보를 찾을 수 없습니다' },
+        { status: 404 }
+      );
+    }
+
+    const partnerId = partner.id;
 
     // 파트너의 총 주문 통계
     const orders = await prisma.order.findMany({
@@ -36,31 +39,31 @@ export async function GET(request: NextRequest) {
       include: {
         items: true
       }
-    })
+    });
 
     // 통계 계산
-    const totalSales = orders.reduce((sum, order) => sum + order.total, 0)
-    const totalOrders = orders.length
+    const totalSales = orders.reduce((sum, order) => sum + order.total, 0);
+    const totalOrders = orders.length;
     
     // 정산 통계 (별도로 조회)
     const settlements = await prisma.settlement.findMany({
       where: { partnerId }
-    })
+    });
     
     const pendingSettlement = orders
       .filter(order => !settlements.some(s => s.status === 'COMPLETED'))
-      .reduce((sum, order) => sum + (order.partnerRevenue || 0), 0)
+      .reduce((sum, order) => sum + (order.partnerRevenue || 0), 0);
     
     const completedSettlement = settlements
       .filter(s => s.status === 'COMPLETED')
-      .reduce((sum, settlement) => sum + settlement.amount, 0)
+      .reduce((sum, settlement) => sum + settlement.amount, 0);
 
     // 오늘 매출
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const todaySales = orders
       .filter(order => new Date(order.createdAt) >= today)
-      .reduce((sum, order) => sum + order.total, 0)
+      .reduce((sum, order) => sum + order.total, 0);
 
     // 활성 제품 수
     const activeProducts = await prisma.partnerProduct.count({
@@ -68,7 +71,7 @@ export async function GET(request: NextRequest) {
         partnerId,
         isActive: true
       }
-    })
+    });
 
     // 최근 주문 5건
     const recentOrders = await prisma.order.findMany({
@@ -83,9 +86,15 @@ export async function GET(request: NextRequest) {
         status: true,
         createdAt: true
       }
-    })
+    });
 
     return NextResponse.json({
+      success: true,
+      partner: {
+        id: partner.id,
+        storeName: partner.storeName,
+        storeSlug: partner.storeSlug
+      },
       stats: {
         totalSales,
         totalOrders,
@@ -95,13 +104,13 @@ export async function GET(request: NextRequest) {
         todaySales
       },
       recentOrders
-    })
+    });
 
-  } catch (error) {
-    console.error('Dashboard API error:', error)
+  } catch (error: any) {
+    console.error('Dashboard API error:', error);
     return NextResponse.json(
-      { error: '데이터를 불러오는 중 오류가 발생했습니다' },
+      { success: false, error: error.message || '데이터를 불러오는 중 오류가 발생했습니다' },
       { status: 500 }
-    )
+    );
   }
 }

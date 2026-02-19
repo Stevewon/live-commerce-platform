@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 interface PartnerStats {
   totalSales: number
@@ -17,39 +18,45 @@ interface RecentOrder {
   id: string
   orderNumber: string
   total: number
-  partnerRevenue: number
+  partnerRevenue: number | null
   status: string
   createdAt: string
 }
 
+interface PartnerInfo {
+  id: string
+  storeName: string
+  storeSlug: string
+}
+
 export default function PartnerDashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const { user, token, logout: authLogout } = useAuth()
+  const [partner, setPartner] = useState<PartnerInfo | null>(null)
   const [stats, setStats] = useState<PartnerStats | null>(null)
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     // 인증 확인
-    const token = localStorage.getItem('token')
-    const userStr = localStorage.getItem('user')
-    
-    if (!token || !userStr) {
+    if (!user || !token) {
       router.push('/partner/login')
       return
     }
 
-    const userData = JSON.parse(userStr)
-    if (userData.role !== 'PARTNER') {
+    if (user.role !== 'PARTNER') {
+      alert('파트너 권한이 필요합니다')
       router.push('/partner/login')
       return
     }
 
-    setUser(userData)
-    loadDashboardData(token)
-  }, [router])
+    loadDashboardData()
+  }, [user, token, router])
 
-  const loadDashboardData = async (token: string) => {
+  const loadDashboardData = async () => {
+    if (!token) return
+
     try {
       const res = await fetch('/api/partner/dashboard', {
         headers: {
@@ -57,22 +64,25 @@ export default function PartnerDashboardPage() {
         }
       })
 
-      if (!res.ok) throw new Error('데이터 로드 실패')
-
       const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || '데이터 로드 실패')
+      }
+
+      setPartner(data.partner)
       setStats(data.stats)
       setRecentOrders(data.recentOrders)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Dashboard data load error:', err)
+      setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    router.push('/partner/login')
+    authLogout()
   }
 
   const formatCurrency = (amount: number) => {
@@ -244,7 +254,7 @@ export default function PartnerDashboardPage() {
                       <td className="py-3 px-4 font-mono text-sm">{order.orderNumber}</td>
                       <td className="py-3 px-4 font-semibold">{formatCurrency(order.total)}</td>
                       <td className="py-3 px-4 font-semibold text-green-600">
-                        {formatCurrency(order.partnerRevenue)}
+                        {formatCurrency(order.partnerRevenue || 0)}
                       </td>
                       <td className="py-3 px-4">{getStatusBadge(order.status)}</td>
                       <td className="py-3 px-4 text-sm text-gray-600">{formatDate(order.createdAt)}</td>
