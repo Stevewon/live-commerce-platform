@@ -1,60 +1,78 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { verifyAuthToken } from '@/lib/auth/middleware';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
+// 관리자 상품 조회 (GET)
+export async function GET(req: NextRequest) {
   try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch {
-    return null
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const decoded = verifyToken(request)
-    if (!decoded || decoded.role !== 'ADMIN') {
+    // 관리자 인증 확인
+    const authResult = await verifyAuthToken(req);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    
+    if (authResult.role !== 'ADMIN') {
       return NextResponse.json(
-        { error: '관리자 권한이 필요합니다' },
-        { status: 401 }
-      )
+        { success: false, error: '관리자 권한이 필요합니다' },
+        { status: 403 }
+      );
     }
 
-    // 모든 제품 가져오기
-    const products = await prisma.product.findMany({
-      include: {
-        category: {
-          select: {
-            name: true
-          }
-        },
-        _count: {
-          select: {
-            partnerProducts: true,
-            orderItems: true
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get('status'); // 'active', 'inactive', 'all'
+    const category = searchParams.get('category');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
+
+    // 필터 조건
+    const where: any = {};
+    if (status === 'active') {
+      where.isActive = true;
+    } else if (status === 'inactive') {
+      where.isActive = false;
+    }
+    if (category && category !== 'all') {
+      where.categoryId = category;
+    }
+
+    // 상품 조회 (관리자는 모든 상품 조회 가능)
+    const [products, totalCount] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          category: {
+            select: {
+              name: true,
+              slug: true
+            }
           }
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+      }),
+      prisma.product.count({ where })
+    ]);
 
-    return NextResponse.json({ products })
+    return NextResponse.json({
+      success: true,
+      data: {
+        products,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      }
+    });
 
   } catch (error) {
-    console.error('Admin Products API error:', error)
+    console.error('관리자 상품 조회 실패:', error);
     return NextResponse.json(
-      { error: '제품을 불러오는 중 오류가 발생했습니다' },
+      { success: false, error: '상품 조회에 실패했습니다' },
       { status: 500 }
-    )
+    );
   }
 }

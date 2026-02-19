@@ -1,54 +1,110 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { verifyAuthToken } from '@/lib/auth/middleware';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-  try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch {
-    return null
-  }
-}
-
+// 주문 상태 변경 (PATCH)
 export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const decoded = verifyToken(request)
-    if (!decoded || decoded.role !== 'ADMIN') {
+    // 관리자 인증 확인
+    const authResult = await verifyAuthToken(req);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    
+    if (authResult.role !== 'ADMIN') {
       return NextResponse.json(
-        { error: '관리자 권한이 필요합니다' },
-        { status: 401 }
-      )
+        { success: false, error: '관리자 권한이 필요합니다' },
+        { status: 403 }
+      );
     }
 
-    const body = await request.json()
-    const params = await context.params
-    const orderId = params.id
+    const { status } = await req.json();
+    const { id: orderId } = await params;
 
-    const updatedOrder = await prisma.order.update({
+    // 유효한 상태 확인
+    const validStatuses = ['PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json(
+        { success: false, error: '유효하지 않은 주문 상태입니다' },
+        { status: 400 }
+      );
+    }
+
+    // 주문 존재 확인
+    const existingOrder = await prisma.order.findUnique({
       where: { id: orderId },
-      data: {
-        status: body.status
-      }
-    })
+      include: { items: true }
+    });
 
-    return NextResponse.json({ order: updatedOrder })
+    if (!existingOrder) {
+      return NextResponse.json(
+        { success: false, error: '주문을 찾을 수 없습니다' },
+        { status: 404 }
+      );
+    }
+
+    // 취소 또는 환불 시 재고 복구
+    if ((status === 'CANCELLED' || status === 'REFUNDED') && 
+        !['CANCELLED', 'REFUNDED'].includes(existingOrder.status)) {
+      
+      await prisma.$transaction(async (tx) => {
+        // 주문 상태 업데이트
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status }
+        });
+
+        // 재고 복구
+        for (const item of existingOrder.items) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { increment: item.quantity }
+            }
+          });
+        }
+      });
+
+    } else {
+      // 일반 상태 변경
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status }
+      });
+    }
+
+    // 업데이트된 주문 조회
+    const updatedOrder = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        items: {
+          include: {
+            product: true
+          }
+        }
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: '주문 상태가 업데이트되었습니다',
+      data: updatedOrder
+    });
 
   } catch (error) {
-    console.error('Order update error:', error)
+    console.error('주문 상태 변경 실패:', error);
     return NextResponse.json(
-      { error: '주문 업데이트 중 오류가 발생했습니다' },
+      { success: false, error: '주문 상태 변경에 실패했습니다' },
       { status: 500 }
-    )
+    );
   }
 }

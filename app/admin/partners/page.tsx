@@ -5,24 +5,28 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import Link from 'next/link';
 
-interface Product {
+interface Partner {
   id: string;
-  name: string;
-  price: number;
-  stock: number;
+  storeName: string;
+  storeSlug: string;
   isActive: boolean;
-  isFeatured: boolean;
-  thumbnail: string;
-  category: {
+  commissionRate: number;
+  user: {
     name: string;
-    slug: string;
+    email: string;
+    phone: string;
+  };
+  totalRevenue: number;
+  _count: {
+    products: number;
+    orders: number;
   };
 }
 
-export default function AdminProducts() {
+export default function AdminPartners() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
 
@@ -33,15 +37,15 @@ export default function AdminProducts() {
     }
 
     if (user?.role === 'ADMIN') {
-      fetchProducts();
+      fetchPartners();
     }
   }, [user, authLoading, router, statusFilter]);
 
-  const fetchProducts = async () => {
+  const fetchPartners = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/products?status=${statusFilter}`, {
+      const response = await fetch(`/api/admin/partners?status=${statusFilter}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -49,19 +53,19 @@ export default function AdminProducts() {
 
       const result = await response.json();
       if (result.success) {
-        setProducts(result.data.products);
+        setPartners(result.data.partners);
       }
     } catch (err) {
-      console.error('상품 조회 실패:', err);
+      console.error('파트너 조회 실패:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleActive = async (productId: string, currentStatus: boolean) => {
+  const handleToggleActive = async (partnerId: string, currentStatus: boolean) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/products/${productId}`, {
+      const response = await fetch(`/api/admin/partners/${partnerId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -72,33 +76,11 @@ export default function AdminProducts() {
 
       const result = await response.json();
       if (result.success) {
-        alert('상품 상태가 변경되었습니다');
-        fetchProducts();
+        alert('파트너 상태가 변경되었습니다');
+        fetchPartners();
       }
     } catch (err) {
       console.error('상태 변경 실패:', err);
-    }
-  };
-
-  const handleToggleFeatured = async (productId: string, currentStatus: boolean) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/admin/products/${productId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ isFeatured: !currentStatus })
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        alert('추천 상태가 변경되었습니다');
-        fetchProducts();
-      }
-    } catch (err) {
-      console.error('추천 상태 변경 실패:', err);
     }
   };
 
@@ -124,8 +106,8 @@ export default function AdminProducts() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">상품 관리</h1>
-          <p className="mt-2 text-gray-600">전체 상품 조회 및 관리</p>
+          <h1 className="text-3xl font-bold text-gray-900">파트너 관리</h1>
+          <p className="mt-2 text-gray-600">파트너 조회 및 승인 관리</p>
         </div>
 
         <div className="mb-8 flex flex-wrap gap-4">
@@ -135,10 +117,10 @@ export default function AdminProducts() {
           <Link href="/admin/orders" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
             주문 관리
           </Link>
-          <Link href="/admin/partners" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+          <Link href="/admin/partners" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
             파트너 관리
           </Link>
-          <Link href="/admin/products" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+          <Link href="/admin/products" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
             상품 관리
           </Link>
         </div>
@@ -166,73 +148,55 @@ export default function AdminProducts() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상품</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">카테고리</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">가격</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">재고</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">스토어명</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">운영자</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">수수료율</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">총 매출</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상품/주문</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {products.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img 
-                          src={product.thumbnail || '/placeholder.jpg'} 
-                          alt={product.name}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                          {product.isFeatured && (
-                            <div className="text-xs text-purple-600">⭐ 추천 상품</div>
-                          )}
-                        </div>
-                      </div>
+                {partners.map((partner) => (
+                  <tr key={partner.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm">
+                      <div className="font-medium text-gray-900">{partner.storeName}</div>
+                      <div className="text-xs text-gray-500">@{partner.storeSlug}</div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {product.category.name}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {formatPrice(product.price)}
+                      <div>{partner.user.name}</div>
+                      <div className="text-xs text-gray-400">{partner.user.email}</div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {product.stock}
+                      {partner.commissionRate}%
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {formatPrice(partner.totalRevenue)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {partner._count.products} / {partner._count.orders}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        product.isActive 
+                        partner.isActive 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        {product.isActive ? '활성' : '비활성'}
+                        {partner.isActive ? '활성' : '비활성'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleToggleActive(product.id, product.isActive)}
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            product.isActive
-                              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                              : 'bg-green-100 text-green-700 hover:bg-green-200'
-                          }`}
-                        >
-                          {product.isActive ? '비활성' : '활성'}
-                        </button>
-                        <button
-                          onClick={() => handleToggleFeatured(product.id, product.isFeatured)}
-                          className={`px-2 py-1 rounded text-xs font-medium ${
-                            product.isFeatured
-                              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {product.isFeatured ? '추천 해제' : '추천'}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleToggleActive(partner.id, partner.isActive)}
+                        className={`px-3 py-1 rounded text-xs font-medium ${
+                          partner.isActive
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                      >
+                        {partner.isActive ? '비활성화' : '활성화'}
+                      </button>
                     </td>
                   </tr>
                 ))}
