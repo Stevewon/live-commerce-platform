@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function PartnerRegisterPage() {
   const router = useRouter()
+  const { register } = useAuth()
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -59,21 +61,15 @@ export default function PartnerRegisterPage() {
     }
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      // AuthContext의 register 함수 사용 (자동 로그인 포함)
+      await register({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone,
+        role: 'PARTNER'
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || '회원가입에 실패했습니다')
-      }
-
-      // 회원가입 성공
-      alert('회원가입이 완료되었습니다! 로그인해주세요.')
-      router.push('/partner/login')
+      // register 함수에서 자동으로 /partner/dashboard로 리다이렉션됨
     } catch (err: any) {
       setError(err.message)
     } finally {

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     
     const pendingSettlement = orders
       .filter(order => !settlements.some(s => s.status === 'COMPLETED'))
-      .reduce((sum, order) => sum + order.partnerRevenue, 0)
+      .reduce((sum, order) => sum + (order.partnerRevenue || 0), 0)
     
     const completedSettlement = settlements
       .filter(s => s.status === 'COMPLETED')

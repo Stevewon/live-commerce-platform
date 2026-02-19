@@ -10,11 +10,10 @@ export interface AuthenticatedRequest extends NextRequest {
   };
 }
 
-// 인증 필요한 API에 사용할 미들웨어
-export async function requireAuth(
-  request: NextRequest,
-  handler: (req: AuthenticatedRequest) => Promise<NextResponse>
-): Promise<NextResponse> {
+// 인증 헬퍼 함수 - userId 반환 또는 에러 응답 반환
+export async function verifyAuthToken(
+  request: NextRequest
+): Promise<{ userId: string; email: string; role: string; name: string } | NextResponse> {
   try {
     // Authorization 헤더에서 토큰 추출
     const authHeader = request.headers.get('authorization');
@@ -43,14 +42,9 @@ export async function requireAuth(
       );
     }
     
-    // request에 user 정보 추가
-    const authenticatedRequest = request as AuthenticatedRequest;
-    authenticatedRequest.user = payload;
-    
-    // 핸들러 실행
-    return await handler(authenticatedRequest);
+    return payload;
   } catch (error) {
-    console.error('[AUTH_MIDDLEWARE_ERROR]', error);
+    console.error('[AUTH_VERIFY_ERROR]', error);
     return NextResponse.json(
       {
         success: false,
@@ -59,6 +53,25 @@ export async function requireAuth(
       { status: 500 }
     );
   }
+}
+
+// 인증 필요한 API에 사용할 미들웨어
+export async function requireAuth(
+  request: NextRequest,
+  handler: (req: AuthenticatedRequest) => Promise<NextResponse>
+): Promise<NextResponse> {
+  const authResult = await verifyAuthToken(request);
+  
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+  
+  // request에 user 정보 추가
+  const authenticatedRequest = request as AuthenticatedRequest;
+  authenticatedRequest.user = authResult;
+  
+  // 핸들러 실행
+  return await handler(authenticatedRequest);
 }
 
 // 특정 역할만 허용하는 미들웨어
@@ -81,3 +94,4 @@ export async function requireRole(
     return await handler(req);
   });
 }
+

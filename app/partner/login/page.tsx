@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function PartnerLoginPage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,22 +19,9 @@ export default function PartnerLoginPage() {
     setError('')
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: 'PARTNER' }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || '로그인에 실패했습니다')
-      }
-
-      // 로그인 성공
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      router.push('/partner/dashboard')
+      // AuthContext의 login 함수 사용
+      await login(email, password)
+      // login 함수에서 자동으로 /partner/dashboard로 리다이렉션됨
     } catch (err: any) {
       setError(err.message)
     } finally {

@@ -196,9 +196,9 @@ model Order {
   userId            String
   user              User          @relation(fields: [userId], references: [id])
   
-  // 파트너 정보 (어떤 파트너의 스토어에서 구매했는지)
-  partnerId         String
-  partner           Partner       @relation(fields: [partnerId], references: [id])
+  // 파트너 정보 (어떤 파트너의 스토어에서 구매했는지) - optional로 변경
+  partnerId         String?
+  partner           Partner?       @relation(fields: [partnerId], references: [id])
   
   // 라이브 스트림 정보 (라이브 중 구매한 경우)
   liveStreamId      String?
@@ -210,9 +210,9 @@ model Order {
   shippingFee       Float         @default(0) // 배송비
   total             Float         // 총액
   
-  // 수익 분배
-  partnerRevenue    Float         // 파트너 수익
-  platformRevenue   Float         // 플랫폼 수익
+  // 수익 분배 - optional로 변경
+  partnerRevenue    Float?         // 파트너 수익
+  platformRevenue   Float?         // 플랫폼 수익
   partnerProfit     Float         @default(0) // 파트너 순수익 (정산용)
   
   // 주문 상태
