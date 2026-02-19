@@ -113,7 +113,7 @@ const products = [
     comparePrice: 139000,
     rating: 4.6,
     reviews: 189,
-    thumbnail: 'https://images.unsplash.com/photo-1542272454315-7dedaabf4d37?w=500',
+    thumbnail: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=500',
     liveCount: 634,
   },
   {
