@@ -1,79 +1,89 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { verifyPassword } from '@/lib/auth/password';
+import { generateToken } from '@/lib/auth/jwt';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
-
+// POST /api/auth/login - 로그인
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { email, password, role } = body
-
+    const body = await request.json();
+    const { email, password } = body;
+    
+    // 입력 검증
     if (!email || !password) {
       return NextResponse.json(
-        { error: '이메일과 비밀번호를 입력해주세요' },
+        {
+          success: false,
+          error: 'Email and password are required',
+        },
         { status: 400 }
-      )
+      );
     }
-
-    // 사용자 찾기
+    
+    // 사용자 조회
     const user = await prisma.user.findUnique({
       where: { email },
-      include: {
-        partner: true
-      }
-    })
-
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        name: true,
+        phone: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+    
     if (!user) {
       return NextResponse.json(
-        { error: '이메일 또는 비밀번호가 올바르지 않습니다' },
+        {
+          success: false,
+          error: 'Invalid email or password',
+        },
         { status: 401 }
-      )
+      );
     }
-
-    // 역할 확인
-    if (role && user.role !== role) {
-      return NextResponse.json(
-        { error: '접근 권한이 없습니다' },
-        { status: 403 }
-      )
-    }
-
-    // 비밀번호 확인
-    const isPasswordValid = await bcrypt.compare(password, user.password)
+    
+    // 비밀번호 검증
+    const isPasswordValid = await verifyPassword(password, user.password);
+    
     if (!isPasswordValid) {
       return NextResponse.json(
-        { error: '이메일 또는 비밀번호가 올바르지 않습니다' },
+        {
+          success: false,
+          error: 'Invalid email or password',
+        },
         { status: 401 }
-      )
+      );
     }
-
+    
     // JWT 토큰 생성
-    const token = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email, 
-        role: user.role,
-        partnerId: user.partner?.id 
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    )
-
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    });
+    
     // 비밀번호 제외하고 반환
-    const { password: _, ...userWithoutPassword } = user
-
+    const { password: _, ...userWithoutPassword } = user;
+    
     return NextResponse.json({
-      token,
-      user: userWithoutPassword
-    })
-
+      success: true,
+      data: {
+        user: userWithoutPassword,
+        token,
+      },
+      message: 'Login successful',
+    });
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('[LOGIN_ERROR]', error);
     return NextResponse.json(
-      { error: '로그인 중 오류가 발생했습니다' },
+      {
+        success: false,
+        error: 'Login failed',
+      },
       { status: 500 }
-    )
+    );
   }
 }
