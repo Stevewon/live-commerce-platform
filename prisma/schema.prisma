@@ -44,6 +44,8 @@ model User {
   // Relations
   partner       Partner?
   orders        Order[]
+  cartItems     CartItem[]
+  wishlistItems WishlistItem[]
 }
 
 // 파트너 (스트리머) 테이블
@@ -129,6 +131,8 @@ model Product {
   // Relations
   partnerProducts PartnerProduct[]
   orderItems      OrderItem[]
+  cartItems       CartItem[]
+  wishlistItems   WishlistItem[]
 }
 
 // 파트너가 판매하는 제품 (파트너-제품 연결 테이블)
@@ -279,4 +283,38 @@ model Settlement {
   
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+}
+
+// 장바구니 아이템
+model CartItem {
+  id          String    @id @default(uuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  quantity    Int       @default(1)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([userId, productId])
+}
+
+// 위시리스트 아이템
+model WishlistItem {
+  id          String    @id @default(uuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([userId, productId])
 }
