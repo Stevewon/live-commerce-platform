@@ -2,71 +2,164 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getOrders, type Order } from '@/lib/utils/orders';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+
+interface OrderItem {
+  id: string;
+  productId: string;
+  quantity: number;
+  price: number;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    thumbnail: string;
+    category: {
+      name: string;
+    };
+  };
+}
+
+interface Order {
+  id: string;
+  orderNumber: string;
+  status: string;
+  total: number;
+  subtotal: number;
+  shippingFee: number;
+  discount: number;
+  shippingName: string;
+  shippingPhone: string;
+  shippingAddress: string;
+  shippingZipCode: string | null;
+  shippingMemo: string | null;
+  paymentMethod: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderItem[];
+}
 
 export default function OrdersPage() {
+  const { token, user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // 인증 체크
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/partner/login');
+    }
+  }, [authLoading, user, router]);
 
   useEffect(() => {
-    loadOrders();
-    
-    const handleUpdate = () => loadOrders();
-    window.addEventListener('ordersUpdated', handleUpdate);
-    
-    return () => {
-      window.removeEventListener('ordersUpdated', handleUpdate);
-    };
-  }, []);
+    if (user && token) {
+      loadOrders();
+    }
+  }, [user, token]);
 
   useEffect(() => {
     if (filterStatus === 'all') {
       setFilteredOrders(orders);
     } else {
-      setFilteredOrders(orders.filter(order => order.status === filterStatus));
+      setFilteredOrders(orders.filter(order => order.status.toUpperCase() === filterStatus.toUpperCase()));
     }
   }, [filterStatus, orders]);
 
-  const loadOrders = () => {
+  const loadOrders = async () => {
+    if (!token) return;
+
     setIsLoading(true);
-    const allOrders = getOrders();
-    setOrders(allOrders);
-    setFilteredOrders(allOrders);
-    setIsLoading(false);
+    setError('');
+
+    try {
+      const response = await fetch('/api/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '주문 내역을 불러오는데 실패했습니다');
+      }
+
+      setOrders(data.orders || []);
+      setFilteredOrders(data.orders || []);
+    } catch (err: any) {
+      console.error('Load orders error:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const cancelOrder = async (orderId: string) => {
+    if (!token) return;
+    if (!confirm('정말로 이 주문을 취소하시겠습니까?')) return;
+
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'CANCELLED' })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '주문 취소에 실패했습니다');
+      }
+
+      alert('주문이 취소되었습니다');
+      loadOrders(); // 목록 새로고침
+    } catch (err: any) {
+      alert(err.message);
+    }
   };
 
   const getStatusText = (status: string) => {
     const statusMap: { [key: string]: string } = {
-      pending: '결제 대기',
-      confirmed: '주문 확인',
-      shipping: '배송 중',
-      delivered: '배송 완료',
-      cancelled: '주문 취소',
+      PENDING: '결제 대기',
+      CONFIRMED: '주문 확인',
+      SHIPPING: '배송 중',
+      DELIVERED: '배송 완료',
+      CANCELLED: '주문 취소',
+      REFUNDED: '환불 완료',
     };
-    return statusMap[status] || status;
+    return statusMap[status.toUpperCase()] || status;
   };
 
   const getStatusColor = (status: string) => {
     const colorMap: { [key: string]: string } = {
-      pending: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
-      confirmed: 'text-blue-400 bg-blue-500/20 border-blue-500/30',
-      shipping: 'text-purple-400 bg-purple-500/20 border-purple-500/30',
-      delivered: 'text-green-400 bg-green-500/20 border-green-500/30',
-      cancelled: 'text-red-400 bg-red-500/20 border-red-500/30',
+      PENDING: 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
+      CONFIRMED: 'text-blue-400 bg-blue-500/20 border-blue-500/30',
+      SHIPPING: 'text-purple-400 bg-purple-500/20 border-purple-500/30',
+      DELIVERED: 'text-green-400 bg-green-500/20 border-green-500/30',
+      CANCELLED: 'text-red-400 bg-red-500/20 border-red-500/30',
+      REFUNDED: 'text-gray-400 bg-gray-500/20 border-gray-500/30',
     };
-    return colorMap[status] || 'text-gray-400 bg-gray-500/20 border-gray-500/30';
+    return colorMap[status.toUpperCase()] || 'text-gray-400 bg-gray-500/20 border-gray-500/30';
   };
 
   const statusCounts = {
     all: orders.length,
-    confirmed: orders.filter(o => o.status === 'confirmed').length,
-    shipping: orders.filter(o => o.status === 'shipping').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
+    PENDING: orders.filter(o => o.status === 'PENDING').length,
+    CONFIRMED: orders.filter(o => o.status === 'CONFIRMED').length,
+    SHIPPING: orders.filter(o => o.status === 'SHIPPING').length,
+    DELIVERED: orders.filter(o => o.status === 'DELIVERED').length,
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
@@ -116,6 +209,19 @@ export default function OrdersPage() {
           </p>
         </div>
 
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="mb-6 bg-red-500/20 border border-red-500/50 rounded-xl p-4">
+            <p className="text-red-400">{error}</p>
+            <button 
+              onClick={loadOrders}
+              className="mt-2 text-sm text-red-300 hover:text-red-200 underline"
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
+
         {/* 상태 필터 */}
         <div className="mb-8">
           <div className="flex flex-wrap gap-3">
@@ -130,34 +236,44 @@ export default function OrdersPage() {
               전체 ({statusCounts.all})
             </button>
             <button
-              onClick={() => setFilterStatus('confirmed')}
+              onClick={() => setFilterStatus('PENDING')}
               className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-                filterStatus === 'confirmed'
+                filterStatus === 'PENDING'
+                  ? 'bg-yellow-600 text-white shadow-lg'
+                  : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
+              }`}
+            >
+              결제 대기 ({statusCounts.PENDING})
+            </button>
+            <button
+              onClick={() => setFilterStatus('CONFIRMED')}
+              className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                filterStatus === 'CONFIRMED'
                   ? 'bg-blue-600 text-white shadow-lg'
                   : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
               }`}
             >
-              주문 확인 ({statusCounts.confirmed})
+              주문 확인 ({statusCounts.CONFIRMED})
             </button>
             <button
-              onClick={() => setFilterStatus('shipping')}
+              onClick={() => setFilterStatus('SHIPPING')}
               className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-                filterStatus === 'shipping'
+                filterStatus === 'SHIPPING'
                   ? 'bg-purple-600 text-white shadow-lg'
                   : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
               }`}
             >
-              배송 중 ({statusCounts.shipping})
+              배송 중 ({statusCounts.SHIPPING})
             </button>
             <button
-              onClick={() => setFilterStatus('delivered')}
+              onClick={() => setFilterStatus('DELIVERED')}
               className={`px-6 py-3 rounded-xl font-semibold transition-all ${
-                filterStatus === 'delivered'
+                filterStatus === 'DELIVERED'
                   ? 'bg-green-600 text-white shadow-lg'
                   : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
               }`}
             >
-              배송 완료 ({statusCounts.delivered})
+              배송 완료 ({statusCounts.DELIVERED})
             </button>
           </div>
         </div>
@@ -201,10 +317,18 @@ export default function OrdersPage() {
                       {getStatusText(order.status)}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-400">
-                    <span>주문일: {new Date(order.orderedAt).toLocaleDateString('ko-KR')}</span>
-                    {order.deliveredAt && (
-                      <span>배송완료: {new Date(order.deliveredAt).toLocaleDateString('ko-KR')}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-sm text-gray-400">
+                      <span>주문일: {new Date(order.createdAt).toLocaleDateString('ko-KR')}</span>
+                    </div>
+                    {/* 주문 취소 버튼 */}
+                    {(order.status === 'PENDING' || order.status === 'CONFIRMED') && (
+                      <button
+                        onClick={() => cancelOrder(order.id)}
+                        className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 transition"
+                      >
+                        주문 취소
+                      </button>
                     )}
                   </div>
                 </div>
@@ -212,22 +336,22 @@ export default function OrdersPage() {
                 {/* 주문 상품 */}
                 <div className="p-6">
                   <div className="space-y-4 mb-6">
-                    {order.items.map((item, idx) => (
+                    {order.items.map((item) => (
                       <Link
-                        key={idx}
-                        href={`/products/${item.productSlug}`}
+                        key={item.id}
+                        href={`/products/${item.product.slug}`}
                         className="flex items-center gap-4 p-4 rounded-xl bg-gray-700/30 hover:bg-gray-700/50 transition group"
                       >
                         <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-700 flex-shrink-0">
                           <img
-                            src={item.productImage}
-                            alt={item.productName}
+                            src={item.product.thumbnail}
+                            alt={item.product.name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform"
                           />
                         </div>
                         <div className="flex-1">
                           <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition">
-                            {item.productName}
+                            {item.product.name}
                           </h3>
                           <div className="flex items-center gap-4 text-sm text-gray-400">
                             <span>수량: {item.quantity}개</span>
@@ -243,21 +367,22 @@ export default function OrdersPage() {
                   <div className="bg-gray-700/30 rounded-xl p-4 mb-4">
                     <div className="text-sm font-semibold text-gray-300 mb-2">배송 정보</div>
                     <div className="text-sm text-gray-400 space-y-1">
-                      <div>받는 사람: {order.shippingAddress.name}</div>
-                      <div>연락처: {order.shippingAddress.phone}</div>
-                      <div>주소: ({order.shippingAddress.zipCode}) {order.shippingAddress.address}</div>
+                      <div>받는 사람: {order.shippingName}</div>
+                      <div>연락처: {order.shippingPhone}</div>
+                      <div>주소: {order.shippingZipCode ? `(${order.shippingZipCode}) ` : ''}{order.shippingAddress}</div>
+                      {order.shippingMemo && <div>배송 메모: {order.shippingMemo}</div>}
                     </div>
                   </div>
 
                   {/* 결제 정보 */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-700">
                     <div className="text-sm text-gray-400">
-                      결제 방법: <span className="text-white font-semibold">{order.paymentMethod}</span>
+                      결제 방법: <span className="text-white font-semibold">{order.paymentMethod || '미선택'}</span>
                     </div>
                     <div className="text-right">
                       <div className="text-sm text-gray-400 mb-1">총 결제금액</div>
                       <div className="text-2xl font-bold text-blue-400">
-                        ₩{order.totalAmount.toLocaleString()}
+                        ₩{order.total.toLocaleString()}
                       </div>
                     </div>
                   </div>

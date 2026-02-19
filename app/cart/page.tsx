@@ -202,10 +202,10 @@ export default function CartPage() {
                 </div>
 
                 <button
-                  onClick={() => alert('결제 기능은 준비중입니다!')}
+                  onClick={() => router.push('/checkout')}
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 mb-3 sm:mb-4"
                 >
-                  결제하기
+                  주문하기
                 </button>
 
                 <Link
