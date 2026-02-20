@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "라이브 커머스 분양형 쇼핑몰 플랫폼",
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.js",
     "build": "next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
