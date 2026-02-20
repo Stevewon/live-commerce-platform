@@ -25,6 +25,12 @@ export default function CheckoutPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   
+  // 쿠폰 관련 상태
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [isCouponLoading, setIsCouponLoading] = useState(false);
+  
   // 배송 정보
   const [shippingInfo, setShippingInfo] = useState({
     name: user?.name || '',
@@ -69,8 +75,54 @@ export default function CheckoutPage() {
   };
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shippingFee = subtotal >= 50000 ? 0 : 3000;
-  const total = subtotal + shippingFee;
+  const shippingFee = appliedCoupon?.discount?.shippingDiscount ? 0 : (subtotal >= 50000 ? 0 : 3000);
+  const discount = couponDiscount;
+  const total = subtotal - discount + shippingFee;
+
+  // 쿠폰 적용
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) {
+      alert('쿠폰 코드를 입력해주세요');
+      return;
+    }
+
+    setIsCouponLoading(true);
+
+    try {
+      const response = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code: couponCode,
+          subtotal
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setAppliedCoupon(result.data);
+        setCouponDiscount(result.data.discount.amount || 0);
+        alert('쿠폰이 적용되었습니다!');
+      } else {
+        alert(result.error || '쿠폰 적용에 실패했습니다');
+      }
+    } catch (error) {
+      console.error('쿠폰 적용 실패:', error);
+      alert('쿠폰 적용 중 오류가 발생했습니다');
+    } finally {
+      setIsCouponLoading(false);
+    }
+  };
+
+  // 쿠폰 제거
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+    setCouponCode('');
+  };
 
   const handlePayment = async () => {
     if (!token || !user) {
@@ -112,7 +164,8 @@ export default function CheckoutPage() {
           shippingZipCode: shippingInfo.zipCode || null,
           shippingMemo: shippingInfo.memo || null,
           paymentMethod: 'CARD',
-          shippingFee
+          shippingFee,
+          couponCode: appliedCoupon?.coupon?.code || null // 쿠폰 코드 전달
         })
       });
 
@@ -286,11 +339,53 @@ export default function CheckoutPage() {
             <div className="bg-gray-800/50 rounded-2xl border border-gray-700 p-6 sticky top-6">
               <h2 className="text-2xl font-bold mb-6">결제 정보</h2>
               
+              {/* 쿠폰 입력 */}
+              <div className="mb-6">
+                <label className="block text-sm text-gray-400 mb-2">쿠폰 코드</label>
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between p-3 bg-purple-500/20 border border-purple-500/50 rounded-lg">
+                    <div>
+                      <div className="text-purple-400 font-medium">{appliedCoupon.coupon.name}</div>
+                      <div className="text-xs text-gray-400">{appliedCoupon.coupon.code}</div>
+                    </div>
+                    <button
+                      onClick={removeCoupon}
+                      className="text-red-400 hover:text-red-300 text-sm"
+                    >
+                      제거
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                      placeholder="쿠폰 코드 입력"
+                      className="flex-1 px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                    />
+                    <button
+                      onClick={applyCoupon}
+                      disabled={isCouponLoading || !couponCode}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isCouponLoading ? '확인 중...' : '적용'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-300">
                   <span>상품금액</span>
                   <span>₩{subtotal.toLocaleString()}</span>
                 </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-purple-400">
+                    <span>할인금액</span>
+                    <span>-₩{discount.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-300">
                   <span>배송비</span>
                   <span>{shippingFee === 0 ? '무료' : `₩${shippingFee.toLocaleString()}`}</span>

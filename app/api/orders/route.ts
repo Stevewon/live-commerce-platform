@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
       shippingZipCode,
       shippingMemo,
       paymentMethod = 'CARD',
-      shippingFee = 3000
+      shippingFee = 3000,
+      couponCode // 쿠폰 코드 추가
     } = body
 
     // 유효성 검사
@@ -79,8 +80,46 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const total = subtotal + shippingFee
-    const discount = 0
+    // 쿠폰 처리
+    let discount = 0
+    let appliedShippingFee = shippingFee
+    let couponId: string | null = null
+
+    if (couponCode) {
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: couponCode.toUpperCase() }
+      })
+
+      if (coupon && coupon.isActive) {
+        const now = new Date()
+        // 유효기간 및 사용 횟수 확인
+        if (now >= coupon.validFrom && now <= coupon.validUntil) {
+          if (coupon.usageLimit === null || coupon.usedCount < coupon.usageLimit) {
+            // 최소 주문 금액 확인
+            if (!coupon.minAmount || subtotal >= coupon.minAmount) {
+              couponId = coupon.id
+
+              switch (coupon.type) {
+                case 'FIXED':
+                  discount = coupon.value
+                  break
+                case 'PERCENT':
+                  discount = subtotal * (coupon.value / 100)
+                  if (coupon.maxDiscount && discount > coupon.maxDiscount) {
+                    discount = coupon.maxDiscount
+                  }
+                  break
+                case 'FREE_SHIPPING':
+                  appliedShippingFee = 0
+                  break
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const total = subtotal - discount + appliedShippingFee
 
     // 주문 번호 생성 (ORD-timestamp)
     const orderNumber = `ORD-${Date.now()}`
@@ -94,7 +133,7 @@ export async function POST(req: NextRequest) {
           userId,
           subtotal,
           discount,
-          shippingFee,
+          shippingFee: appliedShippingFee,
           total,
           shippingName,
           shippingPhone,
@@ -103,6 +142,7 @@ export async function POST(req: NextRequest) {
           shippingMemo,
           paymentMethod,
           status: 'PENDING',
+          couponId, // 쿠폰 ID 저장
           // 주문 항목 생성
           items: {
             create: validatedItems
@@ -125,6 +165,16 @@ export async function POST(req: NextRequest) {
             stock: {
               decrement: item.quantity
             }
+          }
+        })
+      }
+
+      // 쿠폰 사용 횟수 증가
+      if (couponId) {
+        await tx.coupon.update({
+          where: { id: couponId },
+          data: {
+            usedCount: { increment: 1 }
           }
         })
       }

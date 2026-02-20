@@ -206,6 +206,10 @@ model Order {
   liveStreamId      String?
   liveStream        LiveStream?   @relation(fields: [liveStreamId], references: [id])
   
+  // 쿠폰 정보
+  couponId          String?
+  coupon            Coupon?       @relation(fields: [couponId], references: [id])
+  
   // 주문 금액
   subtotal          Float         // 소계
   discount          Float         @default(0) // 할인
@@ -351,4 +355,40 @@ model Review {
   
   @@index([productId])
   @@index([userId])
+}
+
+// 쿠폰 시스템
+model Coupon {
+  id            String    @id @default(uuid())
+  code          String    @unique // 쿠폰 코드 (예: WELCOME2024)
+  name          String    // 쿠폰 이름
+  description   String?   // 설명
+  
+  // 쿠폰 타입
+  type          String    // FIXED(정액), PERCENT(정률), FREE_SHIPPING(무료배송)
+  value         Float     // 할인 값 (정액: 원, 정률: %)
+  
+  // 사용 조건
+  minAmount     Float?    // 최소 주문 금액
+  maxDiscount   Float?    // 최대 할인 금액 (정률 쿠폰용)
+  
+  // 유효기간
+  validFrom     DateTime  // 사용 시작일
+  validUntil    DateTime  // 사용 종료일
+  
+  // 사용 제한
+  usageLimit    Int?      // 총 사용 가능 횟수 (null = 무제한)
+  usedCount     Int       @default(0) // 사용된 횟수
+  
+  // 상태
+  isActive      Boolean   @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  orders        Order[]
+  
+  @@index([code])
+  @@index([validFrom, validUntil])
 }
