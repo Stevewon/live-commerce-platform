@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
+import { notifySettlementStatusChange } from '@/lib/notifications'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
 
@@ -73,6 +74,13 @@ export async function PATCH(
         }
       }
     })
+    
+    // 알림 발송
+    await notifySettlementStatusChange(
+      settlement.partner.userId,
+      settlement.amount,
+      status
+    );
 
     return NextResponse.json({ settlement })
 

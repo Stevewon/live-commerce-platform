@@ -47,6 +47,7 @@ model User {
   cartItems     CartItem[]
   wishlistItems WishlistItem[]
   reviews       Review[]
+  notifications Notification[]
 }
 
 // 파트너 (스트리머) 테이블
@@ -391,4 +392,28 @@ model Coupon {
   
   @@index([code])
   @@index([validFrom, validUntil])
+}
+
+// 알림 시스템
+model Notification {
+  id          String    @id @default(uuid())
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 알림 타입
+  type        String    // ORDER_STATUS, SETTLEMENT, LIVE_START, REVIEW, ANNOUNCEMENT
+  
+  title       String    // 알림 제목
+  content     String    // 알림 내용
+  link        String?   // 연결 링크 (선택)
+  
+  isRead      Boolean   @default(false)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
 }

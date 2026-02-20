@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { notifyOrderStatusChange } from '@/lib/notifications';
 
 // 주문 상태 변경 (PATCH)
 export async function PATCH(
@@ -93,6 +94,16 @@ export async function PATCH(
         }
       }
     });
+    
+    // 알림 발송
+    if (updatedOrder) {
+      await notifyOrderStatusChange(
+        updatedOrder.userId,
+        updatedOrder.orderNumber,
+        existingOrder.status,
+        status
+      );
+    }
 
     return NextResponse.json({
       success: true,
