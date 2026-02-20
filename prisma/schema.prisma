@@ -48,6 +48,7 @@ model User {
   wishlistItems WishlistItem[]
   reviews       Review[]
   notifications Notification[]
+  chatMessages  LiveChat[]
 }
 
 // 파트너 (스트리머) 테이블
@@ -168,17 +169,28 @@ model LiveStream {
   
   title           String
   description     String?
+  thumbnail       String?   // 썸네일 이미지
   
-  // 라이브 URL
-  streamUrl       String?   // 유튜브, 아프리카TV 등 라이브 링크
+  // YouTube Live 정보
+  streamUrl       String?   // YouTube Live URL
+  youtubeUrl      String?   // 호환성 유지
   platform        String?   // youtube, afreecatv, instagram 등
+  
+  // 연결된 상품들 (JSON array of product IDs)
+  productIds      String?   // JSON: ["product-id-1", "product-id-2"]
   
   // 라이브 시간
   scheduledAt     DateTime?
   startedAt       DateTime?
   endedAt         DateTime?
   
+  // 상태
   isLive          Boolean   @default(false)
+  status          String    @default("SCHEDULED") // SCHEDULED, LIVE, ENDED
+  
+  // 통계
+  viewCount       Int       @default(0)
+  peakViewers     Int       @default(0)
   
   // 라이브 중 특별 할인
   specialDiscount Float?    // 할인율 (%)
@@ -188,6 +200,11 @@ model LiveStream {
   
   // Relations
   orders          Order[]
+  chatMessages    LiveChat[]
+  
+  @@index([partnerId])
+  @@index([status])
+  @@index([isLive])
 }
 
 // 주문 테이블
@@ -415,5 +432,27 @@ model Notification {
   
   @@index([userId])
   @@index([isRead])
+  @@index([createdAt])
+}
+
+
+// 라이브 채팅
+model LiveChat {
+  id            String      @id @default(uuid())
+  
+  liveStreamId  String
+  liveStream    LiveStream  @relation(fields: [liveStreamId], references: [id], onDelete: Cascade)
+  
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  message       String      // 채팅 메시지
+  
+  isDeleted     Boolean     @default(false) // 삭제된 메시지 (욕설 등)
+  
+  createdAt     DateTime    @default(now())
+  
+  @@index([liveStreamId])
+  @@index([userId])
   @@index([createdAt])
 }
