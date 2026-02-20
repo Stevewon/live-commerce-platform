@@ -46,6 +46,7 @@ model User {
   orders        Order[]
   cartItems     CartItem[]
   wishlistItems WishlistItem[]
+  reviews       Review[]
 }
 
 // 파트너 (스트리머) 테이블
@@ -133,6 +134,7 @@ model Product {
   orderItems      OrderItem[]
   cartItems       CartItem[]
   wishlistItems   WishlistItem[]
+  reviews         Review[]
 }
 
 // 파트너가 판매하는 제품 (파트너-제품 연결 테이블)
@@ -234,6 +236,7 @@ model Order {
   
   // Relations
   items             OrderItem[]
+  review            Review?
 }
 
 // 주문 아이템
@@ -317,4 +320,35 @@ model WishlistItem {
   updatedAt   DateTime  @updatedAt
   
   @@unique([userId, productId])
+}
+
+// 상품 리뷰
+model Review {
+  id          String    @id @default(uuid())
+  
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  orderId     String    @unique // 한 주문당 한 번만 리뷰 작성 가능
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  rating      Int       // 1-5 별점
+  content     String    // 리뷰 내용
+  images      String?   // JSON array of image URLs (선택)
+  
+  likes       Int       @default(0) // 좋아요 수
+  isReported  Boolean   @default(false) // 신고 여부
+  
+  // 파트너 답글
+  reply       String?
+  repliedAt   DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([productId])
+  @@index([userId])
 }

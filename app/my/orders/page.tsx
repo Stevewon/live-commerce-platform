@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
+import ReviewForm from '@/components/ReviewForm';
 
 interface OrderItem {
   id: string;
@@ -39,6 +40,10 @@ interface Order {
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];
+  review?: {
+    id: string;
+    rating: number;
+  } | null;
 }
 
 export default function OrdersPage() {
@@ -49,6 +54,8 @@ export default function OrdersPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<{orderId: string; productId: string; productName: string} | null>(null);
 
   // 인증 체크
   useEffect(() => {
@@ -321,15 +328,33 @@ export default function OrdersPage() {
                     <div className="flex items-center gap-4 text-sm text-gray-400">
                       <span>주문일: {new Date(order.createdAt).toLocaleDateString('ko-KR')}</span>
                     </div>
-                    {/* 주문 취소 버튼 */}
-                    {(order.status === 'PENDING' || order.status === 'CONFIRMED') && (
-                      <button
-                        onClick={() => cancelOrder(order.id)}
-                        className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 transition"
-                      >
-                        주문 취소
-                      </button>
-                    )}
+                    <div className="flex gap-2">
+                      {/* 리뷰 작성 버튼 */}
+                      {order.status === 'DELIVERED' && !order.review && order.items.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setSelectedOrder({
+                              orderId: order.id,
+                              productId: order.items[0].productId,
+                              productName: order.items[0].product.name
+                            });
+                            setShowReviewForm(true);
+                          }}
+                          className="px-4 py-2 text-sm bg-purple-500/20 text-purple-400 border border-purple-500/50 rounded-lg hover:bg-purple-500/30 transition"
+                        >
+                          리뷰 작성
+                        </button>
+                      )}
+                      {/* 주문 취소 버튼 */}
+                      {(order.status === 'PENDING' || order.status === 'CONFIRMED') && (
+                        <button
+                          onClick={() => cancelOrder(order.id)}
+                          className="px-4 py-2 text-sm bg-red-500/20 text-red-400 border border-red-500/50 rounded-lg hover:bg-red-500/30 transition"
+                        >
+                          주문 취소
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -392,6 +417,24 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {/* 리뷰 작성 모달 */}
+      {showReviewForm && selectedOrder && (
+        <ReviewForm
+          orderId={selectedOrder.orderId}
+          productId={selectedOrder.productId}
+          productName={selectedOrder.productName}
+          onSuccess={() => {
+            setShowReviewForm(false);
+            setSelectedOrder(null);
+            loadOrders(); // 주문 목록 새로고침
+          }}
+          onCancel={() => {
+            setShowReviewForm(false);
+            setSelectedOrder(null);
+          }}
+        />
+      )}
     </div>
   );
 }

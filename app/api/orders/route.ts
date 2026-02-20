@@ -168,6 +168,12 @@ export async function GET(req: NextRequest) {
               }
             }
           }
+        },
+        review: {
+          select: {
+            id: true,
+            rating: true
+          }
         }
       },
       orderBy: {
