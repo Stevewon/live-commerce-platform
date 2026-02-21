@@ -92,15 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // 로그인 성공
-      setUser(data.user)
-      setToken(data.token)
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      const userData = data.data?.user || data.user
+      const tokenData = data.data?.token || data.token
+      
+      setUser(userData)
+      setToken(tokenData)
+      localStorage.setItem('token', tokenData)
+      localStorage.setItem('user', JSON.stringify(userData))
 
       // 역할에 따라 리다이렉션
-      if (data.user.role === 'ADMIN') {
+      if (userData.role === 'ADMIN') {
         router.push('/admin/dashboard')
-      } else if (data.user.role === 'PARTNER') {
+      } else if (userData.role === 'PARTNER') {
         router.push('/partner/dashboard')
       } else {
         router.push('/shop')
@@ -126,13 +129,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // 회원가입 성공 시 자동 로그인
-      setUser(result.user)
-      setToken(result.token)
-      localStorage.setItem('token', result.token)
-      localStorage.setItem('user', JSON.stringify(result.user))
+      const userData = result.data?.user || result.user
+      const tokenData = result.data?.token || result.token
+      
+      setUser(userData)
+      setToken(tokenData)
+      localStorage.setItem('token', tokenData)
+      localStorage.setItem('user', JSON.stringify(userData))
 
       // 역할에 따라 리다이렉션
-      if (result.user.role === 'PARTNER') {
+      if (userData.role === 'PARTNER') {
         router.push('/partner/dashboard')
       } else {
         router.push('/shop')

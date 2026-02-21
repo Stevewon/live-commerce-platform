@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     
     if (category && category !== 'all') {
       where.category = {
-        slug: category,
+        equals: category,
       };
     }
     

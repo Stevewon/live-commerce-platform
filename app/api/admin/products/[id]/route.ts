@@ -5,9 +5,10 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 // 관리자 상품 상세 조회 (GET)
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await segmentData.params;
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -22,7 +23,7 @@ export async function GET(
     }
 
     const product = await prisma.product.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         category: {
           select: {
@@ -31,11 +32,15 @@ export async function GET(
             slug: true
           }
         },
-        partner: {
-          select: {
-            id: true,
-            storeName: true,
-            slug: true
+        partnerProducts: {
+          include: {
+            partner: {
+              select: {
+                id: true,
+                storeName: true,
+                storeSlug: true
+              }
+            }
           }
         }
       }
@@ -65,9 +70,10 @@ export async function GET(
 // 관리자 상품 수정 (PATCH)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await segmentData.params;
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -86,7 +92,7 @@ export async function PATCH(
 
     // 상품 존재 확인
     const existingProduct = await prisma.product.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!existingProduct) {
@@ -111,7 +117,7 @@ export async function PATCH(
 
     // 상품 수정
     const updatedProduct = await prisma.product.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...(name && { name }),
         ...(description !== undefined && { description }),
@@ -128,9 +134,13 @@ export async function PATCH(
             slug: true
           }
         },
-        partner: {
-          select: {
-            storeName: true
+        partnerProducts: {
+          include: {
+            partner: {
+              select: {
+                storeName: true
+              }
+            }
           }
         }
       }
@@ -154,9 +164,10 @@ export async function PATCH(
 // 관리자 상품 삭제 (DELETE)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await segmentData.params;
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -172,7 +183,7 @@ export async function DELETE(
 
     // 상품 존재 확인
     const product = await prisma.product.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!product) {
@@ -184,13 +195,13 @@ export async function DELETE(
 
     // 주문 내역이 있는지 확인
     const orderItemCount = await prisma.orderItem.count({
-      where: { productId: params.id }
+      where: { productId: id }
     });
 
     if (orderItemCount > 0) {
       // 주문 내역이 있으면 비활성화만 가능
       await prisma.product.update({
-        where: { id: params.id },
+        where: { id: id },
         data: { isActive: false }
       });
       return NextResponse.json({
@@ -201,7 +212,7 @@ export async function DELETE(
 
     // 주문 내역이 없으면 완전 삭제
     await prisma.product.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     return NextResponse.json({

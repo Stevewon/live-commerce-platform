@@ -19,12 +19,11 @@ function verifyToken(request: NextRequest) {
 }
 
 // 관리자 정산 상세 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, segmentData: { params: Promise<{ id: string }> }) {
   try {
-    const decoded = verifyToken(request)
+    
+    const { id } = await segmentData.params;
+const decoded = verifyToken(request)
     if (!decoded || decoded.role !== 'ADMIN') {
       return NextResponse.json(
         { error: '관리자 권한이 필요합니다' },
@@ -104,12 +103,11 @@ export async function GET(
 }
 
 // 관리자 정산 승인/거부
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, segmentData: { params: Promise<{ id: string }> }) {
   try {
-    const decoded = verifyToken(request)
+    
+    const { id } = await segmentData.params;
+const decoded = verifyToken(request)
     if (!decoded || decoded.role !== 'ADMIN') {
       return NextResponse.json(
         { error: '관리자 권한이 필요합니다' },

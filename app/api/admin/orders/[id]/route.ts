@@ -7,8 +7,9 @@ const prisma = new PrismaClient();
 // PATCH /api/admin/orders/[id] - 주문 상태 변경
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -19,7 +20,6 @@ export async function PATCH(
       return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
     }
 
-    const { id } = params;
     const body = await req.json();
     const { status } = body;
 
@@ -51,7 +51,7 @@ export async function PATCH(
         await prisma.product.update({
           where: { id: item.productId },
           data: {
-            quantity: {
+            stock: {
               increment: item.quantity,
             },
           },
@@ -102,8 +102,9 @@ export async function PATCH(
 // GET /api/admin/orders/[id] - 주문 상세 조회
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -113,8 +114,6 @@ export async function GET(
     if (authResult.role !== 'ADMIN') {
       return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
     }
-
-    const { id } = params;
 
     const order = await prisma.order.findUnique({
       where: { id },

@@ -5,9 +5,10 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 // 관리자 파트너 상세 조회 (GET)
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await segmentData.params;
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -22,7 +23,7 @@ export async function GET(
     }
 
     const partner = await prisma.partner.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         user: {
           select: {
@@ -78,9 +79,10 @@ export async function GET(
 // 관리자 파트너 정보 수정 (PATCH)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await segmentData.params;
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -99,7 +101,7 @@ export async function PATCH(
 
     // 파트너 존재 확인
     const partner = await prisma.partner.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!partner) {
@@ -111,7 +113,7 @@ export async function PATCH(
 
     // 파트너 정보 수정
     const updatedPartner = await prisma.partner.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...(isActive !== undefined && { isActive }),
         ...(commissionRate !== undefined && { commissionRate }),
@@ -148,9 +150,10 @@ export async function PATCH(
 // 관리자 파트너 삭제 (DELETE)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await segmentData.params;
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
@@ -166,7 +169,7 @@ export async function DELETE(
 
     // 파트너 존재 확인
     const partner = await prisma.partner.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         _count: {
           select: {
@@ -187,7 +190,7 @@ export async function DELETE(
     // 상품이나 주문이 있으면 비활성화만 가능
     if (partner._count.products > 0 || partner._count.orders > 0) {
       await prisma.partner.update({
-        where: { id: params.id },
+        where: { id: id },
         data: { isActive: false }
       });
       return NextResponse.json({
@@ -198,7 +201,7 @@ export async function DELETE(
 
     // 연결된 데이터가 없으면 완전 삭제
     await prisma.partner.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     return NextResponse.json({
