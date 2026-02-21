@@ -41,28 +41,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 자동 로그인 - 페이지 로드 시 토큰 확인
   useEffect(() => {
-    const initAuth = async () => {
+    const initAuth = () => {
       try {
         const savedToken = localStorage.getItem('token')
         const savedUser = localStorage.getItem('user')
 
         if (savedToken && savedUser) {
-          // 토큰 유효성 검증
-          const res = await fetch('/api/auth/session', {
-            headers: {
-              'Authorization': `Bearer ${savedToken}`
-            }
-          })
-
-          if (res.ok) {
-            const data = await res.json()
-            setUser(data.user)
-            setToken(savedToken)
-          } else {
-            // 토큰이 유효하지 않으면 삭제
-            localStorage.removeItem('token')
-            localStorage.removeItem('user')
-          }
+          // localStorage에서 복원
+          setUser(JSON.parse(savedUser))
+          setToken(savedToken)
         }
       } catch (error) {
         console.error('Auto-login failed:', error)
@@ -157,21 +144,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/')
   }
 
-  // 사용자 정보 새로고침
+  // 사용자 정보 새로고침 (localStorage에서 다시 로드)
   const refreshUser = async () => {
     if (!token) return
 
     try {
-      const res = await fetch('/api/auth/session', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        setUser(data.user)
-        localStorage.setItem('user', JSON.stringify(data.user))
+      // localStorage에서 다시 로드
+      const savedUser = localStorage.getItem('user')
+      if (savedUser) {
+        setUser(JSON.parse(savedUser))
       }
     } catch (error) {
       console.error('Failed to refresh user:', error)
