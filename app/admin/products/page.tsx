@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import ImageUpload from '@/components/ImageUpload'
 
 interface Product {
   id: string
@@ -602,17 +603,14 @@ export default function AdminProductsPage() {
                   </select>
                 </div>
 
-                {/* 이미지 URL */}
+                {/* 이미지 업로드 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    이미지 URL
+                    상품 이미지
                   </label>
-                  <input
-                    type="text"
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  <ImageUpload
+                    currentImage={formData.imageUrl}
+                    onUploadSuccess={(url) => setFormData({ ...formData, imageUrl: url })}
                   />
                 </div>
 
