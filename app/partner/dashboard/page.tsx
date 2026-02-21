@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/AuthContext'
+import PartnerCharts from '@/components/dashboard/PartnerCharts'
 
 interface PartnerStats {
   totalSales: number
@@ -218,6 +219,11 @@ export default function PartnerDashboardPage() {
             </p>
             <p className="text-sm text-gray-500">활성화된 제품</p>
           </div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="mb-8">
+          <PartnerCharts />
         </div>
 
         {/* Recent Orders */}

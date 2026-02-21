@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import AdminCharts from '@/components/dashboard/AdminCharts'
 
 interface AdminStats {
   totalRevenue: number
@@ -237,6 +238,11 @@ export default function AdminDashboardPage() {
             </p>
             <p className="text-sm opacity-75">처리 필요</p>
           </div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="mb-8">
+          <AdminCharts />
         </div>
 
         {/* 2 Column Layout */}
