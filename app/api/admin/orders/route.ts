@@ -1,89 +1,97 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
-// 관리자 주문 조회 (GET)
+const prisma = new PrismaClient();
+
+// GET /api/admin/orders - 관리자 주문 목록 조회
 export async function GET(req: NextRequest) {
   try {
-    // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {
       return authResult;
     }
-    
+
+    // 관리자 권한 확인
     if (authResult.role !== 'ADMIN') {
-      return NextResponse.json(
-        { success: false, error: '관리자 권한이 필요합니다' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
     }
 
+    // 쿼리 파라미터
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status');
+    const status = searchParams.get('status') || 'ALL';
+    const search = searchParams.get('search') || '';
+    const partnerId = searchParams.get('partnerId') || '';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = (page - 1) * limit;
+    const offset = (page - 1) * limit;
 
-    // 필터 조건
+    // 필터 조건 구성
     const where: any = {};
-    if (status && status !== 'ALL') {
+
+    if (status !== 'ALL') {
       where.status = status;
     }
 
-    // 전체 주문 조회
-    const [orders, totalCount] = await Promise.all([
+    if (search) {
+      where.OR = [
+        { orderNumber: { contains: search } },
+        { user: { name: { contains: search } } },
+        { user: { email: { contains: search } } },
+      ];
+    }
+
+    if (partnerId) {
+      where.partnerId = partnerId;
+    }
+
+    // 주문 목록 조회
+    const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
         include: {
           user: {
             select: {
               name: true,
               email: true,
-              phone: true
-            }
+            },
           },
           partner: {
             select: {
-              storeName: true
-            }
+              storeName: true,
+            },
           },
           items: {
             include: {
               product: {
                 select: {
                   name: true,
-                  thumbnail: true,
-                  price: true
-                }
-              }
-            }
-          }
-        }
+                  price: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: offset,
+        take: limit,
       }),
-      prisma.order.count({ where })
+      prisma.order.count({ where }),
     ]);
 
     return NextResponse.json({
-      success: true,
-      data: {
-        orders,
-        pagination: {
-          page,
-          limit,
-          totalCount,
-          totalPages: Math.ceil(totalCount / limit)
-        }
-      }
+      orders,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
-
-  } catch (error) {
-    console.error('관리자 주문 조회 실패:', error);
-    return NextResponse.json(
-      { success: false, error: '주문 조회에 실패했습니다' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error('Admin orders list error:', error);
+    return NextResponse.json({ error: '주문 목록 조회 실패' }, { status: 500 });
   }
 }
