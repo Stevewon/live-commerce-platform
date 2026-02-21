@@ -5,75 +5,127 @@ import { useRouter } from 'next/navigation'
 
 interface Settlement {
   id: string
-  amount: number
-  status: string
-  bankAccount?: string
-  accountHolder?: string
-  requestDate: string
-  processedAt?: string
-  completedAt?: string
-  rejectReason?: string
+  partnerId: string
+  startDate: string
+  endDate: string
+  totalAmount: number
+  commissionAmount: number
+  settlementAmount: number
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  requestedAt: string
+  paidAt: string | null
+  rejectionReason: string | null
   partner: {
     storeName: string
+    slug: string
+    commissionRate: number
+    bankAccount: string | null
     user: {
+      name: string
       email: string
-      name: string | null
+      phone: string | null
     }
   }
 }
 
-export default function AdminSettlements() {
+interface Order {
+  id: string
+  orderNumber: string
+  total: number
+  createdAt: string
+  user: {
+    name: string
+    email: string
+  }
+  items: Array<{
+    quantity: number
+    price: number
+    product: {
+      name: string
+    }
+  }>
+}
+
+export default function AdminSettlementsPage() {
   const router = useRouter()
   const [settlements, setSettlements] = useState<Settlement[]>([])
-  const [filter, setFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // 상세 모달
+  const [showDetailModal, setShowDetailModal] = useState(false)
   const [selectedSettlement, setSelectedSettlement] = useState<Settlement | null>(null)
-  const [showModal, setShowModal] = useState(false)
-  const [rejectReason, setRejectReason] = useState('')
+  const [orders, setOrders] = useState<Order[]>([])
+
+  // 거부 모달
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
 
   useEffect(() => {
+    // 인증 확인
+    const token = localStorage.getItem('token')
+    const role = localStorage.getItem('role')
+    if (!token || role !== 'ADMIN') {
+      router.push('/admin/login')
+      return
+    }
+
     fetchSettlements()
-  }, [filter])
+  }, [statusFilter])
 
   const fetchSettlements = async () => {
     try {
+      setLoading(true)
       const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/admin/login')
-        return
+      const params = new URLSearchParams()
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter)
       }
 
-      const url = filter === 'ALL'
-        ? '/api/admin/settlements'
-        : `/api/admin/settlements?status=${filter}`
-
-      const response = await fetch(url, {
+      const res = await fetch(`/api/admin/settlements?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
 
-      if (response.ok) {
-        const data = await response.json()
+      const data = await res.json()
+      if (data.settlements) {
         setSettlements(data.settlements)
-      } else if (response.status === 401) {
-        router.push('/admin/login')
       }
     } catch (error) {
-      console.error('Settlement fetch error:', error)
+      console.error('정산 조회 실패:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleApprove = async (settlement: Settlement) => {
-    if (!confirm(`${settlement.partner.storeName}의 정산을 승인하시겠습니까?`)) {
-      return
+  const handleViewDetail = async (settlement: Settlement) => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/admin/settlements/${settlement.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setSelectedSettlement(data.data.settlement)
+        setOrders(data.data.orders)
+        setShowDetailModal(true)
+      }
+    } catch (error) {
+      console.error('정산 상세 조회 실패:', error)
     }
+  }
+
+  const handleApprove = async (id: string) => {
+    if (!confirm('이 정산을 승인하시겠습니까?')) return
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/admin/settlements/${settlement.id}`, {
+      const res = await fetch(`/api/admin/settlements/${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -82,29 +134,36 @@ export default function AdminSettlements() {
         body: JSON.stringify({ status: 'APPROVED' })
       })
 
-      if (response.ok) {
-        alert('정산이 승인되었습니다')
+      const data = await res.json()
+      if (data.success) {
+        alert(data.message)
         fetchSettlements()
+        setShowDetailModal(false)
       } else {
-        alert('정산 승인 중 오류가 발생했습니다')
+        alert(data.error || '승인 실패')
       }
     } catch (error) {
-      console.error('Settlement approve error:', error)
-      alert('정산 승인 중 오류가 발생했습니다')
+      console.error('정산 승인 실패:', error)
+      alert('정산 승인에 실패했습니다')
     }
   }
 
-  const handleReject = async () => {
-    if (!selectedSettlement) return
+  const handleReject = (settlement: Settlement) => {
+    setSelectedSettlement(settlement)
+    setRejectionReason('')
+    setShowRejectModal(true)
+  }
 
-    if (!rejectReason.trim()) {
-      alert('거절 사유를 입력해주세요')
+  const handleSubmitReject = async () => {
+    if (!selectedSettlement) return
+    if (!rejectionReason.trim()) {
+      alert('거부 사유를 입력해주세요')
       return
     }
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/admin/settlements/${selectedSettlement.id}`, {
+      const res = await fetch(`/api/admin/settlements/${selectedSettlement.id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -112,241 +171,484 @@ export default function AdminSettlements() {
         },
         body: JSON.stringify({
           status: 'REJECTED',
-          rejectReason
+          rejectionReason
         })
       })
 
-      if (response.ok) {
-        alert('정산이 거절되었습니다')
-        setShowModal(false)
-        setRejectReason('')
-        setSelectedSettlement(null)
+      const data = await res.json()
+      if (data.success) {
+        alert(data.message)
+        setShowRejectModal(false)
+        setShowDetailModal(false)
         fetchSettlements()
       } else {
-        alert('정산 거절 중 오류가 발생했습니다')
+        alert(data.error || '거부 실패')
       }
     } catch (error) {
-      console.error('Settlement reject error:', error)
-      alert('정산 거절 중 오류가 발생했습니다')
+      console.error('정산 거부 실패:', error)
+      alert('정산 거부에 실패했습니다')
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const badges: Record<string, { bg: string; text: string; label: string }> = {
-      'PENDING': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '대기중' },
-      'APPROVED': { bg: 'bg-green-100', text: 'text-green-800', label: '승인됨' },
-      'REJECTED': { bg: 'bg-red-100', text: 'text-red-800', label: '거절됨' },
-      'COMPLETED': { bg: 'bg-blue-100', text: 'text-blue-800', label: '완료' }
-    }
+  const filteredSettlements = settlements.filter(settlement =>
+    settlement.partner.storeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    settlement.partner.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    settlement.partner.user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
-    const badge = badges[status] || badges['PENDING']
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ko-KR', {
+      style: 'currency',
+      currency: 'KRW'
+    }).format(amount)
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ko-KR')
+  }
+
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      PENDING: 'bg-yellow-100 text-yellow-800',
+      APPROVED: 'bg-green-100 text-green-800',
+      REJECTED: 'bg-red-100 text-red-800'
+    }
+    const labels = {
+      PENDING: '대기중',
+      APPROVED: '승인완료',
+      REJECTED: '거부됨'
+    }
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${badge.bg} ${badge.text}`}>
-        {badge.label}
+      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[status as keyof typeof styles]}`}>
+        {labels[status as keyof typeof labels]}
       </span>
     )
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('role')
+    router.push('/admin/login')
+  }
+
+  // 통계 계산
   const stats = {
     total: settlements.length,
     pending: settlements.filter(s => s.status === 'PENDING').length,
     approved: settlements.filter(s => s.status === 'APPROVED').length,
     rejected: settlements.filter(s => s.status === 'REJECTED').length,
-    totalAmount: settlements.reduce((sum, s) => sum + s.amount, 0),
-    pendingAmount: settlements.filter(s => s.status === 'PENDING').reduce((sum, s) => sum + s.amount, 0)
+    totalPending: settlements
+      .filter(s => s.status === 'PENDING')
+      .reduce((sum, s) => sum + s.settlementAmount, 0),
+    totalApproved: settlements
+      .filter(s => s.status === 'APPROVED')
+      .reduce((sum, s) => sum + s.settlementAmount, 0)
   }
 
-  if (loading) {
+  if (loading && settlements.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">로딩 중...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">로딩 중...</p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">정산 관리</h1>
-          <p className="mt-2 text-gray-600">파트너 정산 요청을 관리하세요</p>
-        </div>
-
-        {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-600 mb-2">총 정산 건수</p>
-            <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-600 mb-2">대기 중</p>
-            <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-600 mb-2">총 정산 금액</p>
-            <p className="text-2xl font-bold text-blue-600">₩{stats.totalAmount.toLocaleString()}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm text-gray-600 mb-2">대기 중 금액</p>
-            <p className="text-2xl font-bold text-orange-600">₩{stats.pendingAmount.toLocaleString()}</p>
-          </div>
-        </div>
-
-        {/* 필터 버튼 */}
-        <div className="bg-white rounded-lg shadow mb-6 p-4">
-          <div className="flex flex-wrap gap-2">
-            {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`px-4 py-2 rounded-lg font-semibold ${
-                  filter === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {status === 'ALL' ? '전체' :
-                 status === 'PENDING' ? '대기중' :
-                 status === 'APPROVED' ? '승인됨' : '거절됨'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 정산 내역 테이블 */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {settlements.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-gray-500">정산 내역이 없습니다</p>
+      {/* 헤더 */}
+      <header className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">정산 관리</h1>
+              <p className="text-sm text-gray-500 mt-1">전체 {stats.total}건</p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="flex gap-3">
+              <button
+                onClick={() => router.push('/admin/dashboard')}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+              >
+                대시보드
+              </button>
+              <button
+                onClick={() => router.push('/admin/orders')}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+              >
+                주문관리
+              </button>
+              <button
+                onClick={() => router.push('/admin/partners')}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+              >
+                파트너관리
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+              >
+                로그아웃
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 통계 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">대기중</h3>
+            <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.pending}</p>
+            <p className="text-sm text-gray-500 mt-1">{formatCurrency(stats.totalPending)}</p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">승인완료</h3>
+            <p className="text-3xl font-bold text-green-600 mt-2">{stats.approved}</p>
+            <p className="text-sm text-gray-500 mt-1">{formatCurrency(stats.totalApproved)}</p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">거부됨</h3>
+            <p className="text-3xl font-bold text-red-600 mt-2">{stats.rejected}</p>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-sm font-medium text-gray-500">총 건수</h3>
+            <p className="text-3xl font-bold text-blue-600 mt-2">{stats.total}</p>
+          </div>
+        </div>
+
+        {/* 필터 및 검색 */}
+        <div className="bg-white p-6 rounded-lg shadow mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 상태 필터 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                상태
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">전체</option>
+                <option value="PENDING">대기중</option>
+                <option value="APPROVED">승인완료</option>
+                <option value="REJECTED">거부됨</option>
+              </select>
+            </div>
+
+            {/* 검색 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                검색
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="스토어명, 담당자명, 이메일 검색..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+                >
+                  초기화
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 정산 목록 테이블 */}
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    파트너
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    정산기간
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    매출액
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    수수료
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    정산금액
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    상태
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    작업
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredSettlements.length === 0 ? (
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      파트너
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      요청일
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      금액
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      계좌 정보
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      상태
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      액션
-                    </th>
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                      정산 내역이 없습니다
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {settlements.map((settlement) => (
-                    <tr key={settlement.id} className="hover:bg-gray-50">
+                ) : (
+                  filteredSettlements.map((settlement) => (
+                    <tr key={settlement.id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">{settlement.partner.storeName}</div>
+                        <div className="text-sm text-gray-500">{settlement.partner.user.name}</div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {settlement.partner.storeName}
+                        <div className="text-sm text-gray-900">
+                          {formatDate(settlement.startDate)}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {settlement.partner.user.email}
+                          ~ {formatDate(settlement.endDate)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(settlement.requestDate).toLocaleDateString()}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(settlement.totalAmount)}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                        ₩{settlement.amount.toLocaleString()}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-red-600">
+                          -{formatCurrency(settlement.commissionAmount)}
+                        </span>
+                        <div className="text-xs text-gray-500">
+                          ({settlement.partner.commissionRate}%)
+                        </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {settlement.bankAccount}
-                        <br />
-                        <span className="text-xs text-gray-500">{settlement.accountHolder}</span>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-bold text-green-600">
+                          {formatCurrency(settlement.settlementAmount)}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(settlement.status)}
-                        {settlement.rejectReason && (
-                          <div className="text-xs text-red-600 mt-1">
-                            {settlement.rejectReason}
+                        {settlement.paidAt && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {formatDate(settlement.paidAt)}
                           </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {settlement.status === 'PENDING' && (
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleApprove(settlement)}
-                              className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700"
-                            >
-                              승인
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedSettlement(settlement)
-                                setShowModal(true)
-                              }}
-                              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
-                            >
-                              거절
-                            </button>
-                          </div>
-                        )}
-                        {settlement.status !== 'PENDING' && (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleViewDetail(settlement)}
+                            className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+                          >
+                            상세
+                          </button>
+                          {settlement.status === 'PENDING' && (
+                            <>
+                              <button
+                                onClick={() => handleApprove(settlement.id)}
+                                className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                              >
+                                승인
+                              </button>
+                              <button
+                                onClick={() => handleReject(settlement)}
+                                className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                              >
+                                거부
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </main>
 
-      {/* 거절 사유 입력 모달 */}
-      {showModal && selectedSettlement && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">정산 거절</h3>
-            <p className="text-gray-600 mb-4">
-              {selectedSettlement.partner.storeName}의 정산을 거절하시겠습니까?
-            </p>
+      {/* 상세 모달 */}
+      {showDetailModal && selectedSettlement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-6">정산 상세 정보</h2>
+              
+              <div className="space-y-6">
+                {/* 파트너 정보 */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-3">파트너 정보</h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-500">스토어명:</span>
+                      <span className="ml-2 font-medium">{selectedSettlement.partner.storeName}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">담당자:</span>
+                      <span className="ml-2 font-medium">{selectedSettlement.partner.user.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">이메일:</span>
+                      <span className="ml-2 font-medium">{selectedSettlement.partner.user.email}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">연락처:</span>
+                      <span className="ml-2 font-medium">{selectedSettlement.partner.user.phone || '-'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500">계좌정보:</span>
+                      <span className="ml-2 font-medium">{selectedSettlement.partner.bankAccount || '-'}</span>
+                    </div>
+                  </div>
+                </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                거절 사유 <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="거절 사유를 입력해주세요"
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              />
+                {/* 정산 정보 */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-3">정산 정보</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">정산기간:</span>
+                      <span className="font-medium">
+                        {formatDate(selectedSettlement.startDate)} ~ {formatDate(selectedSettlement.endDate)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">총 매출액:</span>
+                      <span className="font-semibold text-blue-600">
+                        {formatCurrency(selectedSettlement.totalAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">수수료 ({selectedSettlement.partner.commissionRate}%):</span>
+                      <span className="font-semibold text-red-600">
+                        -{formatCurrency(selectedSettlement.commissionAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-2 border-t border-gray-300">
+                      <span className="font-semibold">정산금액:</span>
+                      <span className="font-bold text-green-600 text-lg">
+                        {formatCurrency(selectedSettlement.settlementAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">요청일:</span>
+                      <span className="font-medium">{formatDate(selectedSettlement.requestedAt)}</span>
+                    </div>
+                    {selectedSettlement.paidAt && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">지급일:</span>
+                        <span className="font-medium">{formatDate(selectedSettlement.paidAt)}</span>
+                      </div>
+                    )}
+                    {selectedSettlement.rejectionReason && (
+                      <div className="pt-2 border-t border-gray-300">
+                        <span className="text-gray-500">거부 사유:</span>
+                        <p className="mt-1 text-red-600 font-medium">{selectedSettlement.rejectionReason}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 주문 내역 */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-lg mb-3">주문 내역 ({orders.length}건)</h3>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {orders.map(order => (
+                      <div key={order.id} className="bg-white p-3 rounded border border-gray-200">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
+                            <div className="text-xs text-gray-500">{order.user.name} ({order.user.email})</div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              {order.items.map(item => `${item.product.name} x${item.quantity}`).join(', ')}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {formatCurrency(order.total)}
+                            </div>
+                            <div className="text-xs text-gray-500">{formatDate(order.createdAt)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                {selectedSettlement.status === 'PENDING' && (
+                  <>
+                    <button
+                      onClick={() => handleApprove(selectedSettlement.id)}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                    >
+                      승인
+                    </button>
+                    <button
+                      onClick={() => handleReject(selectedSettlement)}
+                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                    >
+                      거부
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+                >
+                  닫기
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            <div className="flex space-x-3">
-              <button
-                onClick={() => {
-                  setShowModal(false)
-                  setRejectReason('')
-                  setSelectedSettlement(null)
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleReject}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                거절하기
-              </button>
+      {/* 거부 모달 */}
+      {showRejectModal && selectedSettlement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-4">정산 거부</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                {selectedSettlement.partner.storeName}의 정산을 거부합니다.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  거부 사유 *
+                </label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                  placeholder="거부 사유를 입력해주세요"
+                />
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={handleSubmitReject}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                >
+                  거부
+                </button>
+                <button
+                  onClick={() => setShowRejectModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition"
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
         </div>
