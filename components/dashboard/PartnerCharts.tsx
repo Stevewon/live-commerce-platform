@@ -129,34 +129,40 @@ export default function PartnerCharts() {
             🔄 새로고침
           </button>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data.salesTrend}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis yAxisId="left" />
-            <YAxis yAxisId="right" orientation="right" />
-            <Tooltip />
-            <Legend />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="sales"
-              stroke="#3B82F6"
-              strokeWidth={2}
-              name="매출 (원)"
-              dot={{ r: 3 }}
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="orders"
-              stroke="#10B981"
-              strokeWidth={2}
-              name="주문 수"
-              dot={{ r: 3 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {data.salesTrend && data.salesTrend.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={data.salesTrend}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip />
+              <Legend />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="sales"
+                stroke="#3B82F6"
+                strokeWidth={2}
+                name="매출 (원)"
+                dot={{ r: 3 }}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="orders"
+                stroke="#10B981"
+                strokeWidth={2}
+                name="주문 수"
+                dot={{ r: 3 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-[300px] text-gray-400">
+            <p>매출 데이터가 없습니다</p>
+          </div>
+        )}
       </div>
 
       {/* 주문 상태 분포 & TOP 10 상품 */}
@@ -164,45 +170,57 @@ export default function PartnerCharts() {
         {/* 주문 상태 분포 */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-bold text-gray-900 mb-4">📊 주문 상태 분포</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={data.orderStatus}
-                dataKey="count"
-                nameKey="label"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label={(entry) => `${entry.label}: ${entry.count}`}
-              >
-                {data.orderStatus.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || '#6B7280'} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {data.orderStatus && data.orderStatus.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={data.orderStatus}
+                  dataKey="count"
+                  nameKey="label"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label={(entry) => `${entry.label}: ${entry.count}`}
+                >
+                  {data.orderStatus.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || '#6B7280'} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[300px] text-gray-400">
+              <p>주문 데이터가 없습니다</p>
+            </div>
+          )}
         </div>
 
         {/* TOP 10 상품 (바 차트) */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-bold text-gray-900 mb-4">🏆 TOP 10 상품 (매출)</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data.topProducts.slice(0, 10)} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis 
-                dataKey="name" 
-                type="category" 
-                width={100}
-                tick={{ fontSize: 12 }}
-              />
-              <Tooltip formatter={(value: number) => `₩${value.toLocaleString()}`} />
-              <Legend />
-              <Bar dataKey="revenue" fill="#3B82F6" name="매출" />
-            </BarChart>
-          </ResponsiveContainer>
+          {data.topProducts && data.topProducts.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.topProducts.slice(0, 10)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" />
+                <YAxis 
+                  dataKey="name" 
+                  type="category" 
+                  width={100}
+                  tick={{ fontSize: 12 }}
+                />
+                <Tooltip formatter={(value: number) => `₩${value.toLocaleString()}`} />
+                <Legend />
+                <Bar dataKey="revenue" fill="#3B82F6" name="매출" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[300px] text-gray-400">
+              <p>상품 데이터가 없습니다</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -231,28 +249,29 @@ export default function PartnerCharts() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {data.topProducts.slice(0, 10).map((product, index) => (
-                <tr key={index} className={index < 3 ? 'bg-yellow-50' : ''}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-xl">
-                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                    {product.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.sales.toLocaleString()}개
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.orders.toLocaleString()}건
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                    ₩{product.revenue.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-              {data.topProducts.length === 0 && (
+              {data.topProducts && data.topProducts.length > 0 ? (
+                data.topProducts.slice(0, 10).map((product, index) => (
+                  <tr key={index} className={index < 3 ? 'bg-yellow-50' : ''}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-xl">
+                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {product.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {product.sales.toLocaleString()}개
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {product.orders.toLocaleString()}건
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+                      ₩{product.revenue.toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                     아직 판매된 상품이 없습니다.

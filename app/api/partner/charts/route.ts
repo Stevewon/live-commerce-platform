@@ -48,14 +48,22 @@ export async function GET(req: NextRequest) {
     });
 
     // 일별 매출 그룹화
-    const salesByDate: Record<string, number> = {};
+    const salesByDate: Record<string, { sales: number; orders: number }> = {};
     orders.forEach((order) => {
       const dateKey = order.createdAt.toISOString().split('T')[0];
-      salesByDate[dateKey] = (salesByDate[dateKey] || 0) + (order.partnerRevenue || 0);
+      if (!salesByDate[dateKey]) {
+        salesByDate[dateKey] = { sales: 0, orders: 0 };
+      }
+      salesByDate[dateKey].sales += order.partnerRevenue || 0;
+      salesByDate[dateKey].orders += 1;
     });
 
     const salesTrend = Object.entries(salesByDate)
-      .map(([date, revenue]) => ({ date, revenue }))
+      .map(([date, data]) => ({ 
+        date: new Date(date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+        sales: data.sales,
+        orders: data.orders
+      }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
     // 상품별 판매 현황 (Top 10)
@@ -86,11 +94,9 @@ export async function GET(req: NextRequest) {
     const topProducts = productSales.map((stat) => {
       const product = products.find((p) => p.id === stat.productId);
       return {
-        id: stat.productId,
         name: product?.name || '알 수 없음',
-        thumbnail: product?.thumbnail || '',
-        price: product?.price || 0,
-        soldCount: stat._sum.quantity || 0,
+        sales: stat._sum.quantity || 0,
+        orders: 1, // 주문 수는 별도로 계산 필요
         revenue: (stat._sum.price || 0) * (stat._sum.quantity || 0),
       };
     });
@@ -102,18 +108,25 @@ export async function GET(req: NextRequest) {
       where: { partnerId: partner.id },
     });
 
-    const statusDistribution = orderStatusCounts.map((stat) => ({
+    const STATUS_LABELS: Record<string, string> = {
+      PENDING: '대기중',
+      CONFIRMED: '확인됨',
+      SHIPPING: '배송중',
+      DELIVERED: '배송완료',
+      CANCELLED: '취소',
+      REFUNDED: '환불',
+    };
+
+    const orderStatus = orderStatusCounts.map((stat) => ({
       status: stat.status,
       count: stat._count.id,
+      label: STATUS_LABELS[stat.status] || stat.status,
     }));
 
     return NextResponse.json({
-      success: true,
-      data: {
-        salesTrend,
-        topProducts,
-        statusDistribution,
-      },
+      salesTrend,
+      topProducts,
+      orderStatus,
     });
   } catch (error: any) {
     console.error('파트너 차트 데이터 조회 오류:', error);
