@@ -1,0 +1,20 @@
+# robots.txt for Live Commerce Platform
+
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /lives
+Allow: /products/
+
+# 관리자 페이지 크롤링 방지
+Disallow: /admin/
+Disallow: /partner/
+Disallow: /api/
+
+# 개인정보 페이지
+Disallow: /my/
+Disallow: /checkout
+Disallow: /cart
+
+# Sitemap
+Sitemap: https://your-app.railway.app/sitemap.xml
