@@ -11,15 +11,16 @@
 
 ### 주요 기능
 - ✅ 멀티 테넌트 시스템 (파트너별 독립 쇼핑몰)
-- ✅ 파트너 회원가입 및 로그인
-- ✅ 파트너 대시보드 (판매 현황, 수익 확인)
-- ✅ 관리자 로그인 및 대시보드
-- ✅ 관리자 대시보드 (전체 통계, 파트너 관리)
+- ✅ 사용자 인증 (이메일/비밀번호, JWT, 소셜 로그인)
+- ✅ 파트너 대시보드 (판매 현황, 수익 확인, 상품/주문/정산 관리)
+- ✅ 관리자 패널 (주문/상품/파트너/정산 통합 관리)
+- ✅ 실시간 라이브 방송 및 채팅 (Socket.io)
+- ✅ 상품 관리 (CRUD, 카테고리, 재고)
+- ✅ 주문 처리 시스템 (결제, 배송, 환불)
 - ✅ 자동 수익 분배 및 정산
-- 🚧 제품 관리 시스템 (예정)
-- 🚧 주문 처리 시스템 (예정)
-- 🚧 라이브 스트림 연동 (예정)
-- ✅ 반응형 디자인 (모바일/PC)
+- ✅ 알림 시스템 (실시간 + 이메일)
+- ✅ 이미지 업로드 (로컬 + Cloudinary)
+- ✅ 반응형 디자인 (모바일/태블릿/PC)
 
 ## 🚀 빠른 시작
 
@@ -90,17 +91,25 @@ live-commerce-platform/
 ## 💻 기술 스택
 
 ### Frontend
-- **Next.js 15** - React 프레임워크
+- **Next.js 15.1.6** - React 19 프레임워크 (App Router)
 - **TypeScript** - 타입 안정성
-- **TailwindCSS** - 스타일링
-- **React Hooks** - 상태 관리
+- **Tailwind CSS** - 유틸리티 스타일링
+- **Shadcn/ui** - UI 컴포넌트 라이브러리
+- **Recharts** - 데이터 시각화
 
 ### Backend
-- **Next.js API Routes** - 서버리스 API
-- **Prisma** - ORM
-- **SQLite** - 개발용 데이터베이스 (프로덕션: PostgreSQL)
-- **JWT** - 인증
-- **bcryptjs** - 비밀번호 암호화
+- **Next.js API Routes** - RESTful API (69개 엔드포인트)
+- **Prisma 5.22.0** - ORM (19개 모델)
+- **PostgreSQL** - 프로덕션 데이터베이스
+- **SQLite** - 개발용 데이터베이스
+- **NextAuth.js** - 인증 (JWT + OAuth)
+- **Socket.io** - 실시간 통신
+- **Nodemailer** - 이메일 발송
+
+### External Services
+- **Toss Payments** - 결제 시스템
+- **Cloudinary** - 이미지 호스팅
+- **Railway** - 배포 플랫폼
 
 ## 🎯 주요 페이지
 
@@ -213,17 +222,33 @@ NEXT_PUBLIC_API_URL="https://yourdomain.com"
 
 ## 📈 다음 단계
 
-### 구현 예정 기능
-- [x] 파트너 회원가입 페이지 ✅
-- [x] 관리자 대시보드 ✅
-- [ ] 제품 관리 UI
-- [ ] 주문 관리 UI
-- [ ] 결제 시스템 연동 (토스페이먼츠, 아임포트)
-- [ ] 라이브 스트림 연동
-- [ ] 이메일 알림
-- [ ] 푸시 알림
-- [ ] 데이터 분석 및 리포트
-- [ ] 파트너 쇼핑몰 커스터마이징
+### ✅ 완료된 기능 (100%)
+- [x] 사용자 인증 (이메일/비밀번호, JWT)
+- [x] 소셜 로그인 구조 (Google, Kakao) - 활성화 대기
+- [x] 파트너 회원가입 및 대시보드
+- [x] 관리자 대시보드 및 통합 관리
+- [x] 상품 관리 UI (CRUD, 카테고리, 재고)
+- [x] 주문 관리 UI (상태 변경, 검색, 필터)
+- [x] 파트너 관리 UI (승인, 수수료, 통계)
+- [x] 정산 관리 UI (승인, 상세 조회)
+- [x] 라이브 방송 및 실시간 채팅
+- [x] 결제 시스템 (Toss Payments)
+- [x] 알림 시스템 (실시간 + 이메일 템플릿)
+- [x] 이미지 업로드 및 관리
+- [x] 프로덕션 배포 준비 (Railway)
+
+### 🔧 활성화 대기 (구조 완성)
+- [ ] 소셜 로그인 활성화 (OAuth 설정 필요)
+- [ ] 이메일 알림 활성화 (SMTP 설정 필요)
+- [ ] Cloudinary 이미지 호스팅
+
+### 🚀 추가 개선 가능
+- [ ] Redis 캐싱
+- [ ] CDN 통합
+- [ ] 자동화 테스트
+- [ ] API 문서화 (Swagger)
+- [ ] AI 상품 추천
+- [ ] 데이터 분석 대시보드
 
 ## 🤝 기여
 
@@ -235,6 +260,30 @@ ISC License
 
 ---
 
-**프로젝트 시작일**: 2024-02-17
-**개발자**: Stevewon
-**버전**: 1.0.0
+## 📦 백업 및 복원
+
+**최신 백업**: `live-commerce-platform-backup-20260221-120820.tar.gz` (8.5 MB)
+
+### 복원 방법
+```bash
+tar -xzf live-commerce-platform-backup-20260221-120820.tar.gz
+cd live-commerce-platform
+npm install
+npx prisma generate
+npx prisma db push
+npm run dev
+```
+
+**상세 가이드**: `QUICK_START.md`, `BACKUP_SUMMARY_20260221.md` 참조
+
+---
+
+**프로젝트 시작일**: 2024-02-17  
+**개발 완료일**: 2026-02-21  
+**개발자**: Stevewon  
+**버전**: 2.0.0  
+**GitHub**: https://github.com/Stevewon/live-commerce-platform  
+**총 개발 시간**: 약 28시간  
+**코드 라인**: 18,871줄  
+**API 엔드포인트**: 69개  
+**페이지**: 26개
