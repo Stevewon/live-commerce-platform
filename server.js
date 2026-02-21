@@ -8,7 +8,7 @@ const { Server } = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = dev ? 'localhost' : '0.0.0.0'; // 프로덕션에서는 모든 인터페이스 바인딩
 const port = parseInt(process.env.PORT || '3000', 10);
 
 const app = next({ dev, hostname, port });
@@ -30,9 +30,11 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer, {
     cors: {
-      origin: '*',
+      origin: process.env.NEXT_PUBLIC_APP_URL || '*',
       methods: ['GET', 'POST'],
+      credentials: true,
     },
+    transports: ['websocket', 'polling'], // WebSocket 우선, 폴백으로 polling
   });
 
   // 방별 접속자 정보 저장
