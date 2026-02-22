@@ -6,14 +6,16 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// 개발 환경에서 SQLite 사용:
-// DATABASE_URL="file:./dev.db"
+// 개발 환경에서 SQLite 사용 시:
+// provider = "sqlite"
+// DATABASE_URL="file:./prisma/dev.db"
 //
 // 프로덕션 환경에서 PostgreSQL 사용:
+// provider = "postgresql"
 // DATABASE_URL="postgresql://user:password@host:5432/database"
 
 // 사용자 역할 (String으로 저장)
