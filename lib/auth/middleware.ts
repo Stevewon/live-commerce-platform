@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken, extractToken } from './jwt';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/jwt';
 
 export interface AuthenticatedRequest extends NextRequest {
   user?: {
@@ -15,9 +16,9 @@ export async function verifyAuthToken(
   request: NextRequest
 ): Promise<{ userId: string; email: string; role: string; name: string } | NextResponse> {
   try {
-    // Authorization 헤더에서 토큰 추출
-    const authHeader = request.headers.get('authorization');
-    const token = extractToken(authHeader);
+    // 쿠키에서 토큰 추출
+    const cookieStore = await cookies();
+    const token = cookieStore.get('auth-token')?.value;
     
     if (!token) {
       return NextResponse.json(
