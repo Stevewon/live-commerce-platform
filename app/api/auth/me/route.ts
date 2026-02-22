@@ -7,7 +7,7 @@ import prisma from '@/lib/prisma';
 export async function GET(request: NextRequest) {
   try {
     // 쿠키에서 토큰 가져오기 - Next.js cookies 사용
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const token = cookieStore.get('auth-token')?.value;
     
     if (!token) {

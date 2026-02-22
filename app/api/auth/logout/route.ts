@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 export async function POST() {
   try {
     // 쿠키 삭제 - Next.js cookies 사용
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.delete('auth-token');
     cookieStore.delete('user-role');
     
