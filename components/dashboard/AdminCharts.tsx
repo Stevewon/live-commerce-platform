@@ -128,34 +128,40 @@ export default function AdminCharts() {
             🔄 새로고침
           </button>
         </div>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={data.salesTrend}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis yAxisId="left" />
-            <YAxis yAxisId="right" orientation="right" />
-            <Tooltip />
-            <Legend />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="sales"
-              stroke="#3B82F6"
-              strokeWidth={2}
-              name="매출 (원)"
-              dot={{ r: 4 }}
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="orders"
-              stroke="#10B981"
-              strokeWidth={2}
-              name="주문 수"
-              dot={{ r: 4 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {data.salesTrend && data.salesTrend.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={data.salesTrend}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip />
+              <Legend />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="sales"
+                stroke="#3B82F6"
+                strokeWidth={2}
+                name="매출 (원)"
+                dot={{ r: 4 }}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="orders"
+                stroke="#10B981"
+                strokeWidth={2}
+                name="주문 수"
+                dot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-[300px] text-gray-400">
+            <p>매출 데이터가 없습니다</p>
+          </div>
+        )}
       </div>
 
       {/* 카테고리별 판매 & 시간대별 주문 */}
@@ -163,40 +169,52 @@ export default function AdminCharts() {
         {/* 카테고리별 판매 */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-bold text-gray-900 mb-4">🎯 카테고리별 판매</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={data.categoryData}
-                dataKey="revenue"
-                nameKey="category"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label={(entry) => `${entry.category}: ${(entry.revenue / 1000).toFixed(0)}K`}
-              >
-                {data.categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value: number) => `₩${value.toLocaleString()}`} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {data.categoryData && data.categoryData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={data.categoryData}
+                  dataKey="revenue"
+                  nameKey="category"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label={(entry) => `${entry.category}: ${(entry.revenue / 1000).toFixed(0)}K`}
+                >
+                  {data.categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => `₩${value.toLocaleString()}`} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[300px] text-gray-400">
+              <p>카테고리 데이터가 없습니다</p>
+            </div>
+          )}
         </div>
 
         {/* 시간대별 주문 */}
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-bold text-gray-900 mb-4">⏰ 시간대별 주문</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data.ordersByHour}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="count" fill="#8B5CF6" name="주문 수" />
-            </BarChart>
-          </ResponsiveContainer>
+          {data.ordersByHour && data.ordersByHour.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={data.ordersByHour}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="hour" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="count" fill="#8B5CF6" name="주문 수" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[300px] text-gray-400">
+              <p>주문 데이터가 없습니다</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -225,27 +243,35 @@ export default function AdminCharts() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {data.topProducts.map((product, index) => (
-                <tr key={index} className={index < 3 ? 'bg-yellow-50' : ''}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-2xl">
-                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {product.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.sales.toLocaleString()}개
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.orders.toLocaleString()}건
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
-                    ₩{product.revenue.toLocaleString()}
+              {data.topProducts && data.topProducts.length > 0 ? (
+                data.topProducts.map((product, index) => (
+                  <tr key={index} className={index < 3 ? 'bg-yellow-50' : ''}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-2xl">
+                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {product.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {product.sales.toLocaleString()}개
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {product.orders.toLocaleString()}건
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">
+                      ₩{product.revenue.toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    아직 판매된 상품이 없습니다.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
