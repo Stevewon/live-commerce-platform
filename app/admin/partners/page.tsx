@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 interface Partner {
   id: string
@@ -25,7 +25,7 @@ interface Partner {
 }
 
 export default function AdminPartnersPage() {
-  const router = useRouter()
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -49,11 +49,6 @@ export default function AdminPartnersPage() {
 
   useEffect(() => {
     // 인증 확인
-    const token = localStorage.getItem('token')
-    const role = localStorage.getItem('role')
-    if (!token || role !== 'ADMIN') {
-      router.push('/admin/login')
-      return
     }
 
     fetchPartners()
@@ -62,7 +57,6 @@ export default function AdminPartnersPage() {
   const fetchPartners = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
       const params = new URLSearchParams({
         status: statusFilter,
         page: currentPage.toString(),
@@ -70,8 +64,8 @@ export default function AdminPartnersPage() {
       })
 
       const res = await fetch(`/api/admin/partners?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+        credentials: 'include',
+      headers: {
         }
       })
 
@@ -92,11 +86,10 @@ export default function AdminPartnersPage() {
     if (!confirm(`파트너를 ${currentStatus ? '비활성화' : '활성화'}하시겠습니까?`)) return
 
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`/api/admin/partners/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
+        credentials: 'include',
+      headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ isActive: !currentStatus })
@@ -135,11 +128,10 @@ export default function AdminPartnersPage() {
     if (!selectedPartner) return
 
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`/api/admin/partners/${selectedPartner.id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
+        credentials: 'include',
+      headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(editData)
@@ -163,11 +155,10 @@ export default function AdminPartnersPage() {
     if (!confirm('정말 이 파트너를 삭제하시겠습니까?\n(상품/주문이 있으면 비활성화만 됩니다)')) return
 
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`/api/admin/partners/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
+        credentials: 'include',
+      headers: {
         }
       })
 
@@ -205,7 +196,6 @@ export default function AdminPartnersPage() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('role')
-    router.push('/admin/login')
   }
 
   if (loading && partners.length === 0) {

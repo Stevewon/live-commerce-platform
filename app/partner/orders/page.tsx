@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth';
 
 interface Order {
   id: string;
@@ -46,7 +46,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function PartnerOrdersPage() {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+  const { user, loading: authLoading, logout } = usePartnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,6 @@ export default function PartnerOrdersPage() {
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'PARTNER')) {
-      router.push('/partner/login');
     }
   }, [user, authLoading, router]);
 
@@ -68,10 +67,9 @@ export default function PartnerOrdersPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       const res = await fetch('/api/partner/orders', {
+        credentials: 'include',
         headers: {
-          Authorization: `Bearer ${token}`,
         },
       });
 

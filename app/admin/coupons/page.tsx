@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth';
 
 interface Coupon {
   id: string;
@@ -26,7 +26,7 @@ interface Coupon {
 
 export default function AdminCouponsPage() {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+  const { user, loading: authLoading, logout } = useAdminAuth();
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,15 +68,14 @@ export default function AdminCouponsPage() {
   const fetchCoupons = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       const params = new URLSearchParams({
         status: statusFilter,
         ...(searchTerm && { search: searchTerm }),
       });
 
       const response = await fetch(`/api/admin/coupons?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
+        credentials: 'include',
+      headers: {
         },
       });
 
@@ -100,7 +99,6 @@ export default function AdminCouponsPage() {
     e.preventDefault();
 
     try {
-      const token = localStorage.getItem('token');
       const url = editingCoupon
         ? `/api/admin/coupons/${editingCoupon.id}`
         : '/api/admin/coupons';
@@ -108,9 +106,9 @@ export default function AdminCouponsPage() {
 
       const response = await fetch(url, {
         method,
-        headers: {
+        credentials: 'include',
+      headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(formData),
       });
@@ -137,11 +135,10 @@ export default function AdminCouponsPage() {
     if (!confirm('정말 이 쿠폰을 삭제하시겠습니까?')) return;
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/coupons/${id}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
+        credentials: 'include',
+      headers: {
         },
       });
 
@@ -162,12 +159,11 @@ export default function AdminCouponsPage() {
   // 쿠폰 활성화/비활성화 토글
   const handleToggleActive = async (coupon: Coupon) => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/coupons/${coupon.id}`, {
         method: 'PATCH',
-        headers: {
+        credentials: 'include',
+      headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ isActive: !coupon.isActive }),
       });

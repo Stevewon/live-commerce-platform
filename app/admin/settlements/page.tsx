@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 interface Settlement {
   id: string
@@ -47,7 +47,7 @@ interface Order {
 }
 
 export default function AdminSettlementsPage() {
-  const router = useRouter()
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all')
@@ -64,11 +64,6 @@ export default function AdminSettlementsPage() {
 
   useEffect(() => {
     // 인증 확인
-    const token = localStorage.getItem('token')
-    const role = localStorage.getItem('role')
-    if (!token || role !== 'ADMIN') {
-      router.push('/admin/login')
-      return
     }
 
     fetchSettlements()
@@ -77,15 +72,14 @@ export default function AdminSettlementsPage() {
   const fetchSettlements = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
       const params = new URLSearchParams()
       if (statusFilter !== 'all') {
         params.append('status', statusFilter)
       }
 
       const res = await fetch(`/api/admin/settlements?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+        credentials: 'include',
+      headers: {
         }
       })
 
@@ -102,10 +96,9 @@ export default function AdminSettlementsPage() {
 
   const handleViewDetail = async (settlement: Settlement) => {
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`/api/admin/settlements/${settlement.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+        credentials: 'include',
+      headers: {
         }
       })
 
@@ -124,11 +117,10 @@ export default function AdminSettlementsPage() {
     if (!confirm('이 정산을 승인하시겠습니까?')) return
 
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`/api/admin/settlements/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
+        credentials: 'include',
+      headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: 'APPROVED' })
@@ -162,11 +154,10 @@ export default function AdminSettlementsPage() {
     }
 
     try {
-      const token = localStorage.getItem('token')
       const res = await fetch(`/api/admin/settlements/${selectedSettlement.id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
+        credentials: 'include',
+      headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -229,7 +220,6 @@ export default function AdminSettlementsPage() {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('role')
-    router.push('/admin/login')
   }
 
   // 통계 계산

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth';
 
 interface Order {
   id: string;
@@ -55,8 +55,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AdminOrdersPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const { user, loading: authLoading, logout } = useAdminAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
@@ -70,28 +69,14 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
-
-    if (!token || !userStr) {
-      router.push('/admin/login');
-      return;
+    if (user && user.role === 'ADMIN') {
+      loadOrders();
     }
-
-    const userData = JSON.parse(userStr);
-    if (userData.role !== 'ADMIN') {
-      router.push('/admin/login');
-      return;
-    }
-
-    setUser(userData);
-    loadOrders();
-  }, [router, statusFilter, pagination.page, searchQuery]);
+  }, [user, statusFilter, pagination.page, searchQuery]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
 
       const params = new URLSearchParams({
         status: statusFilter,
@@ -104,9 +89,7 @@ export default function AdminOrdersPage() {
       }
 
       const res = await fetch(`/api/admin/orders?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (!res.ok) throw new Error('주문 목록 로드 실패');
@@ -128,14 +111,12 @@ export default function AdminOrdersPage() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus }),
       });
 

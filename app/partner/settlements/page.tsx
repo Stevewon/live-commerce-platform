@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth'
 
 interface Settlement {
   id: string
@@ -16,7 +16,7 @@ interface Settlement {
 }
 
 export default function PartnerSettlements() {
-  const router = useRouter()
+  const { user, loading: authLoading, logout } = usePartnerAuth()
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [availableAmount, setAvailableAmount] = useState(0)
   const [showRequestModal, setShowRequestModal] = useState(false)
@@ -33,15 +33,11 @@ export default function PartnerSettlements() {
 
   const fetchSettlements = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/partner/login')
-        return
       }
 
       const response = await fetch('/api/partner/settlements', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -49,7 +45,6 @@ export default function PartnerSettlements() {
         const data = await response.json()
         setSettlements(data.settlements)
       } else if (response.status === 401) {
-        router.push('/partner/login')
       }
     } catch (error) {
       console.error('Settlement fetch error:', error)
@@ -60,10 +55,9 @@ export default function PartnerSettlements() {
 
   const fetchAvailableAmount = async () => {
     try {
-      const token = localStorage.getItem('token')
       const response = await fetch('/api/partner/dashboard', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -79,7 +73,6 @@ export default function PartnerSettlements() {
   const handleRequestSettlement = async () => {
     try {
       setError('')
-      const token = localStorage.getItem('token')
       const amount = parseFloat(requestAmount)
 
       if (isNaN(amount) || amount <= 0) {
@@ -99,8 +92,8 @@ export default function PartnerSettlements() {
 
       const response = await fetch('/api/partner/settlements', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({

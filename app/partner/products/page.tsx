@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth'
 
 interface Product {
   id: string
@@ -26,7 +26,7 @@ interface PartnerProduct {
 }
 
 export default function PartnerProducts() {
-  const router = useRouter()
+  const { user, loading: authLoading, logout } = usePartnerAuth()
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [myProducts, setMyProducts] = useState<PartnerProduct[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,23 +39,19 @@ export default function PartnerProducts() {
 
   const fetchData = async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        router.push('/partner/login')
-        return
       }
 
       // 모든 제품 조회
       const allResponse = await fetch('/api/admin/products', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`
         }
       })
 
       // 내가 선택한 제품 조회
       const myResponse = await fetch('/api/partner/products', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`
         }
       })
 
@@ -65,7 +61,6 @@ export default function PartnerProducts() {
         setAllProducts(allData.products)
         setMyProducts(myData.products)
       } else if (allResponse.status === 401 || myResponse.status === 401) {
-        router.push('/partner/login')
       }
     } catch (error) {
       console.error('Products fetch error:', error)
@@ -80,14 +75,13 @@ export default function PartnerProducts() {
 
   const handleToggleProduct = async (productId: string) => {
     try {
-      const token = localStorage.getItem('token')
       const isSelected = isProductSelected(productId)
       const action = isSelected ? 'remove' : 'add'
 
       const response = await fetch('/api/partner/products', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ productId, action })

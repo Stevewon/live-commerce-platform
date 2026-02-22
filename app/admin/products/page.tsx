@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import ImageUpload from '@/components/ImageUpload'
 
 interface Product {
@@ -29,7 +29,7 @@ interface Category {
 }
 
 export default function AdminProductsPage() {
-  const router = useRouter()
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,22 +55,15 @@ export default function AdminProductsPage() {
   })
 
   useEffect(() => {
-    // 인증 확인
-    const token = localStorage.getItem('token')
-    const role = localStorage.getItem('role')
-    if (!token || role !== 'ADMIN') {
-      router.push('/admin/login')
-      return
+    if (user && user.role === 'ADMIN') {
+      fetchProducts()
+      fetchCategories()
     }
-
-    fetchProducts()
-    fetchCategories()
-  }, [statusFilter, categoryFilter, currentPage])
+  }, [user, statusFilter, categoryFilter, currentPage])
 
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
       const params = new URLSearchParams({
         status: statusFilter,
         category: categoryFilter,
@@ -79,8 +72,9 @@ export default function AdminProductsPage() {
       })
 
       const res = await fetch(`/api/admin/products?${params}`, {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`
+          
         }
       })
 
@@ -113,11 +107,12 @@ export default function AdminProductsPage() {
     if (!confirm('정말 이 상품을 삭제하시겠습니까?')) return
 
     try {
-      const token = localStorage.getItem('token')
+      
       const res = await fetch(`/api/admin/products/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`
+          
         }
       })
 
@@ -173,7 +168,7 @@ export default function AdminProductsPage() {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      
       const url = modalMode === 'edit' && selectedProduct
         ? `/api/admin/products/${selectedProduct.id}`
         : '/api/partner/products'
@@ -182,8 +177,9 @@ export default function AdminProductsPage() {
 
       const res = await fetch(url, {
         method,
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(formData)
@@ -207,11 +203,12 @@ export default function AdminProductsPage() {
     if (!confirm(`상품을 ${currentStatus ? '비활성화' : '활성화'}하시겠습니까?`)) return
 
     try {
-      const token = localStorage.getItem('token')
+      
       const res = await fetch(`/api/admin/products/${id}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ isActive: !currentStatus })
