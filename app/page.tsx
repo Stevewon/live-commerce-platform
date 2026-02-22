@@ -175,28 +175,31 @@ export default function HomePage() {
               <Link href="#platforms" className="text-gray-300 hover:text-white transition text-sm font-semibold">
                 플랫폼
               </Link>
-              <Link href="/shop" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+              <Link href="/products" className="text-gray-300 hover:text-white transition text-sm font-semibold">
                 🛍️ 쇼핑몰
               </Link>
+              <Link href="/register" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                회원가입
+              </Link>
               <Link 
-                href="/partner/login" 
-                className="px-4 lg:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm font-semibold"
+                href="/login" 
+                className="px-4 lg:px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition text-sm font-semibold"
               >
                 로그인
               </Link>
             </div>
 
             {/* Mobile Navigation */}
-            <div className="flex md:hidden items-center space-x-3">
-              <Link href="/shop" className="text-2xl">
+            <div className="flex md:hidden items-center space-x-2">
+              <Link href="/products" className="text-2xl">
                 🛍️
               </Link>
-              <Link href="/my" className="text-2xl">
-                👤
+              <Link href="/register" className="text-gray-300 hover:text-white transition text-xs font-semibold">
+                가입
               </Link>
               <Link 
-                href="/partner/login" 
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold"
+                href="/login" 
+                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-xs font-semibold"
               >
                 로그인
               </Link>
@@ -240,17 +243,17 @@ export default function HomePage() {
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 lg:gap-6 justify-center items-center mb-6 sm:mb-8 lg:mb-16 px-4">
               <Link 
-                href="/partner/register"
+                href="/products"
                 className="w-full sm:w-auto group relative px-4 sm:px-6 lg:px-10 py-2 sm:py-3 lg:py-5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm sm:text-base lg:text-2xl font-semibold rounded-lg lg:rounded-2xl hover:shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 transform hover:-translate-y-1 text-center"
               >
-                <span className="relative z-10">무료로 시작하기</span>
+                <span className="relative z-10">🛍️ 쇼핑 시작하기</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity blur"></div>
               </Link>
               <Link 
-                href="/partner/login"
+                href="/partner/register"
                 className="w-full sm:w-auto px-4 sm:px-6 lg:px-10 py-2 sm:py-3 lg:py-5 bg-white/10 backdrop-blur-lg text-white text-sm sm:text-base lg:text-2xl font-semibold rounded-lg lg:rounded-2xl border border-white/20 hover:bg-white/20 transition-all duration-300 text-center"
               >
-                파트너 로그인
+                🎥 파트너 가입
               </Link>
             </div>
 
@@ -553,11 +556,12 @@ export default function HomePage() {
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-bold mb-4">지원</h4>
+              <h4 className="text-white font-bold mb-4">빠른 링크</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
-                <li><Link href="/docs" className="hover:text-white transition">문서</Link></li>
-                <li><Link href="/contact" className="hover:text-white transition">문의하기</Link></li>
-                <li><Link href="/faq" className="hover:text-white transition">FAQ</Link></li>
+                <li><Link href="/products" className="hover:text-white transition">🛍️ 쇼핑몰</Link></li>
+                <li><Link href="/register" className="hover:text-white transition">회원가입</Link></li>
+                <li><Link href="/login" className="hover:text-white transition">로그인</Link></li>
+                <li><Link href="/partner/register" className="hover:text-white transition">파트너 가입</Link></li>
               </ul>
             </div>
             <div>
