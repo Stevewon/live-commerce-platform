@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 // 호스트 프로필 데이터 (20개)
 const hostProfiles = [
@@ -122,6 +123,7 @@ function HostCard({ host, index }: { host: typeof hostProfiles[0], index: number
 }
 
 export default function HomePage() {
+  const { user, logout } = useAuth()
   const [scrollY, setScrollY] = useState(0)
   // 실시간 카운터 상태
   const [liveStats, setLiveStats] = useState({
@@ -178,15 +180,31 @@ export default function HomePage() {
               <Link href="/products" className="text-gray-300 hover:text-white transition text-sm font-semibold">
                 🛍️ 쇼핑몰
               </Link>
-              <Link href="/register" className="text-gray-300 hover:text-white transition text-sm font-semibold">
-                회원가입
-              </Link>
-              <Link 
-                href="/login" 
-                className="px-4 lg:px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition text-sm font-semibold"
-              >
-                로그인
-              </Link>
+              {user ? (
+                <>
+                  <span className="text-white text-sm font-semibold">
+                    {user.name}님
+                  </span>
+                  <button
+                    onClick={logout}
+                    className="px-4 lg:px-6 py-2 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white rounded-lg transition text-sm font-semibold"
+                  >
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/register" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                    회원가입
+                  </Link>
+                  <Link 
+                    href="/login" 
+                    className="px-4 lg:px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition text-sm font-semibold"
+                  >
+                    로그인
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile Navigation */}
@@ -194,15 +212,31 @@ export default function HomePage() {
               <Link href="/products" className="text-2xl">
                 🛍️
               </Link>
-              <Link href="/register" className="text-gray-300 hover:text-white transition text-xs font-semibold">
-                가입
-              </Link>
-              <Link 
-                href="/login" 
-                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-xs font-semibold"
-              >
-                로그인
-              </Link>
+              {user ? (
+                <>
+                  <span className="text-white text-xs font-semibold truncate max-w-[80px]">
+                    {user.name}님
+                  </span>
+                  <button
+                    onClick={logout}
+                    className="px-3 py-1.5 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg text-xs font-semibold"
+                  >
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link href="/register" className="text-gray-300 hover:text-white transition text-xs font-semibold">
+                    가입
+                  </Link>
+                  <Link 
+                    href="/login" 
+                    className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-xs font-semibold"
+                  >
+                    로그인
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
