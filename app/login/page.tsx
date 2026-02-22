@@ -35,17 +35,18 @@ export default function LoginPage() {
         // localStorage에도 저장 (클라이언트에서 빠른 접근용)
         localStorage.setItem('user', JSON.stringify(data.data.user))
         
-        // 역할별 리다이렉트
+        // 역할별 리다이렉트 URL 결정
+        let redirectUrl = callbackUrl
         if (data.data.user.role === 'ADMIN') {
-          router.push('/admin/dashboard')
+          redirectUrl = '/admin/dashboard'
         } else if (data.data.user.role === 'PARTNER') {
-          router.push('/partner/dashboard')
-        } else {
-          router.push(callbackUrl)
+          redirectUrl = '/partner/dashboard'
         }
         
-        // 페이지 새로고침하여 네비게이션 업데이트
-        router.refresh()
+        // 쿠키가 제대로 설정되도록 약간의 지연 후 전체 페이지 리로드
+        setTimeout(() => {
+          window.location.href = redirectUrl
+        }, 100)
       } else {
         setError(data.error || '로그인에 실패했습니다')
       }
