@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function AdminLoginPage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,24 +19,11 @@ export default function AdminLoginPage() {
     setError('')
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: 'ADMIN' }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || '로그인에 실패했습니다')
-      }
-
-      // 로그인 성공
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-      router.push('/admin/dashboard')
+      // AuthContext의 login 함수 사용
+      await login(email, password)
+      // login 함수에서 자동으로 /admin/dashboard로 리다이렉션됨
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || '로그인에 실패했습니다')
     } finally {
       setLoading(false)
     }
@@ -105,7 +94,7 @@ export default function AdminLoginPage() {
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-800 font-medium mb-2">📋 테스트 계정</p>
           <p className="text-xs text-blue-700">
-            이메일: admin@livecommerce.com<br />
+            이메일: admin@example.com<br />
             비밀번호: admin123
           </p>
         </div>

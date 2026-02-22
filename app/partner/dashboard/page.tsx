@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/contexts/AuthContext'
+import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth'
 import PartnerCharts from '@/components/dashboard/PartnerCharts'
 
 interface PartnerStats {
@@ -31,8 +30,7 @@ interface PartnerInfo {
 }
 
 export default function PartnerDashboardPage() {
-  const router = useRouter()
-  const { user, token, logout: authLogout } = useAuth()
+  const { user, loading: authLoading, logout } = usePartnerAuth()
   const [partner, setPartner] = useState<PartnerInfo | null>(null)
   const [stats, setStats] = useState<PartnerStats | null>(null)
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
@@ -40,29 +38,15 @@ export default function PartnerDashboardPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    // 인증 확인
-    if (!user || !token) {
-      router.push('/partner/login')
-      return
+    if (user && user.role === 'PARTNER') {
+      loadDashboardData()
     }
-
-    if (user.role !== 'PARTNER') {
-      alert('파트너 권한이 필요합니다')
-      router.push('/partner/login')
-      return
-    }
-
-    loadDashboardData()
-  }, [user, token, router])
+  }, [user])
 
   const loadDashboardData = async () => {
-    if (!token) return
-
     try {
       const res = await fetch('/api/partner/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
       })
 
       const data = await res.json()
@@ -83,7 +67,7 @@ export default function PartnerDashboardPage() {
   }
 
   const handleLogout = () => {
-    authLogout()
+    logout()
   }
 
   const formatCurrency = (amount: number) => {

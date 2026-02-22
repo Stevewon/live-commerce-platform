@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminCharts from '@/components/dashboard/AdminCharts'
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 interface AdminStats {
   totalRevenue: number
@@ -48,39 +48,22 @@ interface Partner {
 }
 
 export default function AdminDashboardPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 인증 확인
-    const token = localStorage.getItem('token')
-    const userStr = localStorage.getItem('user')
-    
-    if (!token || !userStr) {
-      router.push('/admin/login')
-      return
+    if (user && user.role === 'ADMIN') {
+      loadDashboardData()
     }
+  }, [user])
 
-    const userData = JSON.parse(userStr)
-    if (userData.role !== 'ADMIN') {
-      router.push('/admin/login')
-      return
-    }
-
-    setUser(userData)
-    loadDashboardData(token)
-  }, [router])
-
-  const loadDashboardData = async (token: string) => {
+  const loadDashboardData = async () => {
     try {
       const res = await fetch('/api/admin/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
       })
 
       if (!res.ok) throw new Error('데이터 로드 실패')
@@ -97,9 +80,7 @@ export default function AdminDashboardPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    router.push('/admin/login')
+    logout()
   }
 
   const formatCurrency = (amount: number) => {
@@ -143,7 +124,7 @@ export default function AdminDashboardPage() {
     )
   }
 
-  if (loading) {
+  if (authLoading || loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

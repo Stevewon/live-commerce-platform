@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-  try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch {
-    return null
-  }
-}
+import { cookies } from 'next/headers'
+import { verifyToken } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
   try {
-    const decoded = verifyToken(request)
+    // 쿠키에서 토큰 가져오기
+    const cookieStore = await cookies()
+    const token = cookieStore.get('auth-token')?.value
+
+    if (!token) {
+      return NextResponse.json(
+        { error: '인증이 필요합니다' },
+        { status: 401 }
+      )
+    }
+
+    const decoded = verifyToken(token)
     if (!decoded || decoded.role !== 'ADMIN') {
       return NextResponse.json(
         { error: '관리자 권한이 필요합니다' },
