@@ -1,61 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 
-// 쿠폰 검증 (POST)
-export async function POST(req: NextRequest) {
+const prisma = new PrismaClient();
+
+// GET: 쿠폰 유효성 검증 (공개 API)
+export async function GET(request: NextRequest) {
   try {
-    const { code, subtotal } = await req.json();
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get('code');
+    const amount = searchParams.get('amount');
 
     if (!code) {
       return NextResponse.json(
-        { success: false, error: '쿠폰 코드를 입력해주세요' },
+        { error: '쿠폰 코드를 입력해주세요.' },
         { status: 400 }
       );
     }
 
     // 쿠폰 조회
     const coupon = await prisma.coupon.findUnique({
-      where: { code: code.toUpperCase() }
+      where: { code: code.toUpperCase() },
     });
 
     if (!coupon) {
       return NextResponse.json(
-        { success: false, error: '존재하지 않는 쿠폰입니다' },
+        { error: '유효하지 않은 쿠폰 코드입니다.' },
         { status: 404 }
       );
     }
 
-    // 활성화 상태 확인
+    const now = new Date();
+
+    // 쿠폰 상태 검증
     if (!coupon.isActive) {
       return NextResponse.json(
-        { success: false, error: '사용할 수 없는 쿠폰입니다' },
+        { error: '비활성화된 쿠폰입니다.' },
         { status: 400 }
       );
     }
 
-    // 유효기간 확인
-    const now = new Date();
-    if (now < coupon.validFrom || now > coupon.validUntil) {
+    if (now < coupon.validFrom) {
       return NextResponse.json(
-        { success: false, error: '쿠폰 사용 기간이 아닙니다' },
+        { error: '아직 사용할 수 없는 쿠폰입니다.' },
         { status: 400 }
       );
     }
 
-    // 사용 횟수 확인
-    if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
+    if (now > coupon.validUntil) {
       return NextResponse.json(
-        { success: false, error: '쿠폰 사용 가능 횟수를 초과했습니다' },
+        { error: '기한이 만료된 쿠폰입니다.' },
         { status: 400 }
       );
     }
 
-    // 최소 주문 금액 확인
-    if (coupon.minAmount && subtotal < coupon.minAmount) {
+    // 사용 횟수 검증
+    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
+      return NextResponse.json(
+        { error: '사용 가능 횟수를 초과한 쿠폰입니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 최소 주문 금액 검증
+    if (amount && coupon.minAmount && parseFloat(amount) < coupon.minAmount) {
       return NextResponse.json(
         { 
-          success: false, 
-          error: `최소 주문 금액 ${coupon.minAmount.toLocaleString()}원 이상부터 사용 가능합니다` 
+          error: `최소 주문 금액은 ₩${coupon.minAmount.toLocaleString()}입니다.`,
         },
         { status: 400 }
       );
@@ -63,46 +73,38 @@ export async function POST(req: NextRequest) {
 
     // 할인 금액 계산
     let discountAmount = 0;
-    let shippingDiscount = 0;
-
-    switch (coupon.type) {
-      case 'FIXED':
-        discountAmount = coupon.value;
-        break;
+    if (amount) {
+      const orderAmount = parseFloat(amount);
       
-      case 'PERCENT':
-        discountAmount = subtotal * (coupon.value / 100);
-        // 최대 할인 금액 적용
+      if (coupon.type === 'FIXED') {
+        discountAmount = coupon.value;
+      } else if (coupon.type === 'PERCENT') {
+        discountAmount = (orderAmount * coupon.value) / 100;
         if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
           discountAmount = coupon.maxDiscount;
         }
-        break;
-      
-      case 'FREE_SHIPPING':
-        shippingDiscount = 3000; // 기본 배송비 (실제 배송비는 주문 시 계산)
-        break;
+      }
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        coupon: {
-          id: coupon.id,
-          code: coupon.code,
-          name: coupon.name,
-          type: coupon.type
-        },
-        discount: {
-          amount: Math.round(discountAmount),
-          shippingDiscount: Math.round(shippingDiscount)
-        }
-      }
+        id: coupon.id,
+        code: coupon.code,
+        name: coupon.name,
+        description: coupon.description,
+        type: coupon.type,
+        value: coupon.value,
+        minAmount: coupon.minAmount,
+        maxDiscount: coupon.maxDiscount,
+        discountAmount,
+      },
+      message: '사용 가능한 쿠폰입니다.',
     });
-
   } catch (error) {
-    console.error('쿠폰 검증 실패:', error);
+    console.error('쿠폰 검증 오류:', error);
     return NextResponse.json(
-      { success: false, error: '쿠폰 검증에 실패했습니다' },
+      { error: '쿠폰 검증에 실패했습니다.' },
       { status: 500 }
     );
   }
