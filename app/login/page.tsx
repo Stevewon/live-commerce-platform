@@ -30,10 +30,9 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (data.success) {
-        // 토큰 저장
-        localStorage.setItem('token', data.data.token)
+        // 로그인 성공 - 쿠키에 자동 저장됨
+        // localStorage에도 저장 (클라이언트에서 빠른 접근용)
         localStorage.setItem('user', JSON.stringify(data.data.user))
-        localStorage.setItem('role', data.data.user.role)
         
         // 역할별 리다이렉트
         if (data.data.user.role === 'ADMIN') {
@@ -43,6 +42,9 @@ export default function LoginPage() {
         } else {
           router.push(callbackUrl)
         }
+        
+        // 페이지 새로고침하여 네비게이션 업데이트
+        router.refresh()
       } else {
         setError(data.error || '로그인에 실패했습니다')
       }

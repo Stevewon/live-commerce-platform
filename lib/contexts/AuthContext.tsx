@@ -39,29 +39,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  // 자동 로그인 - 페이지 로드 시 토큰 확인
+  // 자동 로그인 - 페이지 로드 시 쿠키에서 사용자 정보 가져오기
   useEffect(() => {
-    const initAuth = () => {
+    const initAuth = async () => {
       try {
-        const savedToken = localStorage.getItem('token')
-        const savedUser = localStorage.getItem('user')
+        // 쿠키에서 사용자 정보 가져오기 (서버 검증)
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include', // 쿠키 포함
+        });
 
-        if (savedToken && savedUser) {
-          // localStorage에서 복원
-          setUser(JSON.parse(savedUser))
-          setToken(savedToken)
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.data.user) {
+            setUser(data.data.user);
+            // localStorage에도 저장 (빠른 접근용)
+            localStorage.setItem('user', JSON.stringify(data.data.user));
+          }
+        } else {
+          // 쿠키가 없거나 유효하지 않음
+          setUser(null);
+          localStorage.removeItem('user');
         }
       } catch (error) {
-        console.error('Auto-login failed:', error)
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+        console.error('Auto-login failed:', error);
+        setUser(null);
+        localStorage.removeItem('user');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    initAuth()
-  }, [])
+    initAuth();
+  }, []);
 
   // 로그인
   const login = async (email: string, password: string) => {
@@ -69,7 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
+        credentials: 'include', // 쿠키 포함
       })
 
       const data = await res.json()
@@ -78,13 +88,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || '로그인에 실패했습니다')
       }
 
-      // 로그인 성공
+      // 로그인 성공 - 쿠키에 자동 저장됨
       const userData = data.data?.user || data.user
       const tokenData = data.data?.token || data.token
       
       setUser(userData)
       setToken(tokenData)
-      localStorage.setItem('token', tokenData)
+      // localStorage에도 저장 (빠른 접근용)
       localStorage.setItem('user', JSON.stringify(userData))
 
       // 역할에 따라 리다이렉션
@@ -93,8 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (userData.role === 'PARTNER') {
         router.push('/partner/dashboard')
       } else {
-        router.push('/shop')
+        router.push('/products')
       }
+      
+      // 페이지 새로고침하여 네비게이션 업데이트
+      router.refresh()
     } catch (error) {
       throw error
     }
@@ -106,7 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        credentials: 'include', // 쿠키 포함
       })
 
       const result = await res.json()
@@ -115,44 +129,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(result.error || '회원가입에 실패했습니다')
       }
 
-      // 회원가입 성공 시 자동 로그인
+      // 회원가입 성공 시 자동 로그인 - 쿠키에 자동 저장됨
       const userData = result.data?.user || result.user
       const tokenData = result.data?.token || result.token
       
       setUser(userData)
       setToken(tokenData)
-      localStorage.setItem('token', tokenData)
+      // localStorage에도 저장 (빠른 접근용)
       localStorage.setItem('user', JSON.stringify(userData))
 
       // 역할에 따라 리다이렉션
       if (userData.role === 'PARTNER') {
         router.push('/partner/dashboard')
       } else {
-        router.push('/shop')
+        router.push('/products')
       }
+      
+      // 페이지 새로고침하여 네비게이션 업데이트
+      router.refresh()
     } catch (error) {
       throw error
     }
   }
 
   // 로그아웃
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // 서버에 로그아웃 요청 (쿠키 삭제)
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
     setUser(null)
     setToken(null)
-    localStorage.removeItem('token')
     localStorage.removeItem('user')
     router.push('/')
+    router.refresh()
   }
 
-  // 사용자 정보 새로고침 (localStorage에서 다시 로드)
+  // 사용자 정보 새로고침 (서버에서 다시 가져오기)
   const refreshUser = async () => {
-    if (!token) return
-
     try {
-      // localStorage에서 다시 로드
-      const savedUser = localStorage.getItem('user')
-      if (savedUser) {
-        setUser(JSON.parse(savedUser))
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data.user) {
+          setUser(data.data.user);
+          localStorage.setItem('user', JSON.stringify(data.data.user));
+        }
       }
     } catch (error) {
       console.error('Failed to refresh user:', error)
