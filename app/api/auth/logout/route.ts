@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 // POST /api/auth/logout - 로그아웃
 export async function POST() {
   try {
-    const response = NextResponse.json({
+    // 쿠키 삭제 - Next.js cookies 사용
+    const cookieStore = cookies();
+    cookieStore.delete('auth-token');
+    cookieStore.delete('user-role');
+    
+    return NextResponse.json({
       success: true,
       message: 'Logout successful',
     });
-    
-    // 쿠키 삭제
-    response.cookies.delete('auth-token');
-    response.cookies.delete('user-role');
-    
-    return response;
   } catch (error) {
     console.error('[LOGOUT_ERROR]', error);
     return NextResponse.json(

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import prisma from '@/lib/prisma';
 import { verifyPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
@@ -68,18 +69,9 @@ export async function POST(request: NextRequest) {
     // 비밀번호 제외하고 반환
     const { password: _, ...userWithoutPassword } = user;
     
-    // 쿠키에 토큰 저장 (HTTP-only, Secure, SameSite)
-    const response = NextResponse.json({
-      success: true,
-      data: {
-        user: userWithoutPassword,
-        token,
-      },
-      message: 'Login successful',
-    });
-    
-    // HTTP-only 쿠키 설정 (30일 유효)
-    response.cookies.set('auth-token', token, {
+    // HTTP-only 쿠키 설정 (30일 유효) - Next.js cookies 사용
+    const cookieStore = cookies();
+    cookieStore.set('auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -88,7 +80,7 @@ export async function POST(request: NextRequest) {
     });
     
     // 사용자 역할도 쿠키에 저장 (클라이언트에서 읽을 수 있도록)
-    response.cookies.set('user-role', user.role, {
+    cookieStore.set('user-role', user.role, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -96,7 +88,14 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
     
-    return response;
+    return NextResponse.json({
+      success: true,
+      data: {
+        user: userWithoutPassword,
+        token,
+      },
+      message: 'Login successful',
+    });
   } catch (error) {
     console.error('[LOGIN_ERROR]', error);
     return NextResponse.json(
