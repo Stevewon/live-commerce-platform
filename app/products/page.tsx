@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 
-// 상품 인터페이스
 interface Product {
   id: string;
   name: string;
@@ -58,6 +57,15 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   SHIPPING: { label: '배송 중', color: 'bg-purple-100 text-purple-800' },
   DELIVERED: { label: '배송 완료', color: 'bg-green-100 text-green-800' },
   CANCELLED: { label: '취소됨', color: 'bg-red-100 text-red-800' },
+};
+
+// 카테고리 아이콘 매핑
+const CATEGORY_ICONS: Record<string, string> = {
+  'electronics': '📱',
+  'beauty': '💄',
+  'food': '🍯',
+  'fashion': '👕',
+  'all': '🏷️'
 };
 
 export default function ShopMainPage() {
@@ -213,172 +221,240 @@ export default function ShopMainPage() {
   };
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shippingFee = cartTotal > 0 ? 3000 : 0;
+  const shippingFee = cartTotal >= 50000 ? 0 : 3000;
   const finalAmount = cartTotal + shippingFee;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* 상단 헤더 */}
-      <div className="bg-white border-b sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-bold text-xl text-gray-900 hover:text-blue-600">
-            <span className="text-2xl">🏪</span>
-            <span>Live Commerce</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            {user ? (
-              <>
-                <span className="text-sm text-gray-700"><span className="font-semibold">{user.name}</span>님</span>
-                <Link href="/" className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">홈으로</Link>
-              </>
-            ) : (
-              <Link href="/login" className="text-sm px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">로그인</Link>
-            )}
+      <header className="bg-white border-b sticky top-0 z-50 shadow-sm">
+        <div className="max-w-screen-xl mx-auto px-4">
+          <div className="h-16 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-2xl">🏪</span>
+              <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Live Commerce</span>
+            </Link>
+            
+            {/* 검색바 */}
+            <div className="flex-1 max-w-2xl mx-8">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="상품을 검색해보세요"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full h-11 pl-4 pr-12 border-2 border-blue-500 rounded-lg focus:outline-none focus:border-blue-600"
+                />
+                <button className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center hover:bg-blue-600 transition">
+                  <span className="text-white text-lg">🔍</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 사용자 메뉴 */}
+            <div className="flex items-center gap-4">
+              {user ? (
+                <>
+                  <span className="text-sm font-medium text-gray-700">{user.name}님</span>
+                  <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">홈</Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="text-sm font-medium text-gray-700 hover:text-blue-600">로그인</Link>
+                  <Link href="/register" className="text-sm font-medium text-gray-700 hover:text-blue-600">회원가입</Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 flex gap-6">
-        {/* 좌측 사이드바 */}
-        <aside className="w-64 flex-shrink-0">
-          <div className="bg-white rounded-lg shadow-sm p-4 sticky top-24">
-            <h2 className="font-bold text-lg mb-4 text-gray-900">🛍️ 쇼핑몰</h2>
-            
-            {/* 카테고리 */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-gray-500 mb-2">카테고리</h3>
-              <nav className="space-y-1">
+      <div className="max-w-screen-xl mx-auto px-4 py-6 flex gap-6">
+        {/* 좌측 카테고리 네비게이션 */}
+        <aside className="w-60 flex-shrink-0">
+          <nav className="bg-white rounded-lg border p-4 sticky top-24">
+            <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+              <span>📂</span>
+              <span>카테고리</span>
+            </h2>
+            <ul className="space-y-1">
+              <li>
                 <button
                   onClick={() => { router.push('/products?view=products'); setSelectedCategory('all'); }}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition ${
+                  className={`w-full text-left px-4 py-2.5 rounded-lg transition font-medium ${
                     view === 'products' && selectedCategory === 'all'
-                      ? 'bg-blue-50 text-blue-700 font-semibold'
+                      ? 'bg-blue-50 text-blue-700'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  🏷️ 전체상품
+                  <span className="mr-2">🏷️</span>전체상품
                 </button>
-                {categories.map((cat) => (
+              </li>
+              {categories.map((cat) => (
+                <li key={cat.id}>
                   <button
-                    key={cat.id}
                     onClick={() => { router.push('/products?view=products'); setSelectedCategory(cat.slug); }}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition ${
+                    className={`w-full text-left px-4 py-2.5 rounded-lg transition font-medium ${
                       view === 'products' && selectedCategory === cat.slug
-                        ? 'bg-blue-50 text-blue-700 font-semibold'
+                        ? 'bg-blue-50 text-blue-700'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    {cat.name}
+                    <span className="mr-2">{CATEGORY_ICONS[cat.slug] || '📦'}</span>{cat.name}
                   </button>
-                ))}
-              </nav>
-            </div>
+                </li>
+              ))}
+            </ul>
 
-            {/* 마이쇼핑 */}
             {user && (
-              <div>
-                <h3 className="text-sm font-semibold text-gray-500 mb-2">마이쇼핑</h3>
-                <nav className="space-y-1">
-                  <button
-                    onClick={() => router.push('/products?view=cart')}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition ${
-                      view === 'cart' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    🛒 장바구니
-                  </button>
-                  <button
-                    onClick={() => router.push('/products?view=orders')}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition ${
-                      view === 'orders' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    📦 주문내역
-                  </button>
-                </nav>
-              </div>
+              <>
+                <div className="border-t my-4"></div>
+                <h2 className="font-bold text-lg mb-4 flex items-center gap-2">
+                  <span>👤</span>
+                  <span>마이쇼핑</span>
+                </h2>
+                <ul className="space-y-1">
+                  <li>
+                    <button
+                      onClick={() => router.push('/products?view=cart')}
+                      className={`w-full text-left px-4 py-2.5 rounded-lg transition font-medium ${
+                        view === 'cart' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      🛒 장바구니
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => router.push('/products?view=orders')}
+                      className={`w-full text-left px-4 py-2.5 rounded-lg transition font-medium ${
+                        view === 'orders' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      📦 주문내역
+                    </button>
+                  </li>
+                </ul>
+              </>
             )}
-          </div>
+          </nav>
         </aside>
 
         {/* 메인 콘텐츠 */}
-        <main className="flex-1">
+        <main className="flex-1 min-w-0">
           {/* 상품 목록 뷰 */}
           {view === 'products' && (
             <div>
+              {/* 배너 섹션 */}
+              <div className="mb-6 rounded-2xl overflow-hidden shadow-lg">
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-12 text-white">
+                  <h1 className="text-3xl font-bold mb-2">🎉 특가 세일 진행중!</h1>
+                  <p className="text-lg opacity-90">최대 50% 할인 + 무료배송</p>
+                  <div className="mt-4 inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
+                    <span className="text-sm font-semibold">⚡ 로켓배송</span>
+                    <span className="text-sm">|</span>
+                    <span className="text-sm">오늘 주문 시 내일 도착</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 무료배송 안내 */}
+              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🚚</span>
+                  <div>
+                    <p className="font-bold text-blue-900">50,000원 이상 구매 시 무료배송</p>
+                    <p className="text-sm text-blue-700">지금 바로 혜택을 받아보세요!</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 카테고리 타이틀 */}
               <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                <h2 className="text-2xl font-bold text-gray-900">
                   {selectedCategory === 'all' ? '전체 상품' : categories.find(c => c.slug === selectedCategory)?.name || '상품'}
-                </h1>
-                <input
-                  type="text"
-                  placeholder="상품 검색..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">총 {products.length}개의 상품</p>
               </div>
               
               {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="flex items-center justify-center h-96">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent"></div>
                 </div>
               ) : products.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-lg">
-                  <p className="text-gray-500">상품이 없습니다</p>
+                <div className="text-center py-20 bg-gray-50 rounded-lg">
+                  <span className="text-6xl mb-4 block">📦</span>
+                  <p className="text-xl text-gray-600">상품이 없습니다</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {products.map((product) => (
-                    <div key={product.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition">
+                    <div key={product.id} className="group bg-white border rounded-lg overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer">
                       <Link href={`/products/${product.slug}`}>
-                        <div className="relative h-48 bg-gray-200">
+                        <div className="relative aspect-square bg-gray-100 overflow-hidden">
                           {product.thumbnail ? (
-                            <img src={product.thumbnail} alt={product.name} className="w-full h-full object-cover" />
+                            <img 
+                              src={product.thumbnail} 
+                              alt={product.name} 
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
+                            />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">이미지 없음</div>
+                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                              <span className="text-4xl">📦</span>
+                            </div>
                           )}
                           {product.isFeatured && (
-                            <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">BEST</div>
+                            <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs font-bold shadow-lg">
+                              🔥 인기
+                            </div>
                           )}
                           {product.stock === 0 && (
-                            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                              <span className="text-white font-bold">품절</span>
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                              <span className="text-white font-bold text-lg bg-gray-900/80 px-4 py-2 rounded-lg">품절</span>
+                            </div>
+                          )}
+                          {product.comparePrice && product.comparePrice > product.price && (
+                            <div className="absolute top-2 right-2 bg-yellow-400 text-gray-900 px-2 py-1 rounded-md text-xs font-bold shadow-lg">
+                              {Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)}% 할인
                             </div>
                           )}
                         </div>
                       </Link>
                       <div className="p-4">
-                        <div className="text-xs text-gray-500 mb-1">{product.category.name}</div>
+                        <div className="text-xs text-gray-500 mb-2">{product.category.name}</div>
                         <Link href={`/products/${product.slug}`}>
-                          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-blue-600">{product.name}</h3>
+                          <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition h-10">
+                            {product.name}
+                          </h3>
                         </Link>
                         <div className="mb-3">
                           {product.comparePrice && product.comparePrice > product.price && (
-                            <div className="text-sm text-gray-400 line-through">₩{product.comparePrice.toLocaleString()}</div>
+                            <div className="text-sm text-gray-400 line-through mb-1">
+                              ₩{product.comparePrice.toLocaleString()}
+                            </div>
                           )}
                           <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-bold text-gray-900">₩{product.price.toLocaleString()}</span>
-                            {product.comparePrice && product.comparePrice > product.price && (
-                              <span className="text-sm font-semibold text-red-500">
-                                {Math.round(((product.comparePrice - product.price) / product.comparePrice) * 100)}%
-                              </span>
-                            )}
+                            <span className="text-2xl font-bold text-gray-900">
+                              ₩{product.price.toLocaleString()}
+                            </span>
                           </div>
                         </div>
-                        <div className="text-xs text-gray-500 mb-3">
-                          {product.stock > 0 ? `재고: ${product.stock}개` : '품절'}
-                        </div>
+                        {product.price >= 50000 && (
+                          <div className="mb-2 text-xs text-blue-600 font-semibold flex items-center gap-1">
+                            <span>🚚</span>
+                            <span>무료배송</span>
+                          </div>
+                        )}
                         <button
                           onClick={() => addToCart(product.id)}
                           disabled={product.stock === 0}
-                          className={`w-full py-2 px-4 rounded-lg font-medium transition ${
+                          className={`w-full py-2.5 rounded-lg font-bold transition-all ${
                             product.stock === 0
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95'
                           }`}
                         >
-                          {product.stock === 0 ? '품절' : '🛒 장바구니'}
+                          {product.stock === 0 ? '품절' : '장바구니 담기'}
                         </button>
                       </div>
                     </div>
@@ -391,49 +467,80 @@ export default function ShopMainPage() {
           {/* 장바구니 뷰 */}
           {view === 'cart' && (
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-6">🛒 장바구니</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">🛒 장바구니</h1>
               {!user ? (
-                <div className="bg-white rounded-lg p-12 text-center">
-                  <p className="text-gray-600 mb-4">로그인이 필요합니다</p>
-                  <Link href="/login" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">로그인</Link>
+                <div className="bg-white border rounded-lg p-16 text-center">
+                  <span className="text-6xl mb-4 block">🔒</span>
+                  <p className="text-xl text-gray-600 mb-6">로그인이 필요합니다</p>
+                  <Link href="/login" className="inline-block px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold">로그인하기</Link>
                 </div>
               ) : loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="flex items-center justify-center h-96">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent"></div>
                 </div>
               ) : cartItems.length === 0 ? (
-                <div className="bg-white rounded-lg p-12 text-center">
-                  <div className="text-6xl mb-4">🛒</div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-2">장바구니가 비어있습니다</h2>
-                  <p className="text-gray-600 mb-6">상품을 담아보세요!</p>
-                  <button onClick={() => router.push('/products?view=products')} className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">쇼핑 계속하기</button>
+                <div className="bg-white border rounded-lg p-16 text-center">
+                  <span className="text-6xl mb-4 block">🛒</span>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">장바구니가 비어있습니다</h2>
+                  <p className="text-gray-600 mb-8">마음에 드는 상품을 담아보세요!</p>
+                  <button 
+                    onClick={() => router.push('/products?view=products')} 
+                    className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold"
+                  >
+                    쇼핑 계속하기
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2">
-                    <div className="bg-white rounded-lg shadow">
-                      <div className="p-4 border-b flex justify-between items-center">
-                        <h2 className="font-semibold">상품 목록 ({cartItems.length}개)</h2>
-                        <button onClick={clearCart} className="text-sm text-red-600 hover:text-red-700">전체 삭제</button>
+                    <div className="bg-white border rounded-lg overflow-hidden">
+                      <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+                        <div>
+                          <h2 className="font-bold text-lg">전체 {cartItems.length}개</h2>
+                          <p className="text-sm text-gray-600">일반배송 상품</p>
+                        </div>
+                        <button onClick={clearCart} className="text-sm text-red-600 hover:text-red-700 font-medium">전체삭제</button>
                       </div>
                       <div className="divide-y">
                         {cartItems.map((item) => (
-                          <div key={item.id} className="p-4 hover:bg-gray-50">
+                          <div key={item.id} className="p-4 hover:bg-gray-50 transition">
                             <div className="flex gap-4">
-                              <img src={item.product.thumbnail} alt={item.product.name} className="w-24 h-24 object-cover rounded-lg" />
-                              <div className="flex-1">
+                              <img 
+                                src={item.product.thumbnail} 
+                                alt={item.product.name} 
+                                className="w-28 h-28 object-cover rounded-lg border"
+                              />
+                              <div className="flex-1 min-w-0">
                                 <p className="text-xs text-gray-500 mb-1">{item.product.category.name}</p>
-                                <h3 className="font-semibold text-gray-900 mb-2">{item.product.name}</h3>
-                                <p className="text-lg font-bold text-gray-900 mb-3">₩{item.product.price.toLocaleString()}</p>
+                                <h3 className="font-medium text-gray-900 mb-2 line-clamp-2">{item.product.name}</h3>
+                                <p className="text-xl font-bold text-gray-900 mb-3">₩{item.product.price.toLocaleString()}</p>
                                 <div className="flex items-center gap-2">
-                                  <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} disabled={updating === item.productId || item.quantity <= 1} className="w-8 h-8 border rounded hover:bg-gray-100 disabled:opacity-50">−</button>
-                                  <span className="w-12 text-center font-medium">{item.quantity}</span>
-                                  <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} disabled={updating === item.productId || item.quantity >= item.product.stock} className="w-8 h-8 border rounded hover:bg-gray-100 disabled:opacity-50">+</button>
-                                  <button onClick={() => removeItem(item.productId)} disabled={updating === item.productId} className="ml-4 text-sm text-red-600 hover:text-red-700">삭제</button>
+                                  <button 
+                                    onClick={() => updateQuantity(item.productId, item.quantity - 1)} 
+                                    disabled={updating === item.productId || item.quantity <= 1} 
+                                    className="w-8 h-8 border rounded hover:bg-gray-100 disabled:opacity-50 flex items-center justify-center font-bold"
+                                  >
+                                    −
+                                  </button>
+                                  <span className="w-14 text-center font-bold text-lg">{item.quantity}</span>
+                                  <button 
+                                    onClick={() => updateQuantity(item.productId, item.quantity + 1)} 
+                                    disabled={updating === item.productId || item.quantity >= item.product.stock} 
+                                    className="w-8 h-8 border rounded hover:bg-gray-100 disabled:opacity-50 flex items-center justify-center font-bold"
+                                  >
+                                    +
+                                  </button>
+                                  <button 
+                                    onClick={() => removeItem(item.productId)} 
+                                    disabled={updating === item.productId} 
+                                    className="ml-4 text-sm text-red-600 hover:text-red-700 font-medium"
+                                  >
+                                    삭제
+                                  </button>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-lg font-bold text-gray-900">₩{(item.product.price * item.quantity).toLocaleString()}</p>
+                                <p className="text-xl font-bold text-blue-600">₩{(item.product.price * item.quantity).toLocaleString()}</p>
                               </div>
                             </div>
                           </div>
@@ -442,24 +549,45 @@ export default function ShopMainPage() {
                     </div>
                   </div>
                   <div className="lg:col-span-1">
-                    <div className="bg-white rounded-lg shadow p-6 sticky top-24">
-                      <h2 className="text-lg font-bold text-gray-900 mb-4">주문 요약</h2>
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between text-gray-600">
-                          <span>상품 금액</span>
-                          <span>₩{cartTotal.toLocaleString()}</span>
+                    <div className="bg-white border rounded-lg p-6 sticky top-24">
+                      <h2 className="text-xl font-bold text-gray-900 mb-6">결제 예상금액</h2>
+                      <div className="space-y-3 mb-6 pb-6 border-b">
+                        <div className="flex justify-between text-gray-700">
+                          <span>주문금액</span>
+                          <span className="font-bold">₩{cartTotal.toLocaleString()}</span>
                         </div>
-                        <div className="flex justify-between text-gray-600">
+                        <div className="flex justify-between text-gray-700">
                           <span>배송비</span>
-                          <span>₩{shippingFee.toLocaleString()}</span>
-                        </div>
-                        <div className="border-t pt-3 flex justify-between text-lg font-bold text-gray-900">
-                          <span>총 결제 금액</span>
-                          <span className="text-blue-600">₩{finalAmount.toLocaleString()}</span>
+                          <span className="font-bold">
+                            {shippingFee === 0 ? (
+                              <span className="text-blue-600">무료</span>
+                            ) : (
+                              `₩${shippingFee.toLocaleString()}`
+                            )}
+                          </span>
                         </div>
                       </div>
-                      <Link href="/checkout" className="block w-full py-3 bg-blue-600 text-white text-center rounded-lg font-semibold hover:bg-blue-700 mb-2">주문하기</Link>
-                      <button onClick={() => router.push('/products?view=products')} className="block w-full py-3 bg-gray-100 text-gray-700 text-center rounded-lg font-medium hover:bg-gray-200">쇼핑 계속하기</button>
+                      <div className="flex justify-between text-xl font-bold text-gray-900 mb-6">
+                        <span>총 결제금액</span>
+                        <span className="text-blue-600">₩{finalAmount.toLocaleString()}</span>
+                      </div>
+                      <Link 
+                        href="/checkout" 
+                        className="block w-full py-4 bg-blue-500 text-white text-center rounded-lg font-bold text-lg hover:bg-blue-600 transition mb-3"
+                      >
+                        {cartItems.length}개 상품 주문하기
+                      </Link>
+                      <button 
+                        onClick={() => router.push('/products?view=products')} 
+                        className="block w-full py-3 bg-white border-2 border-gray-300 text-gray-700 text-center rounded-lg font-bold hover:bg-gray-50 transition"
+                      >
+                        쇼핑 계속하기
+                      </button>
+                      {cartTotal < 50000 && (
+                        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                          <span className="font-bold">{(50000 - cartTotal).toLocaleString()}원</span> 더 담으면 <span className="font-bold">무료배송</span>!
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -470,52 +598,74 @@ export default function ShopMainPage() {
           {/* 주문내역 뷰 */}
           {view === 'orders' && (
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-6">📦 주문내역</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">📦 주문내역</h1>
               {!user ? (
-                <div className="bg-white rounded-lg p-12 text-center">
-                  <p className="text-gray-600 mb-4">로그인이 필요합니다</p>
-                  <Link href="/login" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">로그인</Link>
+                <div className="bg-white border rounded-lg p-16 text-center">
+                  <span className="text-6xl mb-4 block">🔒</span>
+                  <p className="text-xl text-gray-600 mb-6">로그인이 필요합니다</p>
+                  <Link href="/login" className="inline-block px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold">로그인하기</Link>
                 </div>
               ) : loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="flex items-center justify-center h-96">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent"></div>
                 </div>
               ) : orders.length === 0 ? (
-                <div className="bg-white rounded-lg p-12 text-center">
-                  <div className="text-6xl mb-4">📦</div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-2">주문 내역이 없습니다</h2>
-                  <p className="text-gray-600 mb-6">첫 주문을 시작해보세요!</p>
-                  <button onClick={() => router.push('/products?view=products')} className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">쇼핑하러 가기</button>
+                <div className="bg-white border rounded-lg p-16 text-center">
+                  <span className="text-6xl mb-4 block">📦</span>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">주문 내역이 없습니다</h2>
+                  <p className="text-gray-600 mb-8">첫 주문을 시작해보세요!</p>
+                  <button 
+                    onClick={() => router.push('/products?view=products')} 
+                    className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold"
+                  >
+                    쇼핑하러 가기
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {orders.map((order) => {
                     const status = STATUS_MAP[order.status] || { label: order.status, color: 'bg-gray-100 text-gray-800' };
                     return (
-                      <div key={order.id} className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+                      <div key={order.id} className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition">
+                        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
                           <div>
-                            <p className="text-sm text-gray-500">주문번호: {order.orderNumber}</p>
-                            <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString('ko-KR')}</p>
+                            <div className="flex items-center gap-3 mb-1">
+                              <p className="font-bold text-gray-900">{order.orderNumber}</p>
+                              <span className={`px-3 py-1 rounded-full text-sm font-bold ${status.color}`}>
+                                {status.label}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600">{new Date(order.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${status.color}`}>{status.label}</span>
+                          <Link 
+                            href={`/orders/${order.id}`} 
+                            className="px-5 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-bold text-sm transition"
+                          >
+                            상세보기
+                          </Link>
                         </div>
                         <div className="p-4">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="flex gap-4 mb-3">
-                              <img src={item.product.thumbnail} alt={item.product.name} className="w-20 h-20 object-cover rounded" />
-                              <div className="flex-1">
-                                <p className="font-semibold text-gray-900">{item.product.name}</p>
-                                <p className="text-sm text-gray-600">₩{item.price.toLocaleString()} × {item.quantity}개</p>
+                          <div className="space-y-3">
+                            {order.items.map((item, idx) => (
+                              <div key={idx} className="flex gap-4">
+                                <img 
+                                  src={item.product.thumbnail} 
+                                  alt={item.product.name} 
+                                  className="w-20 h-20 object-cover rounded-lg border" 
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 mb-1 line-clamp-2">{item.product.name}</p>
+                                  <p className="text-sm text-gray-600">₩{item.price.toLocaleString()} · {item.quantity}개</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-bold text-gray-900">₩{(item.price * item.quantity).toLocaleString()}</p>
+                                </div>
                               </div>
-                              <div className="text-right">
-                                <p className="font-bold text-gray-900">₩{(item.price * item.quantity).toLocaleString()}</p>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="border-t pt-3 flex justify-between items-center">
-                            <p className="text-lg font-bold text-gray-900">총 결제금액: ₩{order.total.toLocaleString()}</p>
-                            <Link href={`/orders/${order.id}`} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">상세보기</Link>
+                            ))}
+                          </div>
+                          <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                            <p className="text-lg font-bold text-gray-900">총 결제금액</p>
+                            <p className="text-2xl font-bold text-blue-600">₩{order.total.toLocaleString()}</p>
                           </div>
                         </div>
                       </div>
