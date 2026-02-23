@@ -393,7 +393,7 @@ export default function ShopMainPage() {
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {products.map((product) => (
-                    <div key={product.id} className="group bg-white border rounded-lg overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer">
+                    <div key={product.id} className="group bg-white border rounded-lg overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col">
                       <Link href={`/products/${product.slug}`}>
                         <div className="relative aspect-square bg-gradient-to-br from-blue-50 to-purple-50 overflow-hidden">
                           <div className="w-full h-full flex items-center justify-center">
@@ -421,7 +421,7 @@ export default function ShopMainPage() {
                           )}
                         </div>
                       </Link>
-                      <div className="p-4">
+                      <div className="p-4 flex flex-col flex-1">
                         <div className="text-xs text-gray-500 mb-2">{product.category.name}</div>
                         <Link href={`/products/${product.slug}`}>
                           <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition h-10">
@@ -440,16 +440,18 @@ export default function ShopMainPage() {
                             </span>
                           </div>
                         </div>
-                        {product.price >= 50000 && (
-                          <div className="mb-2 text-xs text-blue-600 font-semibold flex items-center gap-1">
-                            <span>🚚</span>
-                            <span>무료배송</span>
-                          </div>
-                        )}
+                        <div className="h-6 mb-2">
+                          {product.price >= 50000 && (
+                            <div className="text-xs text-blue-600 font-semibold flex items-center gap-1">
+                              <span>🚚</span>
+                              <span>무료배송</span>
+                            </div>
+                          )}
+                        </div>
                         <button
                           onClick={() => addToCart(product.id)}
                           disabled={product.stock === 0}
-                          className={`w-full py-2.5 rounded-lg font-bold transition-all ${
+                          className={`w-full py-2.5 rounded-lg font-bold transition-all mt-auto ${
                             product.stock === 0
                               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                               : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95'
