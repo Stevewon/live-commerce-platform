@@ -180,6 +180,16 @@ export default function HomePage() {
               <Link href="/products" className="text-gray-300 hover:text-white transition text-sm font-semibold">
                 🛍️ 쇼핑몰
               </Link>
+              {user && (
+                <>
+                  <Link href="/cart" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                    🛒 장바구니
+                  </Link>
+                  <Link href="/orders" className="text-gray-300 hover:text-white transition text-sm font-semibold">
+                    📦 주문내역
+                  </Link>
+                </>
+              )}
               {user ? (
                 <>
                   <span className="text-white text-sm font-semibold">
