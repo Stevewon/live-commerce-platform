@@ -247,6 +247,20 @@ async function main() {
 
   console.log('✅ Products created:', products.length);
 
+  // 관리자 계정 생성
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@example.com' },
+    update: {},
+    create: {
+      email: 'admin@example.com',
+      name: '관리자',
+      password: 'admin123', // 실제로는 해시화해야 함
+      role: 'ADMIN',
+    },
+  });
+
+  console.log('✅ Admin user created:', adminUser.email);
+
   // 샘플 유저 생성 (파트너용)
   const partnerUsers = [
     {
