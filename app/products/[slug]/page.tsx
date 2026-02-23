@@ -181,9 +181,43 @@ export default function ProductDetailPage() {
       {/* 헤더 */}
       <div className="bg-white border-b sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <Link href="/products" className="inline-flex items-center text-gray-600 hover:text-gray-900 font-medium">
-            <span className="mr-2">←</span> 뒤로가기
-          </Link>
+          <div className="flex items-center justify-between">
+            <Link href="/products" className="inline-flex items-center text-gray-600 hover:text-gray-900 font-medium">
+              <span className="mr-2">←</span> 뒤로가기
+            </Link>
+            
+            {/* 사용자 정보 */}
+            <div className="flex items-center gap-4">
+              {user ? (
+                <>
+                  <span className="text-sm text-gray-600">
+                    안녕하세요, <span className="font-bold text-gray-900">{user.name}</span>님
+                  </span>
+                  <Link
+                    href="/products?view=cart"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition text-sm"
+                  >
+                    🛒 장바구니
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+                  >
+                    로그인
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition text-sm"
+                  >
+                    회원가입
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -358,24 +392,26 @@ export default function ProductDetailPage() {
 
         {/* 탭 네비게이션 */}
         <div className="bg-white rounded-t-lg shadow-sm border-b sticky top-[57px] z-40">
-          <div className="flex overflow-x-auto">
-            <button onClick={() => setActiveTab('detail')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'detail' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
-              📝 상세정보
-            </button>
-            <button onClick={() => setActiveTab('specs')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'specs' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
-              📊 상품스펙
-            </button>
-            {product.partnerProducts.length > 0 && (
-              <button onClick={() => setActiveTab('sellers')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'sellers' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
-                🏪 판매업체 ({product.partnerProducts.length})
+          <div className="max-w-4xl mx-auto">
+            <div className="flex overflow-x-auto">
+              <button onClick={() => setActiveTab('detail')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'detail' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
+                📝 상세정보
               </button>
-            )}
-            <button onClick={() => setActiveTab('review')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'review' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
-              ⭐ 리뷰 ({product.reviews.length})
-            </button>
-            <button onClick={() => setActiveTab('qna')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'qna' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
-              ❓ Q&A
-            </button>
+              <button onClick={() => setActiveTab('specs')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'specs' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
+                📊 상품스펙
+              </button>
+              {product.partnerProducts.length > 0 && (
+                <button onClick={() => setActiveTab('sellers')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'sellers' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
+                  🏪 판매업체 ({product.partnerProducts.length})
+                </button>
+              )}
+              <button onClick={() => setActiveTab('review')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'review' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
+                ⭐ 리뷰 ({product.reviews && product.reviews.length})
+              </button>
+              <button onClick={() => setActiveTab('qna')} className={`flex-shrink-0 px-6 py-4 font-bold text-base transition-all ${activeTab === 'qna' ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50' : 'text-gray-600 hover:text-gray-900'}`}>
+                ❓ Q&A
+              </button>
+            </div>
           </div>
         </div>
 
