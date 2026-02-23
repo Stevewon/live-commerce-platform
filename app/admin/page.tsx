@@ -137,6 +137,9 @@ export default function AdminDashboard() {
           <Link href="/admin" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
             대시보드
           </Link>
+          <Link href="/admin/users" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+            👥 회원 관리
+          </Link>
           <Link href="/admin/orders" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
             주문 관리
           </Link>
