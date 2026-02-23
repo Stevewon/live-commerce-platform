@@ -74,7 +74,7 @@ export default function AdminProductsPage() {
       const res = await fetch(`/api/admin/products?${params}`, {
         credentials: 'include',
         headers: {
-          
+          'Content-Type': 'application/json'
         }
       })
 
