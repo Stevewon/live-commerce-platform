@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/middleware';
+import { verifyAuthToken } from '@/lib/auth/middleware';
 import prisma from '@/lib/prisma';
 
 // 알림 설정 조회 (GET)
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const { userId } = authResult;
     if (authResult.error) {
       return NextResponse.json(
         { success: false, error: authResult.error },
@@ -15,14 +19,14 @@ export async function GET(request: NextRequest) {
 
     // 사용자 알림 설정 조회
     let preferences = await prisma.userPreferences.findUnique({
-      where: { userId: authResult.user.id }
+      where: { userId: userId }
     });
 
     // 설정이 없으면 기본값으로 생성
     if (!preferences) {
       preferences = await prisma.userPreferences.create({
         data: {
-          userId: authResult.user.id,
+          userId: userId,
           emailNotifications: true,
           smsNotifications: true,
           orderNotifications: true,
@@ -54,7 +58,11 @@ export async function GET(request: NextRequest) {
 // 알림 설정 업데이트 (PATCH)
 export async function PATCH(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const { userId } = authResult;
     if (authResult.error) {
       return NextResponse.json(
         { success: false, error: authResult.error },
@@ -74,7 +82,7 @@ export async function PATCH(request: NextRequest) {
 
     // 알림 설정 업데이트 (없으면 생성)
     const preferences = await prisma.userPreferences.upsert({
-      where: { userId: authResult.user.id },
+      where: { userId: userId },
       update: {
         ...(emailNotifications !== undefined && { emailNotifications }),
         ...(smsNotifications !== undefined && { smsNotifications }),
@@ -84,7 +92,7 @@ export async function PATCH(request: NextRequest) {
         ...(reviewNotifications !== undefined && { reviewNotifications })
       },
       create: {
-        userId: authResult.user.id,
+        userId: userId,
         emailNotifications: emailNotifications ?? true,
         smsNotifications: smsNotifications ?? true,
         orderNotifications: orderNotifications ?? true,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/middleware';
+import { verifyAuthToken } from '@/lib/auth/middleware';
 import prisma from '@/lib/prisma';
 
 // 리뷰 수정 (PATCH)
@@ -8,13 +8,11 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await requireAuth(request);
-    if (authResult.error) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      );
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
+    const { userId, role } = authResult;
 
     const body = await request.json();
     const { rating, comment, images } = body;
@@ -32,7 +30,7 @@ export async function PATCH(
     }
 
     // 본인 확인
-    if (review.userId !== authResult.user.id) {
+    if (review.userId !== userId) {
       return NextResponse.json(
         { success: false, error: '본인의 리뷰만 수정할 수 있습니다' },
         { status: 403 }
@@ -104,13 +102,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authResult = await requireAuth(request);
-    if (authResult.error) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      );
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
+    const { userId, role } = authResult;
 
     // 리뷰 확인
     const review = await prisma.review.findUnique({
@@ -125,7 +121,7 @@ export async function DELETE(
     }
 
     // 본인 또는 관리자 확인
-    if (review.userId !== authResult.user.id && authResult.user.role !== 'ADMIN') {
+    if (review.userId !== userId && role !== 'ADMIN') {
       return NextResponse.json(
         { success: false, error: '본인의 리뷰만 삭제할 수 있습니다' },
         { status: 403 }

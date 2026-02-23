@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/middleware';
+import { verifyAuthToken } from '@/lib/auth/middleware';
 import prisma from '@/lib/prisma';
 
 // 포인트 내역 조회 (GET)
 export async function GET(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
-    if (authResult.error) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      );
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
+    const { userId } = authResult;
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -20,20 +18,20 @@ export async function GET(request: NextRequest) {
 
     // 포인트 잔액 조회
     const user = await prisma.user.findUnique({
-      where: { id: authResult.user.id },
+      where: { id: userId },
       select: { points: true }
     });
 
     // 포인트 내역 조회
     const [history, total] = await Promise.all([
       prisma.pointHistory.findMany({
-        where: { userId: authResult.user.id },
+        where: { userId },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit
       }),
       prisma.pointHistory.count({
-        where: { userId: authResult.user.id }
+        where: { userId }
       })
     ]);
 
@@ -67,16 +65,14 @@ export async function GET(request: NextRequest) {
 // 포인트 지급/차감 (POST) - 관리자 전용
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
-    if (authResult.error) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      );
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
+    const { userId, role } = authResult;
 
     // 관리자 권한 확인
-    if (authResult.user.role !== 'ADMIN') {
+    if (role !== 'ADMIN') {
       return NextResponse.json(
         { success: false, error: '관리자 권한이 필요합니다' },
         { status: 403 }

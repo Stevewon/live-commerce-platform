@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/middleware';
+import { verifyAuthToken } from '@/lib/auth/middleware';
 import prisma from '@/lib/prisma';
 
 // 리뷰 생성 (POST)
 export async function POST(request: NextRequest) {
   try {
-    const authResult = await requireAuth(request);
-    if (authResult.error) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      );
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
+    const { userId } = authResult;
 
     const body = await request.json();
     const { orderId, productId, rating, comment, images } = body;
@@ -48,7 +46,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (order.userId !== authResult.user.id) {
+    if (order.userId !== userId) {
       return NextResponse.json(
         { success: false, error: '본인의 주문만 리뷰를 작성할 수 있습니다' },
         { status: 403 }
@@ -74,7 +72,7 @@ export async function POST(request: NextRequest) {
       where: {
         orderId,
         productId,
-        userId: authResult.user.id
+        userId
       }
     });
 
@@ -88,7 +86,7 @@ export async function POST(request: NextRequest) {
     // 리뷰 생성
     const review = await prisma.review.create({
       data: {
-        userId: authResult.user.id,
+        userId,
         productId,
         orderId,
         rating,
