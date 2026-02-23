@@ -379,30 +379,31 @@ export default function ShopMainPage() {
               
               {loading ? (
                 <div className="flex items-center justify-center h-96">
-                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent"></div>
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+                    <p className="text-gray-600">상품을 불러오는 중...</p>
+                  </div>
                 </div>
               ) : products.length === 0 ? (
-                <div className="text-center py-20 bg-gray-50 rounded-lg">
-                  <span className="text-6xl mb-4 block">📦</span>
-                  <p className="text-xl text-gray-600">상품이 없습니다</p>
+                <div className="text-center py-20 bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl border-2 border-dashed border-gray-300">
+                  <span className="text-8xl mb-4 block">🔍</span>
+                  <p className="text-2xl font-bold text-gray-700 mb-2">상품이 없습니다</p>
+                  <p className="text-gray-500">다른 카테고리를 확인해보세요</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {products.map((product) => (
                     <div key={product.id} className="group bg-white border rounded-lg overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer">
                       <Link href={`/products/${product.slug}`}>
-                        <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                          {product.thumbnail ? (
-                            <img 
-                              src={product.thumbnail} 
-                              alt={product.name} 
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                              <span className="text-4xl">📦</span>
+                        <div className="relative aspect-square bg-gradient-to-br from-blue-50 to-purple-50 overflow-hidden">
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="text-center">
+                              <span className="text-7xl mb-2 block opacity-30">
+                                {CATEGORY_ICONS[product.category.slug] || '📦'}
+                              </span>
+                              <p className="text-xs text-gray-400 font-medium px-4">{product.name}</p>
                             </div>
-                          )}
+                          </div>
                           {product.isFeatured && (
                             <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-md text-xs font-bold shadow-lg">
                               🔥 인기
@@ -469,10 +470,13 @@ export default function ShopMainPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-6">🛒 장바구니</h1>
               {!user ? (
-                <div className="bg-white border rounded-lg p-16 text-center">
-                  <span className="text-6xl mb-4 block">🔒</span>
-                  <p className="text-xl text-gray-600 mb-6">로그인이 필요합니다</p>
-                  <Link href="/login" className="inline-block px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold">로그인하기</Link>
+                <div className="bg-gradient-to-br from-orange-50 to-red-50 border-2 border-dashed border-orange-300 rounded-2xl p-20 text-center">
+                  <span className="text-8xl mb-6 block">🔐</span>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-3">로그인이 필요합니다</h2>
+                  <p className="text-gray-600 mb-10 text-lg">장바구니 기능을 사용하려면 로그인해주세요</p>
+                  <Link href="/login" className="inline-block px-10 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl hover:from-orange-600 hover:to-red-700 font-bold text-lg shadow-lg hover:shadow-xl transition-all">
+                    🔓 로그인하기
+                  </Link>
                 </div>
               ) : loading ? (
                 <div className="flex items-center justify-center h-96">
@@ -600,25 +604,31 @@ export default function ShopMainPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-6">📦 주문내역</h1>
               {!user ? (
-                <div className="bg-white border rounded-lg p-16 text-center">
-                  <span className="text-6xl mb-4 block">🔒</span>
-                  <p className="text-xl text-gray-600 mb-6">로그인이 필요합니다</p>
-                  <Link href="/login" className="inline-block px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold">로그인하기</Link>
+                <div className="bg-gradient-to-br from-orange-50 to-red-50 border-2 border-dashed border-orange-300 rounded-2xl p-20 text-center">
+                  <span className="text-8xl mb-6 block">🔐</span>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-3">로그인이 필요합니다</h2>
+                  <p className="text-gray-600 mb-10 text-lg">장바구니 기능을 사용하려면 로그인해주세요</p>
+                  <Link href="/login" className="inline-block px-10 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl hover:from-orange-600 hover:to-red-700 font-bold text-lg shadow-lg hover:shadow-xl transition-all">
+                    🔓 로그인하기
+                  </Link>
                 </div>
               ) : loading ? (
                 <div className="flex items-center justify-center h-96">
-                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent"></div>
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+                    <p className="text-gray-600">주문 내역을 불러오는 중...</p>
+                  </div>
                 </div>
               ) : orders.length === 0 ? (
-                <div className="bg-white border rounded-lg p-16 text-center">
-                  <span className="text-6xl mb-4 block">📦</span>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">주문 내역이 없습니다</h2>
-                  <p className="text-gray-600 mb-8">첫 주문을 시작해보세요!</p>
+                <div className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-dashed border-blue-300 rounded-2xl p-20 text-center">
+                  <span className="text-8xl mb-6 block">📦</span>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-3">주문 내역이 없습니다</h2>
+                  <p className="text-gray-600 mb-10 text-lg">첫 주문을 시작해보세요!</p>
                   <button 
                     onClick={() => router.push('/products?view=products')} 
-                    className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-bold"
+                    className="px-10 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl hover:from-blue-600 hover:to-purple-700 font-bold text-lg shadow-lg hover:shadow-xl transition-all"
                   >
-                    쇼핑하러 가기
+                    🛍️ 쇼핑하러 가기
                   </button>
                 </div>
               ) : (
