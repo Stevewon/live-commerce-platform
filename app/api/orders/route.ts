@@ -1,6 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import prisma from '@/lib/prisma'
+import { sendEmail, orderConfirmationEmail } from '@/lib/email'
+import { sendSMS, orderConfirmationSMS } from '@/lib/sms'
+
+// 주문 알림 전송 함수
+async function sendOrderNotifications(order: any, userId: string) {
+  try {
+    // 사용자 정보 조회
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, phone: true, name: true }
+    });
+
+    if (!user) return;
+
+    // 주문 상품 정보 가져오기
+    const orderWithItems = await prisma.order.findUnique({
+      where: { id: order.id },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: { name: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!orderWithItems) return;
+
+    // 이메일 전송
+    const emailHtml = orderConfirmationEmail({
+      customerName: user.name,
+      orderNumber: order.orderNumber,
+      orderDate: new Date(order.createdAt).toLocaleString('ko-KR'),
+      items: orderWithItems.items.map(item => ({
+        name: item.product.name,
+        quantity: item.quantity,
+        price: item.price
+      })),
+      subtotal: order.subtotal,
+      shippingFee: order.shippingFee,
+      total: order.total,
+      shippingAddress: `${order.shippingName} / ${order.shippingPhone}\n${order.shippingAddress} ${order.shippingZipCode || ''}`
+    });
+
+    await sendEmail({
+      to: user.email,
+      subject: `[Live Commerce] 주문이 접수되었습니다 (${order.orderNumber})`,
+      html: emailHtml
+    });
+
+    // SMS 전송
+    if (user.phone) {
+      const smsMessage = orderConfirmationSMS({
+        customerName: user.name,
+        orderNumber: order.orderNumber,
+        total: order.total
+      });
+
+      await sendSMS({
+        to: user.phone,
+        message: smsMessage
+      });
+    }
+  } catch (error) {
+    console.error('Order notification error:', error);
+  }
+}
 
 // 주문 생성 (POST)
 export async function POST(req: NextRequest) {
@@ -182,9 +251,14 @@ export async function POST(req: NextRequest) {
       return newOrder
     })
 
+    // 🔔 주문 확인 알림 전송 (비동기로 처리하여 응답 지연 방지)
+    sendOrderNotifications(order, userId).catch(err => {
+      console.error('Notification send error:', err);
+    });
+
     return NextResponse.json({
       success: true,
-      order,
+      data: order,
       message: '주문이 완료되었습니다'
     })
   } catch (error: any) {
@@ -233,7 +307,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      orders
+      data: orders
     })
   } catch (error: any) {
     console.error('Get orders error:', error)

@@ -1,324 +1,232 @@
-import nodemailer from 'nodemailer'
+// 이메일 전송 라이브러리
+// Nodemailer 대신 간단한 fetch를 사용하여 외부 이메일 서비스 호출
 
-// SMTP 설정
-const transporter = nodemailer.createTransporter({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-})
-
-// 이메일 전송 타입
-interface EmailOptions {
-  to: string
-  subject: string
-  html: string
-  text?: string
+export interface EmailParams {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
 }
 
-// 이메일 전송 함수
-export async function sendEmail({ to, subject, html, text }: EmailOptions) {
+/**
+ * 이메일 전송 함수
+ * 실제 프로덕션에서는 SendGrid, AWS SES, Nodemailer 등을 사용
+ */
+export async function sendEmail(params: EmailParams): Promise<boolean> {
   try {
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Live Commerce" <noreply@livecommerce.com>',
-      to,
-      subject,
-      text,
-      html,
-    })
+    const { to, subject, html, text } = params;
 
-    console.log('Email sent:', info.messageId)
-    return { success: true, messageId: info.messageId }
+    // 개발 환경에서는 콘솔에만 출력
+    if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_API_KEY) {
+      console.log('📧 [EMAIL - Development Mode]');
+      console.log('To:', to);
+      console.log('Subject:', subject);
+      console.log('HTML:', html.substring(0, 200) + '...');
+      return true;
+    }
+
+    // 프로덕션: 실제 이메일 전송 서비스 호출
+    // 예: SendGrid API
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.EMAIL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: to }] }],
+        from: { email: process.env.EMAIL_FROM || 'noreply@livecommerce.com' },
+        subject,
+        content: [
+          { type: 'text/plain', value: text || html.replace(/<[^>]*>/g, '') },
+          { type: 'text/html', value: html }
+        ]
+      })
+    });
+
+    return response.ok;
   } catch (error) {
-    console.error('Email send error:', error)
-    return { success: false, error }
+    console.error('Email send error:', error);
+    return false;
   }
 }
 
-// 이메일 템플릿 헬퍼
-export const emailTemplates = {
-  // 회원가입 환영 이메일
-  welcome: (name: string, email: string) => ({
-    subject: '라이브 커머스 플랫폼에 오신 것을 환영합니다! 🎉',
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
-          .button { display: inline-block; padding: 12px 30px; background: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🎉 환영합니다!</h1>
-          </div>
-          <div class="content">
-            <h2>안녕하세요, ${name}님!</h2>
-            <p>라이브 커머스 플랫폼에 가입해주셔서 감사합니다.</p>
-            <p>이제 다음과 같은 기능을 이용하실 수 있습니다:</p>
-            <ul>
-              <li>🛍️ 다양한 상품 쇼핑</li>
-              <li>📺 실시간 라이브 스트리밍 시청</li>
-              <li>💬 실시간 채팅 참여</li>
-              <li>🎁 특별 할인 혜택</li>
-            </ul>
-            <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}" class="button">쇼핑 시작하기</a>
-            </p>
-            <p>궁금한 점이 있으시면 언제든지 문의해주세요!</p>
-          </div>
-          <div class="footer">
-            <p>© 2024 Live Commerce Platform. All rights reserved.</p>
-            <p>이메일: ${email}</p>
-          </div>
+/**
+ * 주문 확인 이메일 템플릿
+ */
+export function orderConfirmationEmail(data: {
+  customerName: string;
+  orderNumber: string;
+  orderDate: string;
+  items: Array<{ name: string; quantity: number; price: number }>;
+  subtotal: number;
+  shippingFee: number;
+  total: number;
+  shippingAddress: string;
+}): string {
+  const itemsHtml = data.items.map(item => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.name}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}개</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">₩${item.price.toLocaleString()}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>주문 확인</title>
+    </head>
+    <body style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">주문이 접수되었습니다!</h1>
         </div>
-      </body>
-      </html>
-    `,
-    text: `안녕하세요, ${name}님! 라이브 커머스 플랫폼에 가입해주셔서 감사합니다. ${process.env.NEXT_PUBLIC_APP_URL}에서 쇼핑을 시작하세요!`
-  }),
-
-  // 주문 확인 이메일
-  orderConfirmed: (name: string, orderNumber: string, totalAmount: number, items: any[]) => ({
-    subject: `주문이 확인되었습니다 (주문번호: ${orderNumber})`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #10b981; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; }
-          .order-info { background: #f9fafb; padding: 15px; border-radius: 5px; margin: 20px 0; }
-          .items { margin: 20px 0; }
-          .item { padding: 10px 0; border-bottom: 1px solid #e0e0e0; }
-          .total { font-size: 18px; font-weight: bold; color: #10b981; margin-top: 20px; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✅ 주문 확인</h1>
-          </div>
-          <div class="content">
-            <h2>안녕하세요, ${name}님!</h2>
-            <p>주문이 성공적으로 확인되었습니다.</p>
-            
-            <div class="order-info">
-              <p><strong>주문번호:</strong> ${orderNumber}</p>
-              <p><strong>주문일시:</strong> ${new Date().toLocaleString('ko-KR')}</p>
-            </div>
-
-            <div class="items">
-              <h3>주문 상품</h3>
-              ${items.map(item => `
-                <div class="item">
-                  <p><strong>${item.product?.name || '상품'}</strong></p>
-                  <p>수량: ${item.quantity}개 × ${item.price.toLocaleString()}원</p>
-                </div>
-              `).join('')}
-            </div>
-
-            <div class="total">
-              <p>총 결제금액: ${totalAmount.toLocaleString()}원</p>
-            </div>
-
-            <p style="margin-top: 30px;">
-              주문하신 상품은 빠르게 배송 준비하겠습니다.<br>
-              배송이 시작되면 다시 안내 드리겠습니다.
+        
+        <!-- Content -->
+        <div style="padding: 30px;">
+          <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
+            안녕하세요, <strong>${data.customerName}</strong>님!<br>
+            주문해주셔서 감사합니다.
+          </p>
+          
+          <!-- Order Info -->
+          <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="font-size: 18px; color: #333; margin-top: 0;">주문 정보</h2>
+            <p style="margin: 5px 0; color: #666;">
+              <strong>주문번호:</strong> ${data.orderNumber}<br>
+              <strong>주문일시:</strong> ${data.orderDate}
             </p>
           </div>
-          <div class="footer">
-            <p>© 2024 Live Commerce Platform. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    text: `주문이 확인되었습니다. 주문번호: ${orderNumber}, 총 금액: ${totalAmount.toLocaleString()}원`
-  }),
-
-  // 배송 시작 이메일
-  shippingStarted: (name: string, orderNumber: string, trackingNumber?: string) => ({
-    subject: `배송이 시작되었습니다 (주문번호: ${orderNumber})`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #3b82f6; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
-          .tracking { background: #f0f9ff; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>📦 배송 시작</h1>
-          </div>
-          <div class="content">
-            <h2>안녕하세요, ${name}님!</h2>
-            <p>주문하신 상품의 배송이 시작되었습니다.</p>
-            
-            <div class="tracking">
-              <p><strong>주문번호:</strong> ${orderNumber}</p>
-              ${trackingNumber ? `<p><strong>운송장번호:</strong> ${trackingNumber}</p>` : ''}
+          
+          <!-- Order Items -->
+          <h2 style="font-size: 18px; color: #333; margin-bottom: 15px;">주문 상품</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #f0f0f0;">
+                <th style="padding: 10px; text-align: left;">상품명</th>
+                <th style="padding: 10px; text-align: center;">수량</th>
+                <th style="padding: 10px; text-align: right;">금액</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+          
+          <!-- Total -->
+          <div style="border-top: 2px solid #333; padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="color: #666;">상품금액</span>
+              <span style="color: #333;">₩${data.subtotal.toLocaleString()}</span>
             </div>
-
-            <p>곧 상품을 받아보실 수 있습니다. 조금만 기다려주세요! 😊</p>
-          </div>
-          <div class="footer">
-            <p>© 2024 Live Commerce Platform. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    text: `배송이 시작되었습니다. 주문번호: ${orderNumber}${trackingNumber ? `, 운송장번호: ${trackingNumber}` : ''}`
-  }),
-
-  // 배송 완료 이메일
-  delivered: (name: string, orderNumber: string) => ({
-    subject: `배송이 완료되었습니다 (주문번호: ${orderNumber})`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #10b981; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
-          .button { display: inline-block; padding: 12px 30px; background: #10b981; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🎉 배송 완료!</h1>
-          </div>
-          <div class="content">
-            <h2>안녕하세요, ${name}님!</h2>
-            <p>주문하신 상품이 배송 완료되었습니다.</p>
-            <p>상품을 받아보셨나요? 만족스러우셨다면 리뷰를 남겨주세요! ⭐</p>
-            
-            <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/my/orders" class="button">리뷰 작성하기</a>
-            </p>
-
-            <p>앞으로도 더 나은 서비스로 보답하겠습니다. 감사합니다!</p>
-          </div>
-          <div class="footer">
-            <p>© 2024 Live Commerce Platform. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-    text: `배송이 완료되었습니다. 주문번호: ${orderNumber}. 리뷰를 남겨주세요!`
-  }),
-
-  // 비밀번호 재설정 이메일
-  resetPassword: (name: string, resetLink: string) => ({
-    subject: '비밀번호 재설정 요청',
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #ef4444; color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px; }
-          .button { display: inline-block; padding: 12px 30px; background: #ef4444; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .warning { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; }
-          .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🔒 비밀번호 재설정</h1>
-          </div>
-          <div class="content">
-            <h2>안녕하세요, ${name}님!</h2>
-            <p>비밀번호 재설정을 요청하셨습니다.</p>
-            <p>아래 버튼을 클릭하여 비밀번호를 재설정하세요:</p>
-            
-            <p style="text-align: center;">
-              <a href="${resetLink}" class="button">비밀번호 재설정하기</a>
-            </p>
-
-            <div class="warning">
-              <p><strong>⚠️ 주의사항</strong></p>
-              <p>• 이 링크는 1시간 동안만 유효합니다.</p>
-              <p>• 요청하지 않으셨다면 이 이메일을 무시하세요.</p>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+              <span style="color: #666;">배송비</span>
+              <span style="color: #333;">₩${data.shippingFee.toLocaleString()}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 20px; font-weight: bold;">
+              <span style="color: #333;">총 결제금액</span>
+              <span style="color: #667eea;">₩${data.total.toLocaleString()}</span>
             </div>
           </div>
-          <div class="footer">
-            <p>© 2024 Live Commerce Platform. All rights reserved.</p>
+          
+          <!-- Shipping Address -->
+          <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-top: 20px;">
+            <h2 style="font-size: 18px; color: #333; margin-top: 0;">배송지 정보</h2>
+            <p style="margin: 0; color: #666; line-height: 1.6;">
+              ${data.shippingAddress}
+            </p>
+          </div>
+          
+          <!-- Button -->
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL}/orders" 
+               style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+              주문 상세 보기
+            </a>
           </div>
         </div>
-      </body>
-      </html>
-    `,
-    text: `비밀번호를 재설정하려면 다음 링크를 클릭하세요: ${resetLink} (1시간 동안 유효)`
-  })
+        
+        <!-- Footer -->
+        <div style="background-color: #f5f5f5; padding: 20px; text-align: center; color: #999; font-size: 12px;">
+          <p style="margin: 5px 0;">Live Commerce Platform</p>
+          <p style="margin: 5px 0;">문의: support@livecommerce.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }
 
-// 주문 상태별 이메일 전송
-export async function sendOrderStatusEmail(
-  userEmail: string,
-  userName: string,
-  orderNumber: string,
-  status: string,
-  orderData?: any
-) {
-  let template
-
-  switch (status) {
-    case 'CONFIRMED':
-      template = emailTemplates.orderConfirmed(
-        userName,
-        orderNumber,
-        orderData?.total || 0,
-        orderData?.items || []
-      )
-      break
-    case 'SHIPPING':
-      template = emailTemplates.shippingStarted(userName, orderNumber, orderData?.trackingNumber)
-      break
-    case 'DELIVERED':
-      template = emailTemplates.delivered(userName, orderNumber)
-      break
-    default:
-      return { success: false, error: 'Invalid status' }
-  }
-
-  return await sendEmail({
-    to: userEmail,
-    subject: template.subject,
-    html: template.html,
-    text: template.text
-  })
+/**
+ * 배송 시작 이메일 템플릿
+ */
+export function shippingStartedEmail(data: {
+  customerName: string;
+  orderNumber: string;
+  trackingNumber?: string;
+  courier?: string;
+  estimatedDelivery?: string;
+}): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>배송 시작</title>
+    </head>
+    <body style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🚚 배송이 시작되었습니다!</h1>
+        </div>
+        
+        <!-- Content -->
+        <div style="padding: 30px;">
+          <p style="font-size: 16px; color: #333; margin-bottom: 20px;">
+            안녕하세요, <strong>${data.customerName}</strong>님!<br>
+            주문하신 상품이 배송 시작되었습니다.
+          </p>
+          
+          <!-- Order Info -->
+          <div style="background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="font-size: 18px; color: #333; margin-top: 0;">배송 정보</h2>
+            <p style="margin: 5px 0; color: #666;">
+              <strong>주문번호:</strong> ${data.orderNumber}<br>
+              ${data.trackingNumber ? `<strong>송장번호:</strong> ${data.trackingNumber}<br>` : ''}
+              ${data.courier ? `<strong>택배사:</strong> ${data.courier}<br>` : ''}
+              ${data.estimatedDelivery ? `<strong>예상 도착:</strong> ${data.estimatedDelivery}` : ''}
+            </p>
+          </div>
+          
+          <div style="background-color: #e8f5e9; padding: 20px; border-radius: 8px; border-left: 4px solid #4caf50;">
+            <p style="margin: 0; color: #2e7d32; font-size: 14px;">
+              💡 <strong>배송 안내</strong><br>
+              상품은 2-3일 이내에 도착 예정입니다.<br>
+              배송 추적은 주문 상세 페이지에서 확인하실 수 있습니다.
+            </p>
+          </div>
+          
+          <!-- Button -->
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL}/orders" 
+               style="display: inline-block; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; text-decoration: none; padding: 15px 40px; border-radius: 8px; font-weight: bold; font-size: 16px;">
+              배송 추적하기
+            </a>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="background-color: #f5f5f5; padding: 20px; text-align: center; color: #999; font-size: 12px;">
+          <p style="margin: 5px 0;">Live Commerce Platform</p>
+          <p style="margin: 5px 0;">문의: support@livecommerce.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }

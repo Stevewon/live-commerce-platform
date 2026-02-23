@@ -1,179 +1,82 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import jwt from 'jsonwebtoken'
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
+import { verifyToken } from '@/lib/auth/jwt';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
-
-function verifyToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    return jwt.verify(token, JWT_SECRET) as any
-  } catch {
-    return null
-  }
-}
+    // 인증 확인
+    const cookieStore = await cookies();
+    const token = cookieStore.get('auth-token')?.value;
 
-// 관리자 정산 상세 조회
-export async function GET(request: NextRequest, segmentData: { params: Promise<{ id: string }> }) {
-  try {
-    
-    const { id } = await segmentData.params;
-const decoded = verifyToken(request)
+    if (!token) {
+      return NextResponse.json(
+        { error: '인증이 필요합니다' },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyToken(token);
     if (!decoded || decoded.role !== 'ADMIN') {
       return NextResponse.json(
         { error: '관리자 권한이 필요합니다' },
-        { status: 401 }
-      )
+        { status: 403 }
+      );
     }
 
-    const settlement = await prisma.settlement.findUnique({
+    const body = await request.json();
+    const { status } = body;
+
+    if (!status || !['PENDING', 'APPROVED', 'COMPLETED', 'REJECTED'].includes(status)) {
+      return NextResponse.json(
+        { error: '유효하지 않은 상태값입니다' },
+        { status: 400 }
+      );
+    }
+
+    // 정산 업데이트
+    const settlement = await prisma.settlement.update({
       where: { id: params.id },
+      data: {
+        status,
+        settlementDate: status === 'COMPLETED' ? new Date() : undefined
+      },
       include: {
         partner: {
-          include: {
+          select: {
+            storeName: true,
             user: {
               select: {
-                email: true,
                 name: true,
+                email: true,
                 phone: true
               }
             }
           }
         }
       }
-    })
+    });
 
-    if (!settlement) {
-      return NextResponse.json(
-        { error: '정산 내역을 찾을 수 없습니다' },
-        { status: 404 }
-      )
-    }
-
-    // 해당 기간의 주문 내역 조회
-    const orders = await prisma.order.findMany({
-      where: {
-        partnerId: settlement.partnerId,
-        status: { in: ['CONFIRMED', 'SHIPPING', 'DELIVERED'] },
-        createdAt: {
-          gte: settlement.startDate,
-          lte: settlement.endDate
-        }
-      },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        items: {
-          include: {
-            product: {
-              select: {
-                name: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+    // TODO: 정산 완료 시 파트너에게 이메일/SMS 알림 전송
 
     return NextResponse.json({
       success: true,
-      data: {
-        settlement,
-        orders
-      }
-    })
+      message: `정산이 ${status === 'COMPLETED' ? '완료' : '업데이트'}되었습니다`,
+      data: settlement
+    });
 
   } catch (error) {
-    console.error('Settlement detail fetch error:', error)
+    console.error('Update settlement error:', error);
     return NextResponse.json(
-      { error: '정산 상세 조회 중 오류가 발생했습니다' },
-      { status: 500 }
-    )
-  }
-}
-
-// 관리자 정산 승인/거부
-export async function PATCH(request: NextRequest, segmentData: { params: Promise<{ id: string }> }) {
-  try {
-    
-    const { id } = await segmentData.params;
-const decoded = verifyToken(request)
-    if (!decoded || decoded.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: '관리자 권한이 필요합니다' },
-        { status: 401 }
-      )
-    }
-
-    const { status, rejectionReason } = await request.json()
-
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return NextResponse.json(
-        { error: '유효하지 않은 상태입니다' },
-        { status: 400 }
-      )
-    }
-
-    const settlement = await prisma.settlement.findUnique({
-      where: { id: params.id }
-    })
-
-    if (!settlement) {
-      return NextResponse.json(
-        { error: '정산 내역을 찾을 수 없습니다' },
-        { status: 404 }
-      )
-    }
-
-    if (settlement.status !== 'PENDING') {
-      return NextResponse.json(
-        { error: '대기 중인 정산만 처리할 수 있습니다' },
-        { status: 400 }
-      )
-    }
-
-    const updatedSettlement = await prisma.settlement.update({
-      where: { id: params.id },
-      data: {
-        status,
-        ...(status === 'APPROVED' && { paidAt: new Date() }),
-        ...(status === 'REJECTED' && rejectionReason && { rejectionReason })
+      {
+        success: false,
+        error: '정산 업데이트 중 오류가 발생했습니다',
+        details: error instanceof Error ? error.message : String(error)
       },
-      include: {
-        partner: {
-          include: {
-            user: {
-              select: {
-                name: true,
-                email: true
-              }
-            }
-          }
-        }
-      }
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: updatedSettlement,
-      message: status === 'APPROVED' ? '정산이 승인되었습니다' : '정산이 거부되었습니다'
-    })
-
-  } catch (error) {
-    console.error('Settlement update error:', error)
-    return NextResponse.json(
-      { error: '정산 처리 중 오류가 발생했습니다' },
       { status: 500 }
-    )
+    );
   }
 }
