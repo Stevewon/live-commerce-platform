@@ -26,10 +26,10 @@ interface RecentOrder {
   createdAt: string
   partner: {
     storeName: string
-  }
+  } | null
   user: {
     name: string
-  }
+  } | null
 }
 
 interface Partner {
@@ -248,12 +248,12 @@ export default function AdminDashboardPage() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-mono text-sm font-semibold">{order.orderNumber}</p>
-                        <p className="text-sm text-gray-600">{order.user.name}</p>
+                        <p className="text-sm text-gray-600">{order.user?.name || '알 수 없음'}</p>
                       </div>
                       {getStatusBadge(order.status)}
                     </div>
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-600">{order.partner.storeName}</span>
+                      <span className="text-gray-600">{order.partner?.storeName || '파트너 없음'}</span>
                       <span className="font-semibold">{formatCurrency(order.total)}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
