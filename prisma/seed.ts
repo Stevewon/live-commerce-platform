@@ -1,166 +1,131 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 시드 데이터 삽입 시작...');
-
-  // 관리자 계정
-  const adminPassword = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@example.com' },
-    update: {},
-    create: {
-      email: 'admin@example.com',
-      password: adminPassword,
-      name: '관리자',
-      role: 'ADMIN',
-    },
-  });
-  console.log('✅ 관리자 계정 생성:', admin.email);
-
-  // 파트너 계정
-  const partnerPassword = await bcrypt.hash('partner123', 10);
-  const partnerUser = await prisma.user.upsert({
-    where: { email: 'partner@example.com' },
-    update: {},
-    create: {
-      email: 'partner@example.com',
-      password: partnerPassword,
-      name: '김스트리머',
-      phone: '010-9876-5432',
-      role: 'PARTNER',
-    },
-  });
-  console.log('✅ 파트너 계정 생성:', partnerUser.email);
-
-  const partner = await prisma.partner.upsert({
-    where: { userId: partnerUser.id },
-    update: {},
-    create: {
-      userId: partnerUser.id,
-      storeName: '김스트리머 샵',
-      storeSlug: 'kim-streamer',
-      description: '최고의 제품을 소개합니다!',
-      commissionRate: 30.0,
-      isActive: true,
-    },
-  });
-  console.log('✅ 파트너 스토어 생성:', partner.storeName);
-
-  // 고객 계정
-  const customerPassword = await bcrypt.hash('test123', 10);
-  const customer = await prisma.user.upsert({
-    where: { email: 'test2@example.com' },
-    update: {},
-    create: {
-      email: 'test2@example.com',
-      password: customerPassword,
-      name: '테스트 고객',
-      phone: '010-1234-5678',
-      role: 'CUSTOMER',
-    },
-  });
-  console.log('✅ 고객 계정 생성:', customer.email);
+  console.log('🌱 Seeding database...');
 
   // 카테고리 생성
-  const categories = [
-    { name: '패션', slug: 'fashion' },
-    { name: '뷰티', slug: 'beauty' },
-    { name: '푸드', slug: 'food' },
-    { name: '리빙', slug: 'living' },
-    { name: '디지털', slug: 'digital' },
-    { name: '스포츠', slug: 'sports' },
-    { name: '키즈', slug: 'kids' },
-  ];
-
-  for (const cat of categories) {
-    await prisma.category.upsert({
-      where: { slug: cat.slug },
+  const categories = await Promise.all([
+    prisma.category.upsert({
+      where: { slug: 'electronics' },
       update: {},
-      create: cat,
-    });
-  }
-  console.log('✅ 카테고리 생성: 7개');
+      create: {
+        name: '전자기기',
+        slug: 'electronics',
+        description: '스마트폰, 노트북, 태블릿 등',
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'beauty' },
+      update: {},
+      create: {
+        name: '뷰티',
+        slug: 'beauty',
+        description: '화장품, 스킨케어, 향수',
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'food' },
+      update: {},
+      create: {
+        name: '식품',
+        slug: 'food',
+        description: '건강식품, 간식, 음료',
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'fashion' },
+      update: {},
+      create: {
+        name: '패션',
+        slug: 'fashion',
+        description: '의류, 신발, 액세서리',
+      },
+    }),
+  ]);
+
+  console.log('✅ Categories created:', categories.length);
 
   // 샘플 상품 생성
-  const fashionCategory = await prisma.category.findUnique({
-    where: { slug: 'fashion' },
-  });
+  const products = [
+    {
+      name: '갤럭시 스마트폰 S24',
+      slug: 'galaxy-s24',
+      description: '최신 갤럭시 스마트폰',
+      price: 990000,
+      comparePrice: 1200000,
+      stock: 50,
+      isFeatured: true,
+      categoryId: categories[0].id,
+      thumbnail: '/images/products/phone1.jpg',
+      images: JSON.stringify(['/images/products/phone1.jpg']),
+    },
+    {
+      name: '맥북 프로 M3',
+      slug: 'macbook-pro-m3',
+      description: 'Apple 맥북 프로',
+      price: 2200000,
+      comparePrice: 2500000,
+      stock: 30,
+      isFeatured: true,
+      categoryId: categories[0].id,
+      thumbnail: '/images/products/laptop1.jpg',
+      images: JSON.stringify(['/images/products/laptop1.jpg']),
+    },
+    {
+      name: '프리미엄 스킨케어 세트',
+      slug: 'skincare-set',
+      description: '럭셔리 스킨케어',
+      price: 150000,
+      comparePrice: 180000,
+      stock: 100,
+      isFeatured: false,
+      categoryId: categories[1].id,
+      thumbnail: '/images/products/beauty1.jpg',
+      images: JSON.stringify(['/images/products/beauty1.jpg']),
+    },
+    {
+      name: '유기농 견과류 선물세트',
+      slug: 'organic-nuts',
+      description: '건강한 유기농 견과류',
+      price: 45000,
+      comparePrice: 50000,
+      stock: 200,
+      isFeatured: false,
+      categoryId: categories[2].id,
+      thumbnail: '/images/products/food1.jpg',
+      images: JSON.stringify(['/images/products/food1.jpg']),
+    },
+    {
+      name: '명품 레더 재킷',
+      slug: 'leather-jacket',
+      description: '이탈리아 수입 레더',
+      price: 790000,
+      comparePrice: 890000,
+      stock: 20,
+      isFeatured: true,
+      categoryId: categories[3].id,
+      thumbnail: '/images/products/fashion1.jpg',
+      images: JSON.stringify(['/images/products/fashion1.jpg']),
+    },
+  ];
 
-  if (fashionCategory) {
-    const product1 = await prisma.product.upsert({
-      where: { slug: 'sample-product-1' },
+  for (const product of products) {
+    await prisma.product.upsert({
+      where: { slug: product.slug },
       update: {},
-      create: {
-        name: '데일리 베이직 티셔츠',
-        slug: 'sample-product-1',
-        description: '편안한 착용감의 데일리 베이직 티셔츠입니다.',
-        price: 29900,
-        comparePrice: 39900,
-        stock: 100,
-        sku: 'PROD-001',
-        images: JSON.stringify([
-          'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800',
-        ]),
-        thumbnail: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400',
-        categoryId: fashionCategory.id,
-        isActive: true,
-        isFeatured: true,
-      },
+      create: product,
     });
-    console.log('✅ 샘플 상품 생성:', product1.name);
-
-    // 파트너 상품 연결
-    await prisma.partnerProduct.upsert({
-      where: {
-        partnerId_productId: {
-          partnerId: partner.id,
-          productId: product1.id,
-        },
-      },
-      update: {},
-      create: {
-        partnerId: partner.id,
-        productId: product1.id,
-        isActive: true,
-      },
-    });
-    console.log('✅ 파트너 상품 연결 완료');
   }
 
-  // 샘플 쿠폰 생성
-  const coupon1 = await prisma.coupon.upsert({
-    where: { code: 'WELCOME2024' },
-    update: {},
-    create: {
-      code: 'WELCOME2024',
-      name: '신규 회원 환영 쿠폰',
-      description: '첫 구매 시 10% 할인',
-      type: 'PERCENT',
-      value: 10,
-      minAmount: 30000,
-      maxDiscount: 10000,
-      validFrom: new Date('2024-01-01'),
-      validUntil: new Date('2025-12-31'),
-      usageLimit: 1000,
-      isActive: true,
-    },
-  });
-  console.log('✅ 샘플 쿠폰 생성:', coupon1.code);
-
-  console.log('\n🎉 시드 데이터 삽입 완료!');
-  console.log('\n📋 테스트 계정 정보:');
-  console.log('  관리자: admin@example.com / admin123');
-  console.log('  파트너: partner@example.com / partner123');
-  console.log('  고객: test2@example.com / test123');
-  console.log('\n🎫 샘플 쿠폰: WELCOME2024 (10% 할인)');
+  console.log('✅ Products created:', products.length);
+  console.log('🎉 Seeding completed!');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ 시드 데이터 삽입 실패:', e);
+    console.error('❌ Seeding failed:', e);
     process.exit(1);
   })
   .finally(async () => {
