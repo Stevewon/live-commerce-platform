@@ -172,7 +172,7 @@ export default function ProductDetailPage() {
   const images = product.images ? JSON.parse(product.images) : [product.thumbnail];
   const detailImages = product.detailImages ? JSON.parse(product.detailImages) : [];
   const specs = product.specifications ? JSON.parse(product.specifications) : {};
-  const avgRating = product.reviews.length > 0
+  const avgRating = product.reviews && product.reviews.length > 0
     ? (product.reviews.reduce((sum, r) => sum + r.rating, 0) / product.reviews.length).toFixed(1)
     : 0;
 
