@@ -120,6 +120,131 @@ async function main() {
   }
 
   console.log('✅ Products created:', products.length);
+
+  // 샘플 유저 생성 (파트너용)
+  const partnerUsers = [
+    {
+      email: 'partner1@example.com',
+      name: '김판매',
+      password: 'password123', // 실제로는 해시화해야 함
+      role: 'PARTNER',
+    },
+    {
+      email: 'partner2@example.com',
+      name: '이스트림',
+      password: 'password123',
+      role: 'PARTNER',
+    },
+    {
+      email: 'partner3@example.com',
+      name: '박라이브',
+      password: 'password123',
+      role: 'PARTNER',
+    },
+  ];
+
+  const createdUsers = [];
+  for (const userData of partnerUsers) {
+    const user = await prisma.user.upsert({
+      where: { email: userData.email },
+      update: {},
+      create: {
+        email: userData.email,
+        name: userData.name,
+        password: userData.password,
+        role: userData.role,
+      },
+    });
+    createdUsers.push(user);
+  }
+
+  console.log('✅ Partner users created:', createdUsers.length);
+
+  // 파트너 스토어 생성
+  const partners = [
+    {
+      userId: createdUsers[0].id,
+      storeName: '김판매 스토어',
+      storeSlug: 'kim-store',
+      description: '최저가 보장! 믿을 수 있는 정품만 판매합니다',
+      commissionRate: 25.0,
+      youtubeUrl: 'https://youtube.com/@kimstore',
+      instagramUrl: 'https://instagram.com/kimstore',
+    },
+    {
+      userId: createdUsers[1].id,
+      storeName: '이스트림 샵',
+      storeSlug: 'lee-shop',
+      description: '라이브 방송으로 더 저렴하게! 실시간 특가 진행중',
+      commissionRate: 30.0,
+      africaTvUrl: 'https://afreecatv.com/leeshop',
+      naverShoppingUrl: 'https://smartstore.naver.com/leeshop',
+    },
+    {
+      userId: createdUsers[2].id,
+      storeName: '박라이브 마켓',
+      storeSlug: 'park-market',
+      description: '검증된 상품만! 100% 정품 인증',
+      commissionRate: 28.0,
+      tiktokUrl: 'https://tiktok.com/@parkmarket',
+      coupangUrl: 'https://coupang.com/vp/vendors/parkmarket',
+    },
+  ];
+
+  const createdPartners = [];
+  for (const partnerData of partners) {
+    const partner = await prisma.partner.upsert({
+      where: { storeSlug: partnerData.storeSlug },
+      update: {},
+      create: partnerData,
+    });
+    createdPartners.push(partner);
+  }
+
+  console.log('✅ Partners created:', createdPartners.length);
+
+  // 상품 조회
+  const allProducts = await prisma.product.findMany();
+
+  // 파트너 상품 연결 (각 상품마다 2-3개의 파트너가 판매)
+  const partnerProductData = [
+    // 갤럭시 S24
+    { partnerId: createdPartners[0].id, productId: allProducts.find(p => p.slug === 'galaxy-s24')?.id, customPrice: 980000 },
+    { partnerId: createdPartners[1].id, productId: allProducts.find(p => p.slug === 'galaxy-s24')?.id, customPrice: 990000 },
+    { partnerId: createdPartners[2].id, productId: allProducts.find(p => p.slug === 'galaxy-s24')?.id, customPrice: 995000 },
+    
+    // 맥북 프로 M3
+    { partnerId: createdPartners[0].id, productId: allProducts.find(p => p.slug === 'macbook-pro-m3')?.id, customPrice: 2180000 },
+    { partnerId: createdPartners[2].id, productId: allProducts.find(p => p.slug === 'macbook-pro-m3')?.id, customPrice: 2200000 },
+    
+    // 스킨케어 세트
+    { partnerId: createdPartners[1].id, productId: allProducts.find(p => p.slug === 'skincare-set')?.id, customPrice: 145000 },
+    { partnerId: createdPartners[2].id, productId: allProducts.find(p => p.slug === 'skincare-set')?.id, customPrice: 150000 },
+    
+    // 유기농 견과류
+    { partnerId: createdPartners[0].id, productId: allProducts.find(p => p.slug === 'organic-nuts')?.id, customPrice: 43000 },
+    { partnerId: createdPartners[1].id, productId: allProducts.find(p => p.slug === 'organic-nuts')?.id, customPrice: 45000 },
+    { partnerId: createdPartners[2].id, productId: allProducts.find(p => p.slug === 'organic-nuts')?.id, customPrice: 44000 },
+    
+    // 명품 레더 재킷
+    { partnerId: createdPartners[0].id, productId: allProducts.find(p => p.slug === 'leather-jacket')?.id, customPrice: 780000 },
+    { partnerId: createdPartners[1].id, productId: allProducts.find(p => p.slug === 'leather-jacket')?.id, customPrice: 790000 },
+  ];
+
+  for (const ppData of partnerProductData.filter(pp => pp.productId)) {
+    await prisma.partnerProduct.upsert({
+      where: {
+        partnerId_productId: {
+          partnerId: ppData.partnerId!,
+          productId: ppData.productId!,
+        },
+      },
+      update: {},
+      create: ppData as any,
+    });
+  }
+
+  console.log('✅ Partner products created:', partnerProductData.filter(pp => pp.productId).length);
   console.log('🎉 Seeding completed!');
 }
 
