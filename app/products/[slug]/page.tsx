@@ -77,6 +77,8 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState<PartnerProduct | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'detail' | 'sellers' | 'review'>('detail');
 
   useEffect(() => {
     if (slug) {
@@ -101,6 +103,7 @@ export default function ProductDetailPage() {
 
       const productData = data.data[0];
       setProduct(productData);
+      setSelectedImage(productData.thumbnail);
       
       // 기본 선택: 가장 저렴한 파트너
       if (productData.partnerProducts && productData.partnerProducts.length > 0) {
@@ -159,7 +162,7 @@ export default function ProductDetailPage() {
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">상품을 불러오는 중...</p>
+          <p className="text-gray-600 text-lg">상품을 불러오는 중...</p>
         </div>
       </div>
     );
@@ -193,31 +196,46 @@ export default function ProductDetailPage() {
     ? Math.min(...product.partnerProducts.map(pp => pp.customPrice || product.price))
     : product.price;
 
+  const images = product.images ? JSON.parse(product.images) : [product.thumbnail];
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
-        {/* 뒤로 가기 */}
-        <Link 
-          href="/products" 
-          className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4 md:mb-6 text-sm md:text-base font-medium"
-        >
-          <span className="mr-2">←</span> 상품 목록으로
-        </Link>
+      {/* 헤더 */}
+      <div className="bg-white border-b sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <Link 
+            href="/products" 
+            className="inline-flex items-center text-gray-600 hover:text-gray-900 font-medium"
+          >
+            <span className="mr-2">←</span> 뒤로가기
+          </Link>
+        </div>
+      </div>
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8">
-            {/* 이미지 영역 */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* 상품 메인 정보 */}
+        <div className="bg-white rounded-lg shadow-sm mb-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-6 lg:p-8">
+            {/* 이미지 갤러리 */}
             <div>
               {/* 메인 이미지 */}
-              <div className="relative aspect-square mb-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl overflow-hidden shadow-md">
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <span className="text-9xl block opacity-30 mb-4">
-                      {CATEGORY_ICONS[product.category.slug] || '📦'}
-                    </span>
-                    <p className="text-sm text-gray-400 font-medium px-4">{product.name}</p>
-                  </div>
-                </div>
+              <div className="relative aspect-square mb-4 bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
+                <img
+                  src={selectedImage}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement!.innerHTML = `
+                      <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+                        <div class="text-center">
+                          <span class="text-9xl block opacity-30">${CATEGORY_ICONS[product.category.slug] || '📦'}</span>
+                          <p class="text-sm text-gray-400 font-medium mt-4">${product.name}</p>
+                        </div>
+                      </div>
+                    `;
+                  }}
+                />
                 {product.isFeatured && (
                   <div className="absolute top-4 left-4 bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg">
                     🔥 BEST
@@ -234,9 +252,32 @@ export default function ProductDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* 썸네일 갤러리 */}
+              {images.length > 1 && (
+                <div className="grid grid-cols-5 gap-2">
+                  {images.map((img: string, idx: number) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedImage(img)}
+                      className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                        selectedImage === img
+                          ? 'border-blue-500 ring-2 ring-blue-200'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <img
+                        src={img}
+                        alt={`${product.name} ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* 상품 정보 */}
+            {/* 구매 정보 */}
             <div className="flex flex-col">
               {/* 카테고리 */}
               <Link
@@ -247,7 +288,7 @@ export default function ProductDetailPage() {
               </Link>
 
               {/* 상품명 */}
-              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{product.name}</h1>
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4 leading-tight">{product.name}</h1>
 
               {/* 가격 */}
               <div className="mb-6 pb-6 border-b">
@@ -256,167 +297,54 @@ export default function ProductDetailPage() {
                     <span className="text-lg text-gray-400 line-through">
                       ₩{product.comparePrice.toLocaleString()}
                     </span>
-                    <span className="text-xl font-bold text-red-500">
-                      {discountPercent}% OFF
+                    <span className="text-xl font-bold text-red-500 bg-red-50 px-3 py-1 rounded-full">
+                      {discountPercent}% 할인
                     </span>
                   </div>
                 )}
-                <div className="flex items-baseline gap-3">
-                  <span className="text-4xl md:text-5xl font-bold text-gray-900">
+                <div className="flex items-baseline gap-3 mb-3">
+                  <span className="text-5xl font-bold text-gray-900">
                     ₩{currentPrice.toLocaleString()}
                   </span>
-                  {product.partnerProducts.length > 0 && currentPrice > lowestPrice && (
-                    <span className="text-sm text-orange-500 font-semibold">
-                      최저가 ₩{lowestPrice.toLocaleString()}
-                    </span>
-                  )}
                 </div>
+                {product.partnerProducts.length > 0 && currentPrice > lowestPrice && (
+                  <div className="text-sm text-orange-600 font-semibold bg-orange-50 inline-block px-3 py-1 rounded-full">
+                    💰 최저가 ₩{lowestPrice.toLocaleString()}
+                  </div>
+                )}
               </div>
 
-              {/* 설명 */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">📝 상품 설명</h3>
-                <p className="text-base text-gray-600 leading-relaxed whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
-                  {product.description}
-                </p>
-              </div>
-
-              {/* 재고 */}
-              <div className="mb-6">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold bg-green-50 border-2 border-green-200 text-green-700">
-                  <span>
-                    {product.stock > 0 ? `✅ 재고: ${product.stock}개` : '❌ 품절'}
+              {/* 배송 정보 */}
+              <div className="mb-6 space-y-3">
+                <div className="flex items-center justify-between py-3 border-b">
+                  <span className="text-gray-600">배송비</span>
+                  <span className="font-semibold text-gray-900">
+                    {currentPrice >= 50000 ? (
+                      <span className="text-blue-600">무료배송 🚚</span>
+                    ) : (
+                      <span>₩3,000 <span className="text-xs text-gray-500">(50,000원 이상 무료)</span></span>
+                    )}
                   </span>
                 </div>
-              </div>
-
-              {/* 파트너 판매자 목록 */}
-              {product.partnerProducts.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">🏪 판매 업체 ({product.partnerProducts.length})</h3>
-                  <div className="space-y-3 max-h-80 overflow-y-auto">
-                    {product.partnerProducts.map((pp) => (
-                      <div
-                        key={pp.id}
-                        onClick={() => setSelectedPartner(pp)}
-                        className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                          selectedPartner?.id === pp.id
-                            ? 'border-blue-500 bg-blue-50 shadow-md'
-                            : 'border-gray-200 hover:border-blue-300 hover:shadow'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <h4 className="font-bold text-gray-900">{pp.partner.storeName}</h4>
-                              {selectedPartner?.id === pp.id && (
-                                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold">
-                                  선택됨
-                                </span>
-                              )}
-                            </div>
-                            {pp.partner.description && (
-                              <p className="text-sm text-gray-600 mb-2">{pp.partner.description}</p>
-                            )}
-                            <div className="flex flex-wrap gap-2 mb-2">
-                              {pp.partner.youtubeUrl && (
-                                <a
-                                  href={pp.partner.youtubeUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                                >
-                                  YouTube
-                                </a>
-                              )}
-                              {pp.partner.instagramUrl && (
-                                <a
-                                  href={pp.partner.instagramUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs bg-pink-100 text-pink-700 px-2 py-1 rounded hover:bg-pink-200"
-                                >
-                                  Instagram
-                                </a>
-                              )}
-                              {pp.partner.africaTvUrl && (
-                                <a
-                                  href={pp.partner.africaTvUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
-                                >
-                                  AfreecaTV
-                                </a>
-                              )}
-                              {pp.partner.tiktokUrl && (
-                                <a
-                                  href={pp.partner.tiktokUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs bg-gray-800 text-white px-2 py-1 rounded hover:bg-gray-700"
-                                >
-                                  TikTok
-                                </a>
-                              )}
-                              {pp.partner.naverShoppingUrl && (
-                                <a
-                                  href={pp.partner.naverShoppingUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200"
-                                >
-                                  네이버 쇼핑
-                                </a>
-                              )}
-                              {pp.partner.coupangUrl && (
-                                <a
-                                  href={pp.partner.coupangUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded hover:bg-orange-200"
-                                >
-                                  쿠팡
-                                </a>
-                              )}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              판매자: {pp.partner.user.name}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-blue-600">
-                              ₩{(pp.customPrice || product.price).toLocaleString()}
-                            </div>
-                            {pp.customPrice && pp.customPrice < product.price && (
-                              <div className="text-xs text-green-600 font-semibold mt-1">
-                                ₩{(product.price - pp.customPrice).toLocaleString()} 할인
-                              </div>
-                            )}
-                            {pp.customPrice === lowestPrice && product.partnerProducts.length > 1 && (
-                              <div className="text-xs bg-orange-500 text-white px-2 py-1 rounded mt-1 font-bold">
-                                최저가!
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="flex items-center justify-between py-3 border-b">
+                  <span className="text-gray-600">재고</span>
+                  <span className={`font-semibold ${product.stock > 10 ? 'text-green-600' : product.stock > 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                    {product.stock > 0 ? `${product.stock}개 남음` : '품절'}
+                  </span>
                 </div>
-              )}
+                {selectedPartner && (
+                  <div className="flex items-center justify-between py-3 border-b">
+                    <span className="text-gray-600">판매자</span>
+                    <span className="font-semibold text-blue-600">{selectedPartner.partner.storeName}</span>
+                  </div>
+                )}
+              </div>
 
               {/* 수량 선택 */}
               {product.stock > 0 && (
                 <div className="mb-6">
                   <label className="block text-sm font-bold text-gray-700 mb-3">
-                    수량
+                    수량 선택
                   </label>
                   <div className="flex items-center gap-4">
                     <button
@@ -445,23 +373,8 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* 무료배송 안내 */}
-              {currentPrice >= 50000 && (
-                <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center gap-3 text-blue-700 font-bold">
-                    <span className="text-2xl">🚚</span>
-                    <span>무료배송</span>
-                  </div>
-                </div>
-              )}
-
               {/* 구매 버튼 */}
               <div className="mt-auto space-y-3">
-                {selectedPartner && (
-                  <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                    <span className="font-semibold">선택한 판매자:</span> {selectedPartner.partner.storeName}
-                  </div>
-                )}
                 <button
                   onClick={addToCart}
                   disabled={product.stock === 0 || adding}
@@ -473,11 +386,255 @@ export default function ProductDetailPage() {
                       : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 active:scale-95 shadow-lg'
                   }`}
                 >
-                  {adding ? '⏳ 추가 중...' : product.stock === 0 ? '품절' : '🛒 장바구니에 담기'}
+                  {adding ? '⏳ 추가 중...' : product.stock === 0 ? '❌ 품절' : '🛒 장바구니에 담기'}
                 </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button className="py-3 px-4 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition">
+                    ❤️ 찜하기
+                  </button>
+                  <button className="py-3 px-4 border-2 border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 transition">
+                    🔔 알림받기
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+
+        {/* 탭 네비게이션 */}
+        <div className="bg-white rounded-t-lg shadow-sm border-b sticky top-[57px] z-40">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('detail')}
+              className={`flex-1 py-4 font-bold text-base transition-all ${
+                activeTab === 'detail'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📝 상품상세
+            </button>
+            {product.partnerProducts.length > 0 && (
+              <button
+                onClick={() => setActiveTab('sellers')}
+                className={`flex-1 py-4 font-bold text-base transition-all ${
+                  activeTab === 'sellers'
+                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🏪 판매업체 ({product.partnerProducts.length})
+              </button>
+            )}
+            <button
+              onClick={() => setActiveTab('review')}
+              className={`flex-1 py-4 font-bold text-base transition-all ${
+                activeTab === 'review'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              ⭐ 리뷰 (0)
+            </button>
+          </div>
+        </div>
+
+        {/* 탭 컨텐츠 */}
+        <div className="bg-white rounded-b-lg shadow-sm p-6 lg:p-8 min-h-[600px]">
+          {/* 상품 상세 */}
+          {activeTab === 'detail' && (
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b">📋 상품 정보</h2>
+              
+              {/* 상품 설명 */}
+              <div className="mb-8 bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">상품 설명</h3>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-base">
+                  {product.description}
+                </p>
+              </div>
+
+              {/* 상품 스펙 (카테고리별 맞춤 정보) */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">상품 스펙</h3>
+                <div className="border rounded-lg divide-y">
+                  <div className="flex py-4 px-6">
+                    <span className="w-40 text-gray-600 font-medium">상품명</span>
+                    <span className="flex-1 text-gray-900">{product.name}</span>
+                  </div>
+                  <div className="flex py-4 px-6 bg-gray-50">
+                    <span className="w-40 text-gray-600 font-medium">카테고리</span>
+                    <span className="flex-1 text-gray-900">{product.category.name}</span>
+                  </div>
+                  <div className="flex py-4 px-6">
+                    <span className="w-40 text-gray-600 font-medium">가격</span>
+                    <span className="flex-1 text-gray-900 font-bold">₩{product.price.toLocaleString()}</span>
+                  </div>
+                  {product.comparePrice && (
+                    <div className="flex py-4 px-6 bg-gray-50">
+                      <span className="w-40 text-gray-600 font-medium">정가</span>
+                      <span className="flex-1 text-gray-400 line-through">₩{product.comparePrice.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex py-4 px-6">
+                    <span className="w-40 text-gray-600 font-medium">재고</span>
+                    <span className="flex-1 text-gray-900">{product.stock}개</span>
+                  </div>
+                  <div className="flex py-4 px-6 bg-gray-50">
+                    <span className="w-40 text-gray-600 font-medium">배송비</span>
+                    <span className="flex-1 text-gray-900">
+                      {product.price >= 50000 ? '무료배송' : '₩3,000 (50,000원 이상 무료)'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 배송/교환/반품 안내 */}
+              <div className="mb-8">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">배송/교환/반품 안내</h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-blue-600 text-xl">📦</span>
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">배송 안내</p>
+                      <p className="text-gray-600 text-sm">평균 배송일: 2-3일 (주말/공휴일 제외)</p>
+                      <p className="text-gray-600 text-sm">제주/도서산간 지역: 추가 1-2일 소요</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-blue-600 text-xl">🔄</span>
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">교환/반품</p>
+                      <p className="text-gray-600 text-sm">상품 수령 후 7일 이내 가능 (단순 변심 시 왕복 배송비 고객 부담)</p>
+                      <p className="text-gray-600 text-sm">상품 하자 시 무료 교환/반품</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-blue-600 text-xl">❌</span>
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-1">교환/반품 불가</p>
+                      <p className="text-gray-600 text-sm">포장 개봉/사용 흔적이 있는 경우</p>
+                      <p className="text-gray-600 text-sm">시간 경과로 상품 가치가 감소한 경우</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 판매업체 목록 */}
+          {activeTab === 'sellers' && (
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-4 border-b">
+                🏪 판매업체 ({product.partnerProducts.length}개)
+              </h2>
+              <div className="space-y-4">
+                {product.partnerProducts.map((pp) => (
+                  <div
+                    key={pp.id}
+                    onClick={() => setSelectedPartner(pp)}
+                    className={`border-2 rounded-xl p-6 cursor-pointer transition-all hover:shadow-lg ${
+                      selectedPartner?.id === pp.id
+                        ? 'border-blue-500 bg-blue-50 shadow-md'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <h3 className="text-xl font-bold text-gray-900">{pp.partner.storeName}</h3>
+                          {selectedPartner?.id === pp.id && (
+                            <span className="text-xs bg-blue-500 text-white px-3 py-1 rounded-full font-bold">
+                              선택됨 ✓
+                            </span>
+                          )}
+                          {pp.customPrice === lowestPrice && product.partnerProducts.length > 1 && (
+                            <span className="text-xs bg-orange-500 text-white px-3 py-1 rounded-full font-bold">
+                              최저가!
+                            </span>
+                          )}
+                        </div>
+                        {pp.partner.description && (
+                          <p className="text-gray-600 mb-3">{pp.partner.description}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {pp.partner.youtubeUrl && (
+                            <a
+                              href={pp.partner.youtubeUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs bg-red-100 text-red-700 px-3 py-1.5 rounded-full hover:bg-red-200 font-medium"
+                            >
+                              📺 YouTube
+                            </a>
+                          )}
+                          {pp.partner.instagramUrl && (
+                            <a
+                              href={pp.partner.instagramUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs bg-pink-100 text-pink-700 px-3 py-1.5 rounded-full hover:bg-pink-200 font-medium"
+                            >
+                              📷 Instagram
+                            </a>
+                          )}
+                          {pp.partner.africaTvUrl && (
+                            <a
+                              href={pp.partner.africaTvUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-full hover:bg-green-200 font-medium"
+                            >
+                              🎮 AfreecaTV
+                            </a>
+                          )}
+                          {pp.partner.tiktokUrl && (
+                            <a
+                              href={pp.partner.tiktokUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs bg-gray-800 text-white px-3 py-1.5 rounded-full hover:bg-gray-700 font-medium"
+                            >
+                              🎵 TikTok
+                            </a>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          판매자: <span className="font-medium text-gray-700">{pp.partner.user.name}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-blue-600 mb-2">
+                          ₩{(pp.customPrice || product.price).toLocaleString()}
+                        </div>
+                        {pp.customPrice && pp.customPrice < product.price && (
+                          <div className="text-sm text-green-600 font-semibold bg-green-50 px-3 py-1 rounded-full inline-block">
+                            ₩{(product.price - pp.customPrice).toLocaleString()} 할인
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 리뷰 */}
+          {activeTab === 'review' && (
+            <div className="max-w-4xl mx-auto text-center py-20">
+              <span className="text-8xl mb-6 block">💬</span>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">첫 리뷰를 작성해주세요!</h3>
+              <p className="text-gray-600 mb-8">상품을 구매하신 후 리뷰를 남겨주세요.</p>
+              <button className="px-8 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition">
+                리뷰 작성하기
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
