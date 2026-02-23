@@ -48,11 +48,10 @@ export default function AdminPartnersPage() {
   })
 
   useEffect(() => {
-    // 인증 확인
+    if (user && user.role === 'ADMIN') {
+      fetchPartners()
     }
-
-    fetchPartners()
-  }, [statusFilter, currentPage])
+  }, [user, statusFilter, currentPage])
 
   const fetchPartners = async () => {
     try {
@@ -65,7 +64,8 @@ export default function AdminPartnersPage() {
 
       const res = await fetch(`/api/admin/partners?${params}`, {
         credentials: 'include',
-      headers: {
+        headers: {
+          'Content-Type': 'application/json'
         }
       })
 
@@ -89,7 +89,7 @@ export default function AdminPartnersPage() {
       const res = await fetch(`/api/admin/partners/${id}`, {
         method: 'PATCH',
         credentials: 'include',
-      headers: {
+        headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ isActive: !currentStatus })
