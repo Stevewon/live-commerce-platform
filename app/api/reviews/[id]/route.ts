@@ -1,25 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/middleware';
 import prisma from '@/lib/prisma';
-import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // 리뷰 수정 (PATCH)
 export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    // 인증 확인
-    const authResult = await verifyAuthToken(req);
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    const authResult = await requireAuth(request);
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      );
     }
 
-    const { id: reviewId } = await params;
-    const { rating, content, images } = await req.json();
+    const body = await request.json();
+    const { rating, comment, images } = body;
 
-    // 리뷰 존재 확인
+    // 리뷰 확인
     const review = await prisma.review.findUnique({
-      where: { id: reviewId }
+      where: { id: params.id }
     });
 
     if (!review) {
@@ -29,8 +31,8 @@ export async function PATCH(
       );
     }
 
-    // 본인 리뷰인지 확인
-    if (review.userId !== authResult.userId) {
+    // 본인 확인
+    if (review.userId !== authResult.user.id) {
       return NextResponse.json(
         { success: false, error: '본인의 리뷰만 수정할 수 있습니다' },
         { status: 403 }
@@ -39,11 +41,11 @@ export async function PATCH(
 
     // 리뷰 수정
     const updatedReview = await prisma.review.update({
-      where: { id: reviewId },
+      where: { id: params.id },
       data: {
-        rating: rating !== undefined ? rating : review.rating,
-        content: content !== undefined ? content : review.content,
-        images: images !== undefined ? JSON.stringify(images) : review.images
+        ...(rating !== undefined && { rating }),
+        ...(comment !== undefined && { comment }),
+        ...(images !== undefined && { images })
       },
       include: {
         user: {
@@ -54,25 +56,43 @@ export async function PATCH(
         product: {
           select: {
             name: true,
-            thumbnail: true
+            slug: true
           }
         }
       }
     });
 
+    // 평점이 변경된 경우 상품 평균 평점 업데이트
+    if (rating !== undefined) {
+      const reviews = await prisma.review.findMany({
+        where: { productId: review.productId },
+        select: { rating: true }
+      });
+
+      const averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+      
+      await prisma.product.update({
+        where: { id: review.productId },
+        data: {
+          rating: Math.round(averageRating * 10) / 10
+        }
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: '리뷰가 수정되었습니다',
-      data: {
-        ...updatedReview,
-        images: updatedReview.images ? JSON.parse(updatedReview.images) : null
-      }
+      data: updatedReview
     });
 
   } catch (error) {
-    console.error('리뷰 수정 실패:', error);
+    console.error('Update review error:', error);
     return NextResponse.json(
-      { success: false, error: '리뷰 수정에 실패했습니다' },
+      {
+        success: false,
+        error: '리뷰 수정 중 오류가 발생했습니다',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
@@ -80,21 +100,21 @@ export async function PATCH(
 
 // 리뷰 삭제 (DELETE)
 export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
-    // 인증 확인
-    const authResult = await verifyAuthToken(req);
-    if (authResult instanceof NextResponse) {
-      return authResult;
+    const authResult = await requireAuth(request);
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      );
     }
 
-    const { id: reviewId } = await params;
-
-    // 리뷰 존재 확인
+    // 리뷰 확인
     const review = await prisma.review.findUnique({
-      where: { id: reviewId }
+      where: { id: params.id }
     });
 
     if (!review) {
@@ -104,8 +124,8 @@ export async function DELETE(
       );
     }
 
-    // 본인 리뷰이거나 관리자인지 확인
-    if (review.userId !== authResult.userId && authResult.role !== 'ADMIN') {
+    // 본인 또는 관리자 확인
+    if (review.userId !== authResult.user.id && authResult.user.role !== 'ADMIN') {
       return NextResponse.json(
         { success: false, error: '본인의 리뷰만 삭제할 수 있습니다' },
         { status: 403 }
@@ -114,8 +134,33 @@ export async function DELETE(
 
     // 리뷰 삭제
     await prisma.review.delete({
-      where: { id: reviewId }
+      where: { id: params.id }
     });
+
+    // 상품 평균 평점 업데이트
+    const reviews = await prisma.review.findMany({
+      where: { productId: review.productId },
+      select: { rating: true }
+    });
+
+    if (reviews.length > 0) {
+      const averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+      await prisma.product.update({
+        where: { id: review.productId },
+        data: {
+          rating: Math.round(averageRating * 10) / 10,
+          reviewCount: reviews.length
+        }
+      });
+    } else {
+      await prisma.product.update({
+        where: { id: review.productId },
+        data: {
+          rating: 0,
+          reviewCount: 0
+        }
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -123,39 +168,13 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('리뷰 삭제 실패:', error);
+    console.error('Delete review error:', error);
     return NextResponse.json(
-      { success: false, error: '리뷰 삭제에 실패했습니다' },
-      { status: 500 }
-    );
-  }
-}
-
-// 리뷰 좋아요 (POST)
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id: reviewId } = await params;
-
-    // 리뷰 좋아요 증가
-    const review = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        likes: { increment: 1 }
-      }
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: { likes: review.likes }
-    });
-
-  } catch (error) {
-    console.error('리뷰 좋아요 실패:', error);
-    return NextResponse.json(
-      { success: false, error: '리뷰 좋아요에 실패했습니다' },
+      {
+        success: false,
+        error: '리뷰 삭제 중 오류가 발생했습니다',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

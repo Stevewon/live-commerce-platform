@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import prisma from '@/lib/prisma'
-import { sendEmail, orderConfirmationEmail } from '@/lib/email'
-import { sendSMS, orderConfirmationSMS } from '@/lib/sms'
+import { orderConfirmationEmail } from '@/lib/email'
+import { orderConfirmationSMS } from '@/lib/sms'
+import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
 
 // 주문 알림 전송 함수
 async function sendOrderNotifications(order: any, userId: string) {
@@ -47,13 +48,16 @@ async function sendOrderNotifications(order: any, userId: string) {
       shippingAddress: `${order.shippingName} / ${order.shippingPhone}\n${order.shippingAddress} ${order.shippingZipCode || ''}`
     });
 
-    await sendEmail({
+    // 이메일 전송 (사용자 설정 확인)
+    await sendEmailWithPreferences({
+      userId,
       to: user.email,
       subject: `[Live Commerce] 주문이 접수되었습니다 (${order.orderNumber})`,
-      html: emailHtml
+      html: emailHtml,
+      notificationType: 'order'
     });
 
-    // SMS 전송
+    // SMS 전송 (사용자 설정 확인)
     if (user.phone) {
       const smsMessage = orderConfirmationSMS({
         customerName: user.name,
@@ -61,9 +65,11 @@ async function sendOrderNotifications(order: any, userId: string) {
         total: order.total
       });
 
-      await sendSMS({
+      await sendSMSWithPreferences({
+        userId,
         to: user.phone,
-        message: smsMessage
+        message: smsMessage,
+        notificationType: 'order'
       });
     }
   } catch (error) {
