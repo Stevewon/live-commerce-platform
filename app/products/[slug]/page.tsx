@@ -24,6 +24,15 @@ interface Product {
   isFeatured: boolean;
 }
 
+// 카테고리 아이콘
+const CATEGORY_ICONS: Record<string, string> = {
+  'electronics': '📱',
+  'beauty': '💄',
+  'food': '🍯',
+  'fashion': '👕',
+  'all': '🏷️'
+};
+
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -33,7 +42,6 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<string>('');
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
 
@@ -60,7 +68,6 @@ export default function ProductDetailPage() {
 
       const productData = data.data[0];
       setProduct(productData);
-      setSelectedImage(productData.thumbnail);
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -95,6 +102,7 @@ export default function ProductDetailPage() {
 
       if (res.ok) {
         alert('장바구니에 추가되었습니다!');
+        router.push('/products?view=cart');
       } else {
         const data = await res.json();
         alert(data.error || '장바구니 추가 실패');
@@ -107,25 +115,30 @@ export default function ProductDetailPage() {
     }
   };
 
-  const images = product ? 
-    (product.images ? JSON.parse(product.images) : [product.thumbnail]) : 
-    [];
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">상품을 불러오는 중...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !product) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">⚠️ {error || '상품을 찾을 수 없습니다'}</h1>
-          <Link href="/products" className="text-blue-600 hover:text-blue-700">
-            ← 상품 목록으로 돌아가기
+          <span className="text-8xl mb-6 block">😢</span>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            {error || '상품을 찾을 수 없습니다'}
+          </h1>
+          <Link 
+            href="/products" 
+            className="inline-block px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition"
+          >
+            ← 쇼핑 계속하기
           </Link>
         </div>
       </div>
@@ -137,105 +150,93 @@ export default function ProductDetailPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         {/* 뒤로 가기 */}
-        <Link href="/products" className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-6">
+        <Link 
+          href="/products" 
+          className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-4 md:mb-6 text-sm md:text-base"
+        >
           <span className="mr-2">←</span> 상품 목록으로
         </Link>
 
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8">
-            {/* 이미지 갤러리 */}
+        <div className="bg-white rounded-lg md:shadow-lg overflow-hidden md:border">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 p-4 md:p-8">
+            {/* 이미지 영역 */}
             <div>
               {/* 메인 이미지 */}
-              <div className="relative aspect-square mb-4 bg-gray-100 rounded-lg overflow-hidden">
-                <img
-                  src={selectedImage}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative aspect-square mb-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg overflow-hidden">
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <span className="text-8xl md:text-9xl block opacity-30 mb-4">
+                      {CATEGORY_ICONS[product.category.slug] || '📦'}
+                    </span>
+                    <p className="text-sm text-gray-400 font-medium px-4">{product.name}</p>
+                  </div>
+                </div>
                 {product.isFeatured && (
-                  <div className="absolute top-4 left-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                    BEST
+                  <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-md text-xs md:text-sm font-bold shadow-lg">
+                    🔥 BEST
+                  </div>
+                )}
+                {discountPercent > 0 && (
+                  <div className="absolute top-3 right-3 bg-yellow-400 text-gray-900 px-3 py-1.5 rounded-md text-xs md:text-sm font-bold shadow-lg">
+                    {discountPercent}% 할인
                   </div>
                 )}
                 {product.stock === 0 && (
-                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                    <span className="text-white font-bold text-2xl">품절</span>
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <span className="text-white font-bold text-2xl bg-gray-900/80 px-6 py-3 rounded-lg">품절</span>
                   </div>
                 )}
               </div>
-
-              {/* 썸네일 갤러리 */}
-              {images.length > 1 && (
-                <div className="grid grid-cols-4 gap-2">
-                  {images.map((img: string, idx: number) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedImage(img)}
-                      className={`aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                        selectedImage === img
-                          ? 'border-blue-600 ring-2 ring-blue-200'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <img
-                        src={img}
-                        alt={`${product.name} ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* 상품 정보 */}
-            <div>
+            <div className="flex flex-col">
               {/* 카테고리 */}
               <Link
-                href={`/products?category=${product.category.slug}`}
-                className="inline-block text-sm text-blue-600 hover:text-blue-700 mb-2"
+                href={`/products`}
+                className="inline-block text-xs md:text-sm text-blue-600 hover:text-blue-700 mb-2"
               >
                 {product.category.name}
               </Link>
 
               {/* 상품명 */}
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{product.name}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">{product.name}</h1>
 
               {/* 가격 */}
               <div className="mb-6">
                 {product.comparePrice && product.comparePrice > product.price && (
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-lg text-gray-400 line-through">
+                  <div className="flex items-center gap-2 md:gap-3 mb-2">
+                    <span className="text-base md:text-lg text-gray-400 line-through">
                       ₩{product.comparePrice.toLocaleString()}
                     </span>
-                    <span className="text-xl font-bold text-red-500">
+                    <span className="text-lg md:text-xl font-bold text-red-500">
                       {discountPercent}% OFF
                     </span>
                   </div>
                 )}
-                <div className="text-4xl font-bold text-gray-900">
+                <div className="text-3xl md:text-4xl font-bold text-gray-900">
                   ₩{product.price.toLocaleString()}
                 </div>
               </div>
 
               {/* 설명 */}
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">상품 설명</h3>
-                <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
+                <h3 className="text-base md:text-lg font-semibold text-gray-900 mb-2">상품 설명</h3>
+                <p className="text-sm md:text-base text-gray-600 leading-relaxed whitespace-pre-wrap">
                   {product.description}
                 </p>
               </div>
 
               {/* 재고 */}
               <div className="mb-6">
-                <span className={`text-sm font-medium ${
-                  product.stock > 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {product.stock > 0 ? `재고: ${product.stock}개` : '품절'}
-                </span>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-green-50 border border-green-200">
+                  <span className="text-green-600">
+                    {product.stock > 0 ? `재고: ${product.stock}개` : '품절'}
+                  </span>
+                </div>
               </div>
 
               {/* 수량 선택 */}
@@ -248,7 +249,7 @@ export default function ProductDetailPage() {
                     <button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       disabled={quantity <= 1}
-                      className="w-10 h-10 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition text-lg font-semibold"
                     >
                       −
                     </button>
@@ -258,12 +259,12 @@ export default function ProductDetailPage() {
                       max={product.stock}
                       value={quantity}
                       onChange={(e) => setQuantity(Math.max(1, Math.min(product.stock, parseInt(e.target.value) || 1)))}
-                      className="w-20 text-center border border-gray-300 rounded-lg px-3 py-2"
+                      className="w-20 text-center border-2 border-gray-300 rounded-lg px-3 py-2 font-semibold focus:outline-none focus:border-blue-500"
                     />
                     <button
                       onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
                       disabled={quantity >= product.stock}
-                      className="w-10 h-10 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-10 h-10 flex items-center justify-center border-2 border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition text-lg font-semibold"
                     >
                       +
                     </button>
@@ -271,18 +272,30 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
+              {/* 무료배송 안내 */}
+              {product.price >= 50000 && (
+                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-sm text-blue-700 font-semibold">
+                    <span className="text-lg">🚚</span>
+                    <span>무료배송</span>
+                  </div>
+                </div>
+              )}
+
               {/* 구매 버튼 */}
-              <div className="flex gap-3">
+              <div className="mt-auto">
                 <button
                   onClick={addToCart}
                   disabled={product.stock === 0 || adding}
-                  className={`flex-1 py-4 px-6 rounded-lg font-semibold text-lg transition-colors ${
+                  className={`w-full py-3 md:py-4 px-6 rounded-lg font-bold text-base md:text-lg transition-all ${
                     product.stock === 0
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                      : adding
+                      ? 'bg-blue-400 text-white cursor-wait'
+                      : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95'
                   }`}
                 >
-                  {adding ? '추가 중...' : product.stock === 0 ? '품절' : '🛒 장바구니에 담기'}
+                  {adding ? '⏳ 추가 중...' : product.stock === 0 ? '품절' : '🛒 장바구니에 담기'}
                 </button>
               </div>
             </div>
