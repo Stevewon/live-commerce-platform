@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ShopNavigation from '@/components/ShopNavigation';
 
 interface OrderItem {
   id: string;
@@ -110,8 +111,9 @@ export default function OrderDetailPage() {
   const status = statusMap[order.status] || { label: order.status, color: 'bg-gray-100 text-gray-800' };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-gray-50">
+      <ShopNavigation />
+      <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
           <Link

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import ShopNavigation from '@/components/ShopNavigation';
 
 interface Product {
   id: string;
@@ -120,6 +121,7 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ShopNavigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 헤더 */}
         <div className="mb-8">
