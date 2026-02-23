@@ -540,15 +540,21 @@ export default function ShopMainPage() {
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {products.map((product) => (
-                    <div key={product.id} className="group bg-white border rounded-lg overflow-hidden hover:shadow-2xl transition-all duration-300 flex flex-col">
+                    <div key={product.id} className="group bg-white border rounded-lg overflow-hidden hover:shadow-2xl hover:border-blue-300 transition-all duration-300 flex flex-col">
                       <Link href={`/products/${product.slug}`} className="block">
-                        <div className="relative aspect-square bg-gradient-to-br from-blue-50 to-purple-50 overflow-hidden cursor-pointer">
+                        <div className="relative aspect-square bg-gradient-to-br from-blue-50 to-purple-50 overflow-hidden cursor-pointer group-hover:scale-105 transition-transform duration-300">
                           <div className="w-full h-full flex items-center justify-center">
                             <div className="text-center">
-                              <span className="text-7xl mb-2 block opacity-30">
+                              <span className="text-7xl mb-2 block opacity-30 group-hover:opacity-50 transition-opacity">
                                 {CATEGORY_ICONS[product.category.slug] || '📦'}
                               </span>
                               <p className="text-xs text-gray-400 font-medium px-4">{product.name}</p>
+                            </div>
+                          </div>
+                          {/* Hover 시 "상세보기" 오버레이 */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+                            <div className="bg-white px-6 py-3 rounded-full shadow-lg transform scale-75 group-hover:scale-100 transition-transform">
+                              <span className="text-sm font-bold text-gray-900">👁️ 상세보기</span>
                             </div>
                           </div>
                           {product.isFeatured && (
@@ -557,7 +563,7 @@ export default function ShopMainPage() {
                             </div>
                           )}
                           {product.stock === 0 && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
                               <span className="text-white font-bold text-lg bg-gray-900/80 px-4 py-2 rounded-lg">품절</span>
                             </div>
                           )}
@@ -571,7 +577,7 @@ export default function ShopMainPage() {
                       <div className="p-4 flex flex-col flex-1">
                         <div className="text-xs text-gray-500 mb-2">{product.category.name}</div>
                         <Link href={`/products/${product.slug}`} className="block mb-3">
-                          <h3 className="font-medium text-gray-900 line-clamp-2 group-hover:text-blue-600 transition h-10 cursor-pointer">
+                          <h3 className="font-medium text-gray-900 line-clamp-2 group-hover:text-blue-600 group-hover:underline transition h-10 cursor-pointer">
                             {product.name}
                           </h3>
                         </Link>
@@ -595,20 +601,28 @@ export default function ShopMainPage() {
                             </div>
                           )}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            addToCart(product.id);
-                          }}
-                          disabled={product.stock === 0}
-                          className={`w-full py-2.5 rounded-lg font-bold transition-all mt-auto ${
-                            product.stock === 0
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95'
-                          }`}
-                        >
-                          {product.stock === 0 ? '품절' : '장바구니 담기'}
-                        </button>
+                        <div className="flex gap-2 mt-auto">
+                          <Link 
+                            href={`/products/${product.slug}`}
+                            className="flex-1 py-2.5 rounded-lg font-bold transition-all bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:from-purple-600 hover:to-blue-600 active:scale-95 text-center text-sm"
+                          >
+                            👁️ 상세보기
+                          </Link>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              addToCart(product.id);
+                            }}
+                            disabled={product.stock === 0}
+                            className={`flex-1 py-2.5 rounded-lg font-bold transition-all text-sm ${
+                              product.stock === 0
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-blue-500 text-white hover:bg-blue-600 active:scale-95'
+                            }`}
+                          >
+                            {product.stock === 0 ? '품절' : '🛒 담기'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
