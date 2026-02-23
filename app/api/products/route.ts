@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get('featured');
     const slug = searchParams.get('slug');
     
-    // Slug로 단일 상품 조회 (파트너 정보 포함)
+    // Slug로 단일 상품 조회 (파트너 정보 + 리뷰 포함)
     if (slug) {
       const product = await prisma.product.findFirst({
         where: {
@@ -44,6 +44,19 @@ export async function GET(request: NextRequest) {
             orderBy: {
               customPrice: 'asc', // 가격이 낮은 순으로 정렬
             },
+          },
+          reviews: {
+            include: {
+              user: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+            take: 10, // 최근 10개 리뷰만
           },
         },
       });

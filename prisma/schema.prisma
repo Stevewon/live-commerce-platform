@@ -160,7 +160,9 @@ model Product {
   id            String    @id @default(uuid())
   name          String
   slug          String    @unique
-  description   String
+  description   String    // 간단 설명
+  detailContent String?   // 상세 설명 (HTML)
+  
   price         Float
   comparePrice  Float?    // 정가 (할인 표시용)
   
@@ -169,8 +171,16 @@ model Product {
   sku           String?   @unique // 상품 코드
   
   // 이미지
-  images        String    // JSON array of image URLs
+  images        String    // JSON array of image URLs (갤러리)
+  detailImages  String?   // JSON array (상세페이지 이미지)
   thumbnail     String
+  
+  // 상품 스펙 (JSON)
+  specifications String?  // JSON object
+  
+  // 배송 정보
+  shippingInfo  String?   // 배송 안내
+  returnInfo    String?   // 교환/반품 안내
   
   // 카테고리
   categoryId    String
