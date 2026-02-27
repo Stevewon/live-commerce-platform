@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
 
 interface Product {
   id: string;
@@ -71,7 +70,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function ShopMainPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const user = null, loading = false // Temp;
   
   const view = searchParams?.get('view') || 'products';
   const [selectedCategory, setSelectedCategory] = useState<string>('all');

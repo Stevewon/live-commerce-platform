@@ -6,8 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
-import { useSocket } from '@/lib/hooks/useSocket';
+// import { useSocket } from '@/lib/hooks/useSocket' // Temp disabled;
 
 interface LiveData {
   id: string;
@@ -35,7 +34,7 @@ interface LiveData {
 export default function LiveViewPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, token } = useAuth();
+  const user = null, loading = false // Temp;
   
   const liveId = params.id as string;
   
@@ -56,7 +55,7 @@ export default function LiveViewPage() {
     sendMessage,
     startTyping,
     stopTyping,
-  } = useSocket({
+  } = { isConnected: false, emit: () => {}, on: () => {} } // Temp disabled
     liveId,
     userId: user?.userId,
     userName: user?.name,

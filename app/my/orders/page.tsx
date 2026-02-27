@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import ReviewForm from '@/components/ReviewForm';
 
@@ -47,7 +46,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
-  const { token, user, loading: authLoading } = useAuth();
+  const user = null, loading = false // Temp;
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);

@@ -3,11 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function PartnerRegisterPage() {
   const router = useRouter()
-  const { register } = useAuth()
+  const user = null, loading = false // Temp
   const [formData, setFormData] = useState({
     email: '',
     password: '',

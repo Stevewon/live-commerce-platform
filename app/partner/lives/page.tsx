@@ -6,7 +6,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
 
 interface Live {
   id: string;
@@ -27,7 +26,7 @@ interface Live {
 
 export default function PartnerLivesPage() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const user = null, loading = false // Temp;
   
   const [lives, setLives] = useState<Live[]>([]);
   const [loading, setLoading] = useState(true);

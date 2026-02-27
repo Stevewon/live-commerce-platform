@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/lib/contexts/AuthContext';
 import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth';
 
 interface Order {
@@ -45,7 +44,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function PartnerOrdersPage() {
-  const { user, loading: authLoading } = useAuth();
+  const user = null, loading = false // Temp;
   const { user, loading: authLoading, logout } = usePartnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);

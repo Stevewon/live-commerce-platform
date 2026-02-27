@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/contexts/AuthContext'
 
 // 호스트 프로필 데이터 (20개)
 const hostProfiles = [
@@ -123,7 +122,7 @@ function HostCard({ host, index }: { host: typeof hostProfiles[0], index: number
 }
 
 export default function HomePage() {
-  const { user, logout } = useAuth()
+  const user = null, loading = false // Temp
   const [scrollY, setScrollY] = useState(0)
   // 실시간 카운터 상태
   const [liveStats, setLiveStats] = useState({

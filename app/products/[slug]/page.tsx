@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
 
 interface Partner {
   id: string;
@@ -69,7 +68,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const user = null, loading = false // Temp;
   const slug = params.slug as string;
 
   const [product, setProduct] = useState<Product | null>(null);

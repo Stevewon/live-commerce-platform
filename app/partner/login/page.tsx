@@ -3,11 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function PartnerLoginPage() {
   const router = useRouter()
-  const { login } = useAuth()
+  const user = null, loading = false // Temp
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import SocialLoginButtons from '@/components/SocialLoginButtons'
+// Social login temp disabled
 
 export default function LoginPage() {
   const router = useRouter()
@@ -152,7 +152,7 @@ export default function LoginPage() {
           </div>
 
           {/* 소셜 로그인 버튼 */}
-          <SocialLoginButtons callbackUrl={callbackUrl} />
+          {/* Social login temp disabled */}
         </form>
 
         {/* 추가 링크 */}

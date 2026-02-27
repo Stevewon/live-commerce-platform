@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/contexts/AuthContext';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
 import ShopNavigation from '@/components/ShopNavigation';
 
@@ -20,7 +19,7 @@ interface CartItem {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const user = null, loading = false // Temp;
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
