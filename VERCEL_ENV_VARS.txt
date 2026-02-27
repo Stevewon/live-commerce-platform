@@ -1,0 +1,49 @@
+# ============================================
+# Vercel 환경 변수 설정 가이드
+# ============================================
+# 아래 변수들을 Vercel Dashboard > Project Settings > Environment Variables에 추가하세요
+# Production 환경에 체크하세요!
+
+# === 필수 환경 변수 (최소 설정) ===
+
+# 1. 데이터베이스 (임시: SQLite, 프로덕션: PostgreSQL)
+DATABASE_URL="file:./dev.db"
+# 프로덕션용 PostgreSQL (Vercel Postgres 추가 시 자동 생성됨):
+# DATABASE_URL="postgresql://user:password@host:5432/database"
+
+# 2. 보안 키 (아래 명령어로 생성: openssl rand -hex 32)
+JWT_SECRET="temp-jwt-secret-change-me-in-production-32chars"
+NEXTAUTH_SECRET="temp-nextauth-secret-change-me-in-production-32chars"
+
+# 3. 애플리케이션 URL
+NEXTAUTH_URL="https://qrlive.io"
+NEXT_PUBLIC_APP_URL="https://qrlive.io"
+
+# 4. 환경
+NODE_ENV="production"
+
+# === 소셜 로그인 (선택 사항 - 나중에 추가 가능) ===
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-secret"
+KAKAO_CLIENT_ID="your-kakao-client-id"
+KAKAO_CLIENT_SECRET="your-kakao-secret"
+
+# === 이메일 (선택 사항 - 나중에 추가 가능) ===
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASSWORD="your-app-password"
+SMTP_FROM="QR Live <noreply@qrlive.io>"
+
+# === 토스페이먼츠 (테스트 키로 시작) ===
+NEXT_PUBLIC_TOSS_CLIENT_KEY="test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq"
+TOSS_SECRET_KEY="test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R"
+
+# ============================================
+# 🎯 첫 배포를 위한 최소 필수 변수 (5개만!)
+# ============================================
+DATABASE_URL=file:./dev.db
+JWT_SECRET=temp-jwt-secret-change-me-in-production-32chars
+NEXTAUTH_SECRET=temp-nextauth-secret-change-me-in-production-32chars
+NEXTAUTH_URL=https://qrlive.io
+NODE_ENV=production
