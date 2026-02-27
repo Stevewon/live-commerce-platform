@@ -1,4 +1,5 @@
 'use client'
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
 
@@ -46,7 +47,7 @@ interface Order {
 }
 
 export default function AdminSettlementsPage() {
-  const authLoading = false // Temp disabled
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all')

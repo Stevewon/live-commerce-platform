@@ -1,9 +1,10 @@
 'use client'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-// Social login temp disabled
+import SocialLoginButtons from '@/components/SocialLoginButtons'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -152,7 +153,7 @@ export default function LoginPage() {
           </div>
 
           {/* 소셜 로그인 버튼 */}
-          {/* Social login temp disabled */}
+          <SocialLoginButtons callbackUrl={callbackUrl} />
         </form>
 
         {/* 추가 링크 */}

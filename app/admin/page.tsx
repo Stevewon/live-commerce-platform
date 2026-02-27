@@ -1,4 +1,5 @@
 'use client';
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -29,7 +30,7 @@ interface Stats {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const user = null // Temp disabled;
+  const user = null ;
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

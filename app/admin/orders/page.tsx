@@ -1,8 +1,9 @@
 'use client';
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-// Auth temporarily disabled;
+;
 
 interface Order {
   id: string;
@@ -64,7 +65,7 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 export default function AdminOrdersPage() {
-  const authLoading = false;
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,

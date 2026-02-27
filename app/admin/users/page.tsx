@@ -1,8 +1,9 @@
 'use client';
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-// Auth temporarily disabled;
+;
 import Link from 'next/link';
 
 interface User {

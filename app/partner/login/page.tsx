@@ -1,4 +1,5 @@
 'use client'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -6,15 +7,15 @@ import Link from 'next/link'
 
 export default function PartnerLoginPage() {
   const router = useRouter()
-  const user = null, loading = false // Temp
+  const user = null, isLoading = false // Temp
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setIsLoading(true)
     setError('')
 
     try {
@@ -24,7 +25,7 @@ export default function PartnerLoginPage() {
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -75,7 +76,7 @@ export default function PartnerLoginPage() {
             <button
               type="submit"
               className="btn btn-primary w-full"
-              disabled={loading}
+              disabled={isLoading}
             >
               {loading ? '로그인 중...' : '로그인'}
             </button>

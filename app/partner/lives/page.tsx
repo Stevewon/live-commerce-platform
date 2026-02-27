@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 // app/partner/lives/page.tsx
 // 파트너 라이브 관리 페이지
@@ -26,10 +27,10 @@ interface Live {
 
 export default function PartnerLivesPage() {
   const router = useRouter();
-  const user = null, loading = false // Temp;
+  const user = null, isLoading = false // Temp;
   
   const [lives, setLives] = useState<Live[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   
   // 새 라이브 폼
@@ -58,7 +59,7 @@ export default function PartnerLivesPage() {
   const fetchLives = async () => {
     if (!token) return;
     
-    setLoading(true);
+    setIsLoading(true);
     try {
       const res = await fetch('/api/partner/lives', {
         headers: { Authorization: `Bearer ${token}` },
@@ -70,7 +71,7 @@ export default function PartnerLivesPage() {
     } catch (error) {
       console.error('라이브 목록 로드 실패:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 

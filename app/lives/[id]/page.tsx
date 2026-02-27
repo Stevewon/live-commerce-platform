@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 // app/lives/[id]/page.tsx
 // 라이브 시청 페이지 - Socket.io 실시간 채팅
@@ -6,7 +7,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-// import { useSocket } from '@/lib/hooks/useSocket' // Temp disabled;
+import { useSocket } from '@/lib/hooks/useSocket'
 
 interface LiveData {
   id: string;
@@ -34,13 +35,13 @@ interface LiveData {
 export default function LiveViewPage() {
   const params = useParams();
   const router = useRouter();
-  const user = null, loading = false // Temp;
+  const user = null, isLoading = false // Temp;
   
   const liveId = params.id as string;
   
   const [live, setLive] = useState<LiveData | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +56,7 @@ export default function LiveViewPage() {
     sendMessage,
     startTyping,
     stopTyping,
-  } = { isConnected: false, emit: () => {}, on: () => {} } // Temp disabled
+  } = useSocket({
     liveId,
     userId: user?.userId,
     userName: user?.name,
@@ -76,7 +77,7 @@ export default function LiveViewPage() {
     } catch (error) {
       console.error('라이브 로드 실패:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 

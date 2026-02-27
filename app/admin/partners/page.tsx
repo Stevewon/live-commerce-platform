@@ -1,4 +1,5 @@
 'use client'
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
 
@@ -24,7 +25,7 @@ interface Partner {
 }
 
 export default function AdminPartnersPage() {
-  const authLoading = false // Temp disabled
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')

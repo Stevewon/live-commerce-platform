@@ -1,7 +1,8 @@
 'use client'
+import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
-// Auth temporarily disabled
+
 
 interface Product {
   id: string
@@ -28,7 +29,7 @@ interface Category {
 }
 
 export default function AdminProductsPage() {
-  const authLoading = false
+  const { user, loading: authLoading, logout } = useAdminAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
