@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
+// Auth temporarily disabled
 import ImageUpload from '@/components/ImageUpload'
 
 interface Product {
@@ -29,7 +29,7 @@ interface Category {
 }
 
 export default function AdminProductsPage() {
-  const { user, loading: authLoading, logout } = useAdminAuth()
+  const authLoading = false
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
