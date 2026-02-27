@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 // Auth temporarily disabled
-import ImageUpload from '@/components/ImageUpload'
 
 interface Product {
   id: string

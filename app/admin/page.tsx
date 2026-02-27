@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/contexts/AuthContext';
 import Link from 'next/link';
 
 interface Stats {
@@ -30,7 +29,7 @@ interface Stats {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const user = null // Temp disabled;
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

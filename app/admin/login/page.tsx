@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function AdminLoginPage() {
   const router = useRouter()

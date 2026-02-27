@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/contexts/AuthContext';
-import { useAdminAuth } from '@/lib/hooks/useAdminAuth';
 
 interface Coupon {
   id: string;
@@ -25,8 +23,8 @@ interface Coupon {
 }
 
 export default function AdminCouponsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const { user, loading: authLoading, logout } = useAdminAuth();
+  const user = null // Temp disabled;
+  const authLoading = false // Temp disabled;
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
