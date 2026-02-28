@@ -86,9 +86,8 @@ export async function POST(request: NextRequest) {
         data: {
           userId: partnerId,
           storeName: '파트너 테스트 스토어',
-          businessNumber: '123-45-67890',
-          bankAccount: '신한은행 110-123-456789',
-          status: 'ACTIVE',
+          storeSlug: 'test-partner-store',
+          description: '테스트용 파트너 스토어입니다',
         },
       });
       console.log('   Partner Store 생성 완료!');

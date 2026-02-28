@@ -84,24 +84,8 @@ const authOptions = {
   adapter: PrismaAdapter(prisma),
   providers,
   
-  // Cloudflare Workers 호환성 설정
-  useSecureCookies: process.env.NODE_ENV === 'production',
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === 'production' 
-        ? '__Secure-next-auth.session-token' 
-        : 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-      },
-    },
-  },
-  
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account }: any) {
       if (user) {
         token.id = user.id
         token.role = user.role
@@ -123,7 +107,7 @@ const authOptions = {
       return token
     },
     
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
@@ -131,7 +115,7 @@ const authOptions = {
       return session
     },
     
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account, profile }: any) {
       // 소셜 로그인 시 사용자 생성 또는 업데이트
       if (account?.provider && account?.provider !== "credentials") {
         try {

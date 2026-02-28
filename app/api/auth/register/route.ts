@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
     });
     
     // HTTP-only 쿠키 설정 (30일 유효) - Next.js cookies 사용
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     cookieStore.set('auth-token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
