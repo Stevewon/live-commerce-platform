@@ -1,9 +1,12 @@
 'use client';
 import { useAuth } from '@/lib/contexts/AuthContext'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+
+// Disable static generation for this page
+export const dynamic = 'force-dynamic';
 
 interface Product {
   id: string;
