@@ -7,29 +7,42 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
-const authOptions = {
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    // Google OAuth
+// OAuth Providers 동적 구성
+const providers = [];
+
+// Google OAuth (클라이언트 ID가 설정된 경우에만)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'your-google-client-id') {
+  providers.push(
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-    }),
-    
-    // Naver OAuth
+    })
+  );
+}
+
+// Naver OAuth (클라이언트 ID가 설정된 경우에만)
+if (process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_ID !== 'your-naver-client-id') {
+  providers.push(
     NaverProvider({
-      clientId: process.env.NAVER_CLIENT_ID || "",
+      clientId: process.env.NAVER_CLIENT_ID,
       clientSecret: process.env.NAVER_CLIENT_SECRET || "",
-    }),
-    
-    // Kakao OAuth
+    })
+  );
+}
+
+// Kakao OAuth (클라이언트 ID가 설정된 경우에만)
+if (process.env.KAKAO_CLIENT_ID && process.env.KAKAO_CLIENT_ID !== 'your-kakao-client-id') {
+  providers.push(
     KakaoProvider({
-      clientId: process.env.KAKAO_CLIENT_ID || "",
+      clientId: process.env.KAKAO_CLIENT_ID,
       clientSecret: process.env.KAKAO_CLIENT_SECRET || "",
-    }),
-    
-    // 기존 이메일/비밀번호 로그인
-    CredentialsProvider({
+    })
+  );
+}
+
+// 기존 이메일/비밀번호 로그인 (항상 활성화)
+providers.push(
+  CredentialsProvider({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -65,7 +78,11 @@ const authOptions = {
         }
       }
     })
-  ],
+);
+
+const authOptions = {
+  adapter: PrismaAdapter(prisma),
+  providers,
   
   callbacks: {
     async jwt({ token, user, account }) {
