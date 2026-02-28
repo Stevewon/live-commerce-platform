@@ -16,9 +16,19 @@ export async function verifyAuthToken(
   request: NextRequest
 ): Promise<{ userId: string; email: string; role: string; name: string } | NextResponse> {
   try {
-    // 쿠키에서 토큰 추출
-    const cookieStore = await cookies();
-    const token = cookieStore.get('auth-token')?.value;
+    let token: string | undefined;
+    
+    // 1. Authorization 헤더에서 토큰 추출 (우선순위)
+    const authHeader = request.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+    
+    // 2. 쿠키에서 토큰 추출 (fallback)
+    if (!token) {
+      const cookieStore = await cookies();
+      token = cookieStore.get('auth-token')?.value;
+    }
     
     if (!token) {
       return NextResponse.json(
