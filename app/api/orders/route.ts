@@ -52,7 +52,7 @@ async function sendOrderNotifications(order: any, userId: string) {
     await sendEmailWithPreferences({
       userId,
       to: user.email,
-      subject: `[Live Commerce] 주문이 접수되었습니다 (${order.orderNumber})`,
+      subject: `[QRLIVE] 주문이 접수되었습니다 (${order.orderNumber})`,
       html: emailHtml,
       notificationType: 'order'
     });

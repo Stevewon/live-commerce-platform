@@ -28,7 +28,7 @@ export interface Order {
   deliveredAt?: string;
 }
 
-const ORDERS_KEY = 'live-commerce-orders';
+const ORDERS_KEY = 'qrlive-orders';
 
 // 주문 목록 가져오기
 export const getOrders = (): Order[] => {

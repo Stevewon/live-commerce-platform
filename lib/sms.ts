@@ -65,7 +65,7 @@ export function orderConfirmationSMS(data: {
   orderNumber: string;
   total: number;
 }): string {
-  return `[Live Commerce] ${data.customerName}님, 주문이 접수되었습니다.\n주문번호: ${data.orderNumber}\n결제금액: ₩${data.total.toLocaleString()}\n배송은 2-3일 소요됩니다.`;
+  return `[QRLIVE] ${data.customerName}님, 주문이 접수되었습니다.\n주문번호: ${data.orderNumber}\n결제금액: ₩${data.total.toLocaleString()}\n배송은 2-3일 소요됩니다.`;
 }
 
 /**
@@ -77,7 +77,7 @@ export function shippingStartedSMS(data: {
   trackingNumber?: string;
 }): string {
   const tracking = data.trackingNumber ? `\n송장번호: ${data.trackingNumber}` : '';
-  return `[Live Commerce] ${data.customerName}님, 상품이 발송되었습니다.\n주문번호: ${data.orderNumber}${tracking}\n배송 추적: livecommerce.com/orders`;
+  return `[QRLIVE] ${data.customerName}님, 상품이 발송되었습니다.\n주문번호: ${data.orderNumber}${tracking}\n배송 추적: qrlive.io/orders`;
 }
 
 /**
@@ -87,5 +87,5 @@ export function deliveryCompletedSMS(data: {
   customerName: string;
   orderNumber: string;
 }): string {
-  return `[Live Commerce] ${data.customerName}님, 상품이 배송 완료되었습니다.\n주문번호: ${data.orderNumber}\n구매 후기를 남겨주세요!`;
+  return `[QRLIVE] ${data.customerName}님, 상품이 배송 완료되었습니다.\n주문번호: ${data.orderNumber}\n구매 후기를 남겨주세요!`;
 }

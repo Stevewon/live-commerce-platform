@@ -138,7 +138,7 @@ export default function RegisterPage() {
         <div className="text-center">
           <Link href="/" className="inline-block">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Live Commerce
+              QRLIVE
             </h1>
           </Link>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">

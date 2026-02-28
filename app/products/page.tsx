@@ -233,7 +233,7 @@ export default function ShopMainPage() {
           <div className="h-16 flex items-center justify-between gap-2">
             <Link href="/" className="flex items-center gap-2 flex-shrink-0">
               <span className="text-2xl">🏪</span>
-              <span className="font-bold text-lg lg:text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:inline">Live Commerce</span>
+              <span className="font-bold text-lg lg:text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:inline">QRLIVE</span>
             </Link>
             
             {/* 검색바 - 데스크톱 */}

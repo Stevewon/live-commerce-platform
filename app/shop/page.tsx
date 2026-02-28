@@ -249,7 +249,7 @@ export default function ShopPage() {
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-              Live Commerce
+              QRLIVE
             </Link>
             <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
               <Link href="/" className="hidden sm:inline text-gray-300 hover:text-white transition text-sm">
@@ -442,7 +442,7 @@ export default function ShopPage() {
       {/* 푸터 */}
       <footer className="bg-gray-800/50 border-t border-gray-700 py-8 mt-16">
         <div className="container mx-auto px-6 text-center text-gray-400">
-          <p>© 2026 Live Commerce Platform. All rights reserved.</p>
+          <p>© 2026 QRLIVE Platform. All rights reserved.</p>
         </div>
       </footer>
     </div>

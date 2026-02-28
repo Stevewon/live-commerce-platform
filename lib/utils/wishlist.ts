@@ -11,7 +11,7 @@ export interface WishlistItem {
   addedAt: string;
 }
 
-const WISHLIST_KEY = 'live-commerce-wishlist';
+const WISHLIST_KEY = 'qrlive-wishlist';
 
 // 찜 목록 가져오기
 export const getWishlist = (): WishlistItem[] => {

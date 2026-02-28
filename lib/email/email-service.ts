@@ -131,14 +131,14 @@ export async function sendOrderConfirmationEmail(orderData: {
     </div>
     <div class="footer">
       <p>본 메일은 발신 전용입니다. 문의사항이 있으시면 고객센터로 연락해주세요.</p>
-      <p>&copy; 2024 Live Commerce Platform. All rights reserved.</p>
+      <p>&copy; 2024 QRLIVE Platform. All rights reserved.</p>
     </div>
   `;
 
   await transporter.sendMail({
-    from: `"Live Commerce" <${process.env.SMTP_USER}>`,
+    from: `"QRLIVE" <${process.env.SMTP_USER}>`,
     to: orderData.email,
-    subject: `[Live Commerce] 주문이 완료되었습니다 (${orderData.orderNumber})`,
+    subject: `[QRLIVE] 주문이 완료되었습니다 (${orderData.orderNumber})`,
     html,
   });
 }
@@ -192,14 +192,14 @@ export async function sendShippingStartEmail(data: {
     </div>
     <div class="footer">
       <p>본 메일은 발신 전용입니다. 문의사항이 있으시면 고객센터로 연락해주세요.</p>
-      <p>&copy; 2024 Live Commerce Platform. All rights reserved.</p>
+      <p>&copy; 2024 QRLIVE Platform. All rights reserved.</p>
     </div>
   `;
 
   await transporter.sendMail({
-    from: `"Live Commerce" <${process.env.SMTP_USER}>`,
+    from: `"QRLIVE" <${process.env.SMTP_USER}>`,
     to: data.email,
-    subject: `[Live Commerce] 상품이 배송 중입니다 (${data.orderNumber})`,
+    subject: `[QRLIVE] 상품이 배송 중입니다 (${data.orderNumber})`,
     html,
   });
 }
@@ -241,14 +241,14 @@ export async function sendDeliveryCompleteEmail(data: {
     </div>
     <div class="footer">
       <p>본 메일은 발신 전용입니다. 문의사항이 있으시면 고객센터로 연락해주세요.</p>
-      <p>&copy; 2024 Live Commerce Platform. All rights reserved.</p>
+      <p>&copy; 2024 QRLIVE Platform. All rights reserved.</p>
     </div>
   `;
 
   await transporter.sendMail({
-    from: `"Live Commerce" <${process.env.SMTP_USER}>`,
+    from: `"QRLIVE" <${process.env.SMTP_USER}>`,
     to: data.email,
-    subject: `[Live Commerce] 배송이 완료되었습니다 (${data.orderNumber})`,
+    subject: `[QRLIVE] 배송이 완료되었습니다 (${data.orderNumber})`,
     html,
   });
 }
@@ -268,7 +268,7 @@ export async function sendPartnerApprovalEmail(data: {
     </div>
     <div class="content">
       <p>안녕하세요 ${data.name}님,</p>
-      <p>Live Commerce 플랫폼 파트너 가입이 승인되었습니다!</p>
+      <p>QRLIVE 플랫폼 파트너 가입이 승인되었습니다!</p>
       
       <div class="order-info">
         <h3>🏪 스토어 정보</h3>
@@ -291,14 +291,14 @@ export async function sendPartnerApprovalEmail(data: {
     </div>
     <div class="footer">
       <p>본 메일은 발신 전용입니다. 문의사항이 있으시면 고객센터로 연락해주세요.</p>
-      <p>&copy; 2024 Live Commerce Platform. All rights reserved.</p>
+      <p>&copy; 2024 QRLIVE Platform. All rights reserved.</p>
     </div>
   `;
 
   await transporter.sendMail({
-    from: `"Live Commerce" <${process.env.SMTP_USER}>`,
+    from: `"QRLIVE" <${process.env.SMTP_USER}>`,
     to: data.email,
-    subject: `[Live Commerce] 파트너 가입이 승인되었습니다`,
+    subject: `[QRLIVE] 파트너 가입이 승인되었습니다`,
     html,
   });
 }
@@ -342,14 +342,14 @@ export async function sendSettlementCompleteEmail(data: {
     </div>
     <div class="footer">
       <p>본 메일은 발신 전용입니다. 문의사항이 있으시면 고객센터로 연락해주세요.</p>
-      <p>&copy; 2024 Live Commerce Platform. All rights reserved.</p>
+      <p>&copy; 2024 QRLIVE Platform. All rights reserved.</p>
     </div>
   `;
 
   await transporter.sendMail({
-    from: `"Live Commerce" <${process.env.SMTP_USER}>`,
+    from: `"QRLIVE" <${process.env.SMTP_USER}>`,
     to: data.email,
-    subject: `[Live Commerce] 정산이 완료되었습니다`,
+    subject: `[QRLIVE] 정산이 완료되었습니다`,
     html,
   });
 }

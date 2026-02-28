@@ -15,7 +15,7 @@ export default function MyPage() {
     loadData();
     
     // 샘플 데이터 생성 (테스트용 - 한 번만 실행)
-    const hasOrders = localStorage.getItem('live-commerce-orders');
+    const hasOrders = localStorage.getItem('qrlive-orders');
     if (!hasOrders) {
       createSampleOrders();
       loadData();
@@ -81,7 +81,7 @@ export default function MyPage() {
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-              Live Commerce
+              QRLIVE
             </Link>
             <div className="flex items-center gap-3 sm:gap-6">
               <Link href="/" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">

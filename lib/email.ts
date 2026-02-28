@@ -35,7 +35,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: to }] }],
-        from: { email: process.env.EMAIL_FROM || 'noreply@livecommerce.com' },
+        from: { email: process.env.EMAIL_FROM || 'noreply@qrlive.io' },
         subject,
         content: [
           { type: 'text/plain', value: text || html.replace(/<[^>]*>/g, '') },
@@ -152,8 +152,8 @@ export function orderConfirmationEmail(data: {
         
         <!-- Footer -->
         <div style="background-color: #f5f5f5; padding: 20px; text-align: center; color: #999; font-size: 12px;">
-          <p style="margin: 5px 0;">Live Commerce Platform</p>
-          <p style="margin: 5px 0;">문의: support@livecommerce.com</p>
+          <p style="margin: 5px 0;">QRLIVE Platform</p>
+          <p style="margin: 5px 0;">문의: support@qrlive.io</p>
         </div>
       </div>
     </body>
@@ -222,8 +222,8 @@ export function shippingStartedEmail(data: {
         
         <!-- Footer -->
         <div style="background-color: #f5f5f5; padding: 20px; text-align: center; color: #999; font-size: 12px;">
-          <p style="margin: 5px 0;">Live Commerce Platform</p>
-          <p style="margin: 5px 0;">문의: support@livecommerce.com</p>
+          <p style="margin: 5px 0;">QRLIVE Platform</p>
+          <p style="margin: 5px 0;">문의: support@qrlive.io</p>
         </div>
       </div>
     </body>

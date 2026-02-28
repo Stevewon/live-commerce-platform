@@ -184,7 +184,7 @@ export default function OrdersPage() {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-              Live Commerce
+              QRLIVE
             </Link>
             <div className="flex items-center gap-6">
               <Link href="/" className="text-gray-300 hover:text-white transition text-sm">
