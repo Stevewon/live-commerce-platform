@@ -76,3 +76,105 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+// 관리자 상품 등록 (POST)
+export async function POST(req: NextRequest) {
+  try {
+    // 관리자 인증 확인
+    const authResult = await verifyAuthToken(req);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    
+    if (authResult.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, error: '관리자 권한이 필요합니다' },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const { 
+      name, 
+      description, 
+      price, 
+      stock, 
+      categoryId, 
+      isActive,
+      imageUrl,
+      slug,
+      thumbnail,
+      images,
+      detailContent,
+      comparePrice,
+      sku,
+      specifications,
+      shippingInfo,
+      returnInfo,
+      isFeatured
+    } = body;
+
+    // 필수 필드 검증
+    if (!name || !categoryId || !price || price <= 0) {
+      return NextResponse.json(
+        { success: false, error: '필수 항목을 입력해주세요' },
+        { status: 400 }
+      );
+    }
+
+    // slug 자동 생성 (제공되지 않은 경우)
+    const productSlug = slug || name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now();
+
+    // 상품 생성
+    const product = await prisma.product.create({
+      data: {
+        name,
+        slug: productSlug,
+        description: description || '',
+        detailContent: detailContent || null,
+        price: parseFloat(price),
+        comparePrice: comparePrice ? parseFloat(comparePrice) : null,
+        stock: parseInt(stock) || 0,
+        sku: sku || null,
+        images: images || JSON.stringify([imageUrl || '']),
+        thumbnail: thumbnail || imageUrl || '',
+        categoryId,
+        specifications: specifications || null,
+        shippingInfo: shippingInfo || null,
+        returnInfo: returnInfo || null,
+        isActive: isActive !== undefined ? isActive : true,
+        isFeatured: isFeatured !== undefined ? isFeatured : false
+      },
+      include: {
+        category: {
+          select: {
+            name: true,
+            slug: true
+          }
+        }
+      }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: '상품이 등록되었습니다',
+      data: product
+    });
+
+  } catch (error: any) {
+    console.error('관리자 상품 등록 실패:', error);
+    
+    // Unique constraint 에러 처리
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { success: false, error: '이미 존재하는 상품명 또는 SKU입니다' },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, error: '상품 등록에 실패했습니다' },
+      { status: 500 }
+    );
+  }
+}

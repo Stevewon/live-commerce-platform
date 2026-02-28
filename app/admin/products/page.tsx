@@ -174,7 +174,7 @@ export default function AdminProductsPage() {
       
       const url = modalMode === 'edit' && selectedProduct
         ? `/api/admin/products/${selectedProduct.id}`
-        : '/api/partner/products'
+        : '/api/admin/products'
 
       const method = modalMode === 'edit' ? 'PATCH' : 'POST'
 
