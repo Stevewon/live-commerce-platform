@@ -2,7 +2,7 @@
 // 관리자 대시보드 차트 데이터 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 export async function GET(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     
     if (role !== 'ADMIN') {
       return NextResponse.json(
-        { success: false, error: '관리자 권한이 필요합니다' },
+        { error: '관리자 권한이 필요합니다' },
         { status: 403 }
       );
     }
@@ -34,15 +34,23 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // 일별 매출 그룹화
-    const salesByDate: Record<string, number> = {};
+    // 일별 매출 그룹화 (sales, orders)
+    const salesByDate: Record<string, { sales: number; orders: number }> = {};
     orders.forEach((order) => {
       const dateKey = order.createdAt.toISOString().split('T')[0];
-      salesByDate[dateKey] = (salesByDate[dateKey] || 0) + order.total;
+      if (!salesByDate[dateKey]) {
+        salesByDate[dateKey] = { sales: 0, orders: 0 };
+      }
+      salesByDate[dateKey].sales += order.total;
+      salesByDate[dateKey].orders += 1;
     });
 
     const salesTrend = Object.entries(salesByDate)
-      .map(([date, total]) => ({ date, total }))
+      .map(([date, data]) => ({
+        date,
+        sales: data.sales,
+        orders: data.orders,
+      }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
     // 카테고리별 매출
@@ -80,8 +88,8 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    const categoryData = Object.entries(categorySales).map(([name, data]) => ({
-      name,
+    const categoryData = Object.entries(categorySales).map(([category, data]) => ({
+      category,  // ✅ 'name' → 'category'
       revenue: data.revenue,
       count: data.count,
     }));
@@ -92,7 +100,7 @@ export async function GET(req: NextRequest) {
     });
 
     const ordersByHour = Array.from({ length: 24 }, (_, hour) => ({
-      hour,
+      hour: `${hour}시`,  // ✅ 문자열로 변환
       count: 0,
     }));
 
@@ -102,9 +110,10 @@ export async function GET(req: NextRequest) {
     });
 
     // 인기 상품 Top 5
-    const topProducts = await prisma.orderItem.groupBy({
+    const topProductsRaw = await prisma.orderItem.groupBy({
       by: ['productId'],
       _sum: { quantity: true, price: true },
+      _count: { id: true },
       orderBy: { _sum: { quantity: 'desc' } },
       take: 5,
       where: {
@@ -114,7 +123,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const topProductIds = topProducts.map((p) => p.productId);
+    const topProductIds = topProductsRaw.map((p) => p.productId);
     const topProductDetails = await prisma.product.findMany({
       where: { id: { in: topProductIds } },
       select: {
@@ -125,31 +134,26 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const topProductsData = topProducts.map((stat) => {
+    const topProducts = topProductsRaw.map((stat) => {
       const product = topProductDetails.find((p) => p.id === stat.productId);
       return {
-        id: stat.productId,
         name: product?.name || '알 수 없음',
-        thumbnail: product?.thumbnail || '',
-        price: product?.price || 0,
-        soldCount: stat._sum.quantity || 0,
+        sales: stat._sum.quantity || 0,  // ✅ 'soldCount' → 'sales'
+        orders: stat._count.id || 0,  // ✅ 주문 수 추가
         revenue: (stat._sum.price || 0) * (stat._sum.quantity || 0),
       };
     });
 
     return NextResponse.json({
-      success: true,
-      data: {
-        salesTrend,
-        categoryData,
-        ordersByHour,
-        topProducts: topProductsData,
-      },
+      salesTrend,
+      categoryData,
+      ordersByHour,
+      topProducts,
     });
   } catch (error: any) {
     console.error('차트 데이터 조회 오류:', error);
     return NextResponse.json(
-      { success: false, error: '차트 데이터를 불러올 수 없습니다' },
+      { error: '차트 데이터를 불러올 수 없습니다' },
       { status: 500 }
     );
   }
