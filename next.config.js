@@ -11,6 +11,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
   // API 라우트 처리
   async headers() {
     return [
