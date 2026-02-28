@@ -33,9 +33,15 @@ export default function AdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🔐</div>
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/logos/qrlive-logo.png" 
+              alt="QRLIVE Logo" 
+              className="w-20 h-20 object-contain"
+            />
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            관리자 로그인
+            QRLIVE 관리자
           </h1>
           <p className="text-gray-600">
             플랫폼 관리자 전용 페이지입니다

@@ -159,10 +159,12 @@ export default function HomePage() {
       }`}>
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg sm:text-xl">L</span>
-              </div>
+            <Link href="/" className="flex items-center space-x-2 sm:space-x-3">
+              <img 
+                src="/logos/qrlive-logo.png" 
+                alt="QRLIVE Logo" 
+                className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+              />
               <span className="text-white text-lg sm:text-xl font-bold hidden xs:inline">QRLIVE</span>
             </Link>
             
@@ -571,10 +573,12 @@ export default function HomePage() {
         <div className="container mx-auto px-6">
           <div className="grid md:grid-cols-4 gap-12 mb-12">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-xl">L</span>
-                </div>
+              <div className="flex items-center space-x-3 mb-4">
+                <img 
+                  src="/logos/qrlive-logo.png" 
+                  alt="QRLIVE Logo" 
+                  className="w-10 h-10 object-contain"
+                />
                 <span className="text-white text-xl font-bold">QRLIVE</span>
               </div>
               <p className="text-gray-400 text-sm">

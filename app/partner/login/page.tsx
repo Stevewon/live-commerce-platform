@@ -33,8 +33,15 @@ export default function PartnerLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/logos/qrlive-logo.png" 
+              alt="QRLIVE Logo" 
+              className="w-20 h-20 object-contain"
+            />
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            파트너 로그인
+            QRLIVE 파트너
           </h1>
           <p className="text-gray-600">
             큐라이브 플랫폼에 오신 것을 환영합니다
