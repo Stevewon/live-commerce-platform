@@ -19,11 +19,21 @@ export default function PartnerLoginPage() {
     setError('')
 
     try {
-      // AuthContext의 login 함수 사용
-      await login(email, password)
-      // login 함수에서 자동으로 /partner/dashboard로 리다이렉션됨
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role: 'PARTNER' }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        router.push('/partner/dashboard')
+      } else {
+        setError(data.error || '로그인에 실패했습니다.')
+      }
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || '로그인 중 오류가 발생했습니다.')
     } finally {
       setIsLoading(false)
     }
@@ -85,7 +95,7 @@ export default function PartnerLoginPage() {
               className="btn btn-primary w-full"
               disabled={isLoading}
             >
-              {loading ? '로그인 중...' : '로그인'}
+              {isLoading ? '로그인 중...' : '로그인'}
             </button>
           </form>
 
