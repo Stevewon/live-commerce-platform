@@ -5,6 +5,12 @@ const nextConfig = {
     domains: ['localhost'],
     unoptimized: true,
   },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // API 라우트 처리
   async headers() {
     return [

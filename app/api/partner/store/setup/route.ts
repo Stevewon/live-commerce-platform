@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 기존 스토어 확인
-    const existingStore = await prisma.partnerStore.findUnique({
+    const existingStore = await prisma.partner.findUnique({
       where: { userId: decoded.userId }
     });
 
@@ -42,15 +42,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 스토어 생성
-    const store = await prisma.partnerStore.create({
+    const store = await prisma.partner.create({
       data: {
         userId: decoded.userId,
         storeName: `${decoded.name}의 스토어`,
         storeSlug: `store-${decoded.userId.substring(0, 8)}`,
-        businessNumber: '123-45-67890',
-        bankAccount: '신한은행 110-123-456789',
-        status: 'ACTIVE',
         description: '테스트 파트너 스토어입니다.',
+        commissionRate: 30.0,
+        isActive: true,
       },
     });
 

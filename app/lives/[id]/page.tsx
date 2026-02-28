@@ -96,7 +96,7 @@ export default function LiveViewPage() {
 
   // 메시지 전송
   const handleSendMessage = () => {
-    if (!user || !token) {
+    if (!user) {
       alert('로그인이 필요합니다');
       router.push('/partner/login');
       return;

@@ -70,12 +70,13 @@ export async function PATCH(
 
       const averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
       
-      await prisma.product.update({
-        where: { id: review.productId },
-        data: {
-          rating: Math.round(averageRating * 10) / 10
-        }
-      });
+      // TODO: Product 모델에 rating 필드 추가 후 활성화
+      // await prisma.product.update({
+      //   where: { id: review.productId },
+      //   data: {
+      //     rating: Math.round(averageRating * 10) / 10
+      //   }
+      // });
     }
 
     return NextResponse.json({
@@ -141,24 +142,25 @@ export async function DELETE(
       select: { rating: true }
     });
 
-    if (reviews.length > 0) {
-      const averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
-      await prisma.product.update({
-        where: { id: review.productId },
-        data: {
-          rating: Math.round(averageRating * 10) / 10,
-          reviewCount: reviews.length
-        }
-      });
-    } else {
-      await prisma.product.update({
-        where: { id: review.productId },
-        data: {
-          rating: 0,
-          reviewCount: 0
-        }
-      });
-    }
+    // TODO: Product 모델에 rating, reviewCount 필드 추가 후 활성화
+    // if (reviews.length > 0) {
+    //   const averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+    //   await prisma.product.update({
+    //     where: { id: review.productId },
+    //     data: {
+    //       rating: Math.round(averageRating * 10) / 10,
+    //       reviewCount: reviews.length
+    //     }
+    //   });
+    // } else {
+    //   await prisma.product.update({
+    //     where: { id: review.productId },
+    //     data: {
+    //       rating: 0,
+    //       reviewCount: 0
+    //     }
+    //   });
+    // }
 
     return NextResponse.json({
       success: true,

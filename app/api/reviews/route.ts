@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         productId,
         orderId,
         rating,
-        comment: comment || '',
+        content: comment || '',
         images: images || []
       },
       include: {
@@ -117,13 +117,14 @@ export async function POST(request: NextRequest) {
 
     const averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
     
-    await prisma.product.update({
-      where: { id: productId },
-      data: {
-        rating: Math.round(averageRating * 10) / 10, // 소수점 1자리
-        reviewCount: reviews.length
-      }
-    });
+    // TODO: Product 모델에 rating, reviewCount 필드 추가 후 활성화
+    // await prisma.product.update({
+    //   where: { id: productId },
+    //   data: {
+    //     rating: Math.round(averageRating * 10) / 10, // 소수점 1자리
+    //     reviewCount: reviews.length
+    //   }
+    // });
 
     return NextResponse.json({
       success: true,

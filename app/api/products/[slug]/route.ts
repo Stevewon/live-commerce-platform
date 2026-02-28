@@ -7,11 +7,11 @@ export async function GET(
   context: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { id } = await params;
-    const params = await context.params;
+    const resolvedParams = await context.params;
+    const { slug } = resolvedParams;
     const product = await prisma.product.findUnique({
       where: {
-        slug: params.slug,
+        slug: slug,
       },
       include: {
         category: {

@@ -37,7 +37,6 @@ export async function POST(request: NextRequest) {
       where: { id: order.id },
       data: {
         status: 'PAID',
-        paymentKey,
         paymentMethod: paymentData.method,
       },
     });
