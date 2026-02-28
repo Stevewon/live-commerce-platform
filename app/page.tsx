@@ -569,33 +569,33 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 border-t border-gray-800 py-16">
-        <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
+      <footer className="bg-gray-900 border-t border-gray-800 py-12 sm:py-16">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12 mb-8 sm:mb-12">
             <div>
-              <div className="flex items-center space-x-3 mb-4">
+              <div className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4">
                 <img 
                   src="/logos/qrlive-logo.png" 
                   alt="QRLIVE Logo" 
-                  className="w-10 h-10 object-contain"
+                  className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
                 />
-                <span className="text-white text-xl font-bold">QRLIVE</span>
+                <span className="text-white text-lg sm:text-xl font-bold">QRLIVE</span>
               </div>
-              <p className="text-gray-400 text-sm">
+              <p className="text-gray-400 text-xs sm:text-sm">
                 QR 코드 기반 실시간 라이브 쇼핑 플랫폼
               </p>
             </div>
             <div>
-              <h4 className="text-white font-bold mb-4">플랫폼</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
+              <h4 className="text-white font-bold mb-3 sm:mb-4 text-sm sm:text-base">플랫폼</h4>
+              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
                 <li><a href="#features" className="hover:text-white transition">기능</a></li>
                 <li><a href="#how" className="hover:text-white transition">시작하기</a></li>
                 <li><a href="#platforms" className="hover:text-white transition">지원 플랫폼</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-bold mb-4">빠른 링크</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
+              <h4 className="text-white font-bold mb-3 sm:mb-4 text-sm sm:text-base">빠른 링크</h4>
+              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
                 <li><Link href="/products" className="hover:text-white transition">🛍️ 쇼핑몰</Link></li>
                 <li><Link href="/register" className="hover:text-white transition">회원가입</Link></li>
                 <li><Link href="/login" className="hover:text-white transition">로그인</Link></li>
@@ -603,14 +603,14 @@ export default function HomePage() {
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-bold mb-4">법률</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
+              <h4 className="text-white font-bold mb-3 sm:mb-4 text-sm sm:text-base">법률</h4>
+              <ul className="space-y-2 text-gray-400 text-xs sm:text-sm">
                 <li><Link href="/terms" className="hover:text-white transition">이용약관</Link></li>
                 <li><Link href="/privacy" className="hover:text-white transition">개인정보처리방침</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
+          <div className="border-t border-gray-800 pt-6 sm:pt-8 text-center text-gray-500 text-xs sm:text-sm">
             <p>© 2024 QRLIVE Platform. All rights reserved. Built with ❤️ by Stevewon</p>
           </div>
         </div>

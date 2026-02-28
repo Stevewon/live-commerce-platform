@@ -37,13 +37,13 @@ export default function PartnerLoginPage() {
             <img 
               src="/logos/qrlive-logo.png" 
               alt="QRLIVE Logo" 
-              className="w-20 h-20 object-contain"
+              className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
             />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
             QRLIVE 파트너
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             큐라이브 플랫폼에 오신 것을 환영합니다
           </p>
         </div>
