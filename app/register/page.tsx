@@ -1,314 +1,193 @@
 'use client';
-import { useAuth } from '@/lib/contexts/AuthContext'
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import Link from 'next/link';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const user = null, authLoading = false // Temp;
-  
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    phone: '',
-  });
-  
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
-  const [generalError, setGeneralError] = useState('');
+  const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  // 이메일 유효성 검증
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  // 비밀번호 강도 검증
-  const validatePassword = (password: string) => {
-    if (password.length < 8) {
-      return '비밀번호는 최소 8자 이상이어야 합니다.';
-    }
-    if (!/[A-Z]/.test(password) && !/[a-z]/.test(password)) {
-      return '비밀번호는 영문자를 포함해야 합니다.';
-    }
-    if (!/[0-9]/.test(password)) {
-      return '비밀번호는 숫자를 포함해야 합니다.';
-    }
-    return '';
-  };
-
-  // 전화번호 포맷팅
-  const formatPhoneNumber = (value: string) => {
-    const numbers = value.replace(/[^\d]/g, '');
-    if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-    return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
-  };
-
-  // 폼 유효성 검증
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = '이름을 입력해주세요.';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = '이메일을 입력해주세요.';
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = '올바른 이메일 형식이 아닙니다.';
-    }
-
-    const passwordError = validatePassword(formData.password);
-    if (passwordError) {
-      newErrors.password = passwordError;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = '비밀번호가 일치하지 않습니다.';
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = '전화번호를 입력해주세요.';
-    } else if (formData.phone.replace(/[^\d]/g, '').length < 10) {
-      newErrors.phone = '올바른 전화번호를 입력해주세요.';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // 회원가입 처리
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGeneralError('');
-
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      await register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone.replace(/[^\d]/g, ''),
-      });
-
-      // 회원가입 성공 시 자동 로그인 및 리다이렉트는 AuthContext에서 처리
-      // router.push('/products'); // 상품 페이지로 이동
-    } catch (error: any) {
-      console.error('회원가입 오류:', error);
-      setGeneralError(
-        error.response?.data?.error || 
-        error.message || 
-        '회원가입 중 오류가 발생했습니다.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 입력 변경 처리
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  // 소셜 로그인 핸들러
+  const handleSocialLogin = async (provider: 'google' | 'naver' | 'kakao') => {
+    setLoading(provider);
+    setError('');
     
-    if (name === 'phone') {
-      setFormData({ ...formData, [name]: formatPhoneNumber(value) });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
-
-    // 입력 시 해당 필드의 에러 메시지 제거
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: '' });
+    try {
+      // NextAuth 소셜 로그인 (자동 회원가입 포함)
+      const result = await signIn(provider, {
+        callbackUrl: '/',
+        redirect: true,
+      });
+      
+      if (result?.error) {
+        setError('로그인에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch (err: any) {
+      console.error('Social login error:', err);
+      setError(err.message || '로그인에 실패했습니다.');
+    } finally {
+      setLoading(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full">
         {/* 헤더 */}
-        <div className="text-center">
-          <Link href="/" className="inline-block">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              QRLIVE
-            </h1>
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-block mb-6">
+            <div className="flex items-center justify-center space-x-2">
+              <img 
+                src="/logos/qrlive-logo.png" 
+                alt="QRLIVE" 
+                className="w-12 h-12 sm:w-14 sm:h-14"
+              />
+              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                QRLIVE
+              </h1>
+            </div>
           </Link>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            회원가입
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+            간편하게 시작하기
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            라이브 커머스 플랫폼에 오신 것을 환영합니다
+          <p className="text-sm sm:text-base text-gray-600">
+            SNS 계정으로 3초만에 가입하세요
           </p>
         </div>
 
-        {/* 회원가입 폼 */}
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-2xl shadow-xl" onSubmit={handleSubmit}>
-          {generalError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-600 text-sm">⚠️ {generalError}</p>
+        {/* 소셜 로그인 카드 */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-600 text-sm">⚠️ {error}</p>
             </div>
           )}
 
-          <div className="space-y-4">
-            {/* 이름 */}
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                이름 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={handleChange}
-                className={`appearance-none relative block w-full px-3 py-3 border ${
-                  errors.name ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors`}
-                placeholder="홍길동"
-              />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-              )}
-            </div>
+          {/* 구글 로그인 */}
+          <button
+            onClick={() => handleSocialLogin('google')}
+            disabled={loading !== null}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group"
+          >
+            {loading === 'google' ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+            ) : (
+              <>
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                <span className="text-gray-700 font-semibold text-sm sm:text-base">
+                  Google로 계속하기
+                </span>
+              </>
+            )}
+          </button>
 
-            {/* 이메일 */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                이메일 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                value={formData.email}
-                onChange={handleChange}
-                className={`appearance-none relative block w-full px-3 py-3 border ${
-                  errors.email ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors`}
-                placeholder="example@email.com"
-              />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
+          {/* 네이버 로그인 */}
+          <button
+            onClick={() => handleSocialLogin('naver')}
+            disabled={loading !== null}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-[#03C75A] hover:bg-[#02B350] rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading === 'naver' ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : (
+              <>
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="white">
+                  <path d="M16.273 12.845L7.376 0H0v24h7.726V11.156L16.624 24H24V0h-7.727v12.845z"/>
+                </svg>
+                <span className="text-white font-semibold text-sm sm:text-base">
+                  네이버로 계속하기
+                </span>
+              </>
+            )}
+          </button>
 
-            {/* 비밀번호 */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                value={formData.password}
-                onChange={handleChange}
-                className={`appearance-none relative block w-full px-3 py-3 border ${
-                  errors.password ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors`}
-                placeholder="영문, 숫자 포함 8자 이상"
-              />
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
-            </div>
+          {/* 카카오 로그인 */}
+          <button
+            onClick={() => handleSocialLogin('kakao')}
+            disabled={loading !== null}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-[#FEE500] hover:bg-[#FDD835] rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading === 'kakao' ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+            ) : (
+              <>
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#000000" d="M12 3c5.799 0 10.5 3.664 10.5 8.185 0 4.52-4.701 8.184-10.5 8.184a13.5 13.5 0 0 1-1.727-.11l-4.408 2.883c-.501.265-.678.236-.472-.413l.892-3.678c-2.88-1.46-4.785-3.99-4.785-6.866C1.5 6.665 6.201 3 12 3z"/>
+                </svg>
+                <span className="text-gray-800 font-semibold text-sm sm:text-base">
+                  카카오로 계속하기
+                </span>
+              </>
+            )}
+          </button>
 
-            {/* 비밀번호 확인 */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호 확인 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className={`appearance-none relative block w-full px-3 py-3 border ${
-                  errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors`}
-                placeholder="비밀번호를 다시 입력하세요"
-              />
-              {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-              )}
+          {/* 구분선 */}
+          <div className="relative py-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200"></div>
             </div>
-
-            {/* 전화번호 */}
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                전화번호 <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                autoComplete="tel"
-                value={formData.phone}
-                onChange={handleChange}
-                className={`appearance-none relative block w-full px-3 py-3 border ${
-                  errors.phone ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors`}
-                placeholder="010-1234-5678"
-              />
-              {errors.phone && (
-                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-              )}
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-gray-500">또는</span>
             </div>
           </div>
 
-          {/* 제출 버튼 */}
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]"
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  가입 중...
-                </div>
-              ) : (
-                '회원가입'
-              )}
-            </button>
-          </div>
+          {/* 이메일 회원가입 버튼 */}
+          <Link
+            href="/register/email"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] font-semibold text-sm sm:text-base"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            이메일로 가입하기
+          </Link>
 
           {/* 로그인 링크 */}
-          <div className="text-center">
+          <div className="text-center pt-4">
             <p className="text-sm text-gray-600">
               이미 계정이 있으신가요?{' '}
-              <Link href="/login" className="font-medium text-purple-600 hover:text-purple-500 transition-colors">
-                로그인하기
+              <Link 
+                href="/login" 
+                className="font-semibold text-purple-600 hover:text-purple-700 transition-colors"
+              >
+                로그인
               </Link>
             </p>
           </div>
 
-          {/* 파트너 가입 링크 */}
-          <div className="text-center pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              라이브 스트리밍으로 판매하고 싶으신가요?{' '}
-              <Link href="/partner/register" className="font-medium text-pink-600 hover:text-pink-500 transition-colors">
-                파트너 가입하기
-              </Link>
+          {/* 파트너 가입 안내 */}
+          <div className="text-center pt-4 border-t border-gray-100">
+            <p className="text-xs sm:text-sm text-gray-600 mb-2">
+              🎥 라이브 방송으로 상품을 판매하고 싶으신가요?
             </p>
+            <Link
+              href="/partner/register"
+              className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-pink-600 hover:text-pink-700 transition-colors"
+            >
+              <span>파트너 가입하기</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
           </div>
-        </form>
+        </div>
+
+        {/* 약관 안내 */}
+        <p className="mt-6 text-center text-xs text-gray-500 px-4">
+          가입하시면 QRLIVE의{' '}
+          <Link href="/terms" className="underline hover:text-gray-700">이용약관</Link>
+          {' '}및{' '}
+          <Link href="/privacy" className="underline hover:text-gray-700">개인정보처리방침</Link>
+          에 동의하는 것으로 간주됩니다.
+        </p>
       </div>
     </div>
   );
