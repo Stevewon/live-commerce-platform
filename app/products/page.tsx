@@ -71,7 +71,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function ShopMainPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const user = null, loading = false // Temp;
+  const user = null, authLoading = false // Temp;
   
   const view = searchParams?.get('view') || 'products';
   const [selectedCategory, setSelectedCategory] = useState<string>('all');

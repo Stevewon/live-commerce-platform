@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/lib/contexts/AuthContext'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -56,7 +57,7 @@ export default function AdminLoginPage() {
                 className="input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@livecommerce.com"
+                placeholder="admin@qrlive.io"
                 required
               />
             </div>

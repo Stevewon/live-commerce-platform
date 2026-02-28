@@ -2,6 +2,8 @@
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import ImageUpload from '@/components/ImageUpload'
 
 
 interface Product {
@@ -29,6 +31,7 @@ interface Category {
 }
 
 export default function AdminProductsPage() {
+  const router = useRouter();
   const { user, loading: authLoading, logout } = useAdminAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])

@@ -47,7 +47,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
-  const user = null, loading = false // Temp;
+  const user = null, authLoading = false // Temp;
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);

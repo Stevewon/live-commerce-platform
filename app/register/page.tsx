@@ -7,7 +7,7 @@ import Link from 'next/link';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const user = null, loading = false // Temp;
+  const user = null, authLoading = false // Temp;
   
   const [formData, setFormData] = useState({
     name: '',

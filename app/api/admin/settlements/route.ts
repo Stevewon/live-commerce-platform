@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           lte: end
         },
         // 이미 정산된 주문 제외
-        settlementId: null
+        // settlementId: null
       },
       include: {
         partner: {
@@ -168,29 +168,22 @@ export async function POST(request: NextRequest) {
       const settlement = await prisma.settlement.create({
         data: {
           partnerId: group.partnerId,
-          periodStart: start,
-          periodEnd: end,
-          totalOrders: group.orders.length,
-          totalSales,
-          partnerRevenue: totalPartnerRevenue,
-          platformRevenue,
-          commissionRate: group.commissionRate,
-          status: 'PENDING',
-          settlementDate: null
+          amount: totalPartnerRevenue,
+          status: 'PENDING'
         }
       });
 
       // 주문에 정산 ID 연결
-      await prisma.order.updateMany({
-        where: {
-          id: {
-            in: group.orders.map((o: any) => o.id)
-          }
-        },
-        data: {
-          settlementId: settlement.id
-        }
-      });
+      // await prisma.order.updateMany({
+      //   where: {
+      //     id: {
+      //       in: group.orders.map((o: any) => o.id)
+      //     }
+      //   },
+      //   data: {
+      //     settlementId: settlement.id
+      //   }
+      // });
 
       settlements.push(settlement);
     }

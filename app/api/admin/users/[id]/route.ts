@@ -6,9 +6,10 @@ import { verifyToken } from '@/lib/auth/jwt';
 // PATCH: 회원 권한 변경
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const cookieStore = await cookies();
     const token = cookieStore.get('auth-token')?.value;
 
@@ -28,7 +29,7 @@ export async function PATCH(
     }
 
     const { role } = await request.json();
-    const userId = params.id;
+    const userId = id;
 
     // 본인의 권한은 변경할 수 없음
     if (userId === decoded.userId) {
@@ -67,9 +68,10 @@ export async function PATCH(
 // DELETE: 회원 삭제
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const cookieStore = await cookies();
     const token = cookieStore.get('auth-token')?.value;
 
@@ -88,7 +90,7 @@ export async function DELETE(
       );
     }
 
-    const userId = params.id;
+    const userId = id;
 
     // 본인은 삭제할 수 없음
     if (userId === decoded.userId) {

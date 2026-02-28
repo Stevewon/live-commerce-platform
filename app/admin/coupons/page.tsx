@@ -2,6 +2,7 @@
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Coupon {
   id: string;
@@ -24,7 +25,7 @@ interface Coupon {
 }
 
 export default function AdminCouponsPage() {
-  const user = null ;
+  const router = useRouter();
   const { user, loading: authLoading, logout } = useAdminAuth()
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);

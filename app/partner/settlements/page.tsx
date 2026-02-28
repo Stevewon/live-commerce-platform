@@ -33,8 +33,6 @@ export default function PartnerSettlements() {
 
   const fetchSettlements = async () => {
     try {
-      }
-
       const response = await fetch('/api/partner/settlements', {
         credentials: 'include',
         headers: {

@@ -2,6 +2,7 @@
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Partner {
   id: string
@@ -25,6 +26,7 @@ interface Partner {
 }
 
 export default function AdminPartnersPage() {
+  const router = useRouter();
   const { user, loading: authLoading, logout } = useAdminAuth()
   const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)

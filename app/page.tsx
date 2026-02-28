@@ -163,7 +163,7 @@ export default function HomePage() {
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-lg sm:text-xl">L</span>
               </div>
-              <span className="text-white text-lg sm:text-xl font-bold hidden xs:inline">Live Commerce</span>
+              <span className="text-white text-lg sm:text-xl font-bold hidden xs:inline">QRLIVE</span>
             </Link>
             
             {/* Desktop Navigation */}
@@ -260,18 +260,18 @@ export default function HomePage() {
 
             {/* Main Heading */}
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-7xl xl:text-8xl font-extrabold text-white mb-3 sm:mb-4 lg:mb-8 leading-tight px-4">
-              라이브 방송으로
+              QR 코드로
               <br />
               <span className="bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                수익을 창출
+                실시간 쇼핑
               </span>
-              하세요
+              혁신
             </h1>
 
             <p className="text-sm sm:text-base md:text-lg lg:text-2xl xl:text-3xl text-gray-300 mb-6 sm:mb-8 lg:mb-12 max-w-4xl mx-auto leading-relaxed px-4">
-              스트리머를 위한 분양형 쇼핑몰. 구독자를 고객으로 전환하고,
+              라이브 방송 중 QR 코드로 즉시 구매하는 혁신적인 쇼핑 경험.
               <br className="hidden md:block" />
-              실시간으로 수익을 확인하세요.
+              스캔 한 번으로 실시간 주문이 완료됩니다.
             </p>
 
             {/* CTA Buttons */}
@@ -397,10 +397,10 @@ export default function HomePage() {
         <div className="container mx-auto px-6">
           <div className="text-center mb-20">
             <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6">
-              왜 Live Commerce인가?
+              왜 QRLIVE인가?
             </h2>
             <p className="text-2xl sm:text-3xl text-gray-400 max-w-3xl mx-auto">
-              스트리머를 위한 올인원 커머스 솔루션
+              QR 코드 기반 실시간 라이브 커머스 플랫폼
             </p>
           </div>
 
@@ -575,10 +575,10 @@ export default function HomePage() {
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-xl">L</span>
                 </div>
-                <span className="text-white text-xl font-bold">Live Commerce</span>
+                <span className="text-white text-xl font-bold">QRLIVE</span>
               </div>
               <p className="text-gray-400 text-sm">
-                스트리머를 위한 분양형 쇼핑몰 플랫폼
+                QR 코드 기반 실시간 라이브 쇼핑 플랫폼
               </p>
             </div>
             <div>
@@ -607,7 +607,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-gray-500 text-sm">
-            <p>© 2024 LiveCommerce Platform. All rights reserved. Built with ❤️ by Stevewon</p>
+            <p>© 2024 QRLIVE Platform. All rights reserved. Built with ❤️ by Stevewon</p>
           </div>
         </div>
       </footer>

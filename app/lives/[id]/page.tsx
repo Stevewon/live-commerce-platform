@@ -35,7 +35,7 @@ interface LiveData {
 export default function LiveViewPage() {
   const params = useParams();
   const router = useRouter();
-  const user = null, isLoading = false // Temp;
+  const user = null, authLoading = false // Temp;
   
   const liveId = params.id as string;
   

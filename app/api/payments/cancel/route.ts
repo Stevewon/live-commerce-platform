@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cancelTossPayment } from '@/lib/toss';
 import prisma from '@/lib/prisma';
-import { requireAuth } from '@/lib/middleware';
+import { requireAuth } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 본인 주문 확인 (관리자는 모든 주문 취소 가능)
-    if (order.userId !== authResult.user.id && authResult.user.role !== 'ADMIN') {
+    if (order.userId !== authResult.user.id && authResult.role !== 'ADMIN') {
       return NextResponse.json(
         { success: false, error: '권한이 없습니다.' },
         { status: 403 }

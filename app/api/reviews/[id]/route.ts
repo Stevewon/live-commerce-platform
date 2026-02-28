@@ -5,9 +5,10 @@ import prisma from '@/lib/prisma';
 // 리뷰 수정 (PATCH)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const authResult = await verifyAuthToken(request);
     if (authResult instanceof NextResponse) {
       return authResult;
@@ -19,7 +20,7 @@ export async function PATCH(
 
     // 리뷰 확인
     const review = await prisma.review.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!review) {
@@ -39,7 +40,7 @@ export async function PATCH(
 
     // 리뷰 수정
     const updatedReview = await prisma.review.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...(rating !== undefined && { rating }),
         ...(comment !== undefined && { comment }),
@@ -99,9 +100,10 @@ export async function PATCH(
 // 리뷰 삭제 (DELETE)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const authResult = await verifyAuthToken(request);
     if (authResult instanceof NextResponse) {
       return authResult;
@@ -110,7 +112,7 @@ export async function DELETE(
 
     // 리뷰 확인
     const review = await prisma.review.findUnique({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     if (!review) {
@@ -130,7 +132,7 @@ export async function DELETE(
 
     // 리뷰 삭제
     await prisma.review.delete({
-      where: { id: params.id }
+      where: { id: id }
     });
 
     // 상품 평균 평점 업데이트

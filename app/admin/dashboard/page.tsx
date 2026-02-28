@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AdminCharts from '@/components/dashboard/AdminCharts'
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
+import { useRouter } from 'next/navigation'
 
 interface AdminStats {
   totalRevenue: number

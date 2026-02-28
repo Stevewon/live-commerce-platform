@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Admin 계정 생성
     console.log('1️⃣ Admin 계정 확인/생성...');
-    const adminEmail = 'admin@livecommerce.com';
+    const adminEmail = 'admin@qrlive.com';
     const adminPassword = 'admin123';
     
     let existingAdmin = await prisma.user.findUnique({
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Partner 계정 생성
     console.log('2️⃣ Partner 계정 확인/생성...');
-    const partnerEmail = 'partner@livecommerce.com';
+    const partnerEmail = 'partner@qrlive.com';
     const partnerPassword = 'partner123';
     
     let existingPartner = await prisma.user.findUnique({
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Partner Store 생성
     console.log('3️⃣ Partner Store 확인/생성...');
-    const existingStore = await prisma.partnerStore.findUnique({
+    const existingStore = await prisma.partner.findUnique({
       where: { userId: partnerId }
     });
 
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       console.log('   Partner Store가 이미 존재합니다.');
       results.store = { existing: true, storeName: existingStore.storeName };
     } else {
-      const store = await prisma.partnerStore.create({
+      const store = await prisma.partner.create({
         data: {
           userId: partnerId,
           storeName: '파트너 테스트 스토어',
@@ -103,12 +103,12 @@ export async function POST(request: NextRequest) {
       data: results,
       accounts: {
         admin: {
-          email: 'admin@livecommerce.com',
+          email: 'admin@qrlive.com',
           password: 'admin123',
           url: '/admin/login',
         },
         partner: {
-          email: 'partner@livecommerce.com',
+          email: 'partner@qrlive.com',
           password: 'partner123',
           url: '/partner/login',
         },

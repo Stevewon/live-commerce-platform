@@ -80,9 +80,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { userId, amount, type, description, orderId } = body;
+    const { userId: targetUserId, amount, type, description, orderId } = body;
 
-    if (!userId || !amount || !type || !description) {
+    if (!targetUserId || !amount || !type || !description) {
       return NextResponse.json(
         { success: false, error: '필수 정보가 누락되었습니다' },
         { status: 400 }
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     // 포인트 차감인 경우 잔액 확인
     if (['USE', 'EXPIRE'].includes(type)) {
       const user = await prisma.user.findUnique({
-        where: { id: userId },
+        where: { id: targetUserId },
         select: { points: true }
       });
 
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
       // 포인트 증감
       const increment = ['EARN', 'REFUND', 'ADMIN_ADJUST'].includes(type) && amount > 0;
       const user = await tx.user.update({
-        where: { id: userId },
+        where: { id: targetUserId },
         data: {
           points: {
             [increment ? 'increment' : 'decrement']: Math.abs(amount)
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       // 포인트 내역 생성
       const history = await tx.pointHistory.create({
         data: {
-          userId,
+          userId: targetUserId,
           amount: increment ? amount : -amount,
           type,
           description,

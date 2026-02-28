@@ -14,12 +14,12 @@ export async function GET(
 
     // 인증 확인
     const authResult = await verifyAuthToken(request);
-    if (!authResult.valid || !authResult.user) {
-      return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
 
     // 관리자 권한 확인
-    if (authResult.user.role !== 'ADMIN') {
+    if (authResult.role !== 'ADMIN') {
       return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 });
     }
 
@@ -62,12 +62,12 @@ export async function PATCH(
 
     // 인증 확인
     const authResult = await verifyAuthToken(request);
-    if (!authResult.valid || !authResult.user) {
-      return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
 
     // 관리자 권한 확인
-    if (authResult.user.role !== 'ADMIN') {
+    if (authResult.role !== 'ADMIN') {
       return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 });
     }
 
@@ -135,12 +135,12 @@ export async function DELETE(
 
     // 인증 확인
     const authResult = await verifyAuthToken(request);
-    if (!authResult.valid || !authResult.user) {
-      return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
 
     // 관리자 권한 확인
-    if (authResult.user.role !== 'ADMIN') {
+    if (authResult.role !== 'ADMIN') {
       return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 });
     }
 

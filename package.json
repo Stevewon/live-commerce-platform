@@ -1,10 +1,10 @@
 {
-  "name": "live-commerce-platform",
+  "name": "qrlive-platform",
   "version": "1.0.0",
-  "description": "라이브 커머스 분양형 쇼핑몰 플랫폼",
+  "description": "큐라이브 분양형 쇼핑몰 플랫폼",
   "scripts": {
     "dev": "node server.js",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && next build",
     "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
     "db:generate": "prisma generate",
@@ -17,7 +17,7 @@
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "keywords": [
-    "live-commerce",
+    "qrlive",
     "multi-tenant",
     "ecommerce"
   ],

@@ -45,7 +45,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function PartnerOrdersPage() {
-  const user = null, loading = false // Temp;
+  // const user = null, loading = false // Temp;
   const { user, loading: authLoading, logout } = usePartnerAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);

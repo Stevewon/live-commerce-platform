@@ -8,6 +8,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     // 인증 확인
     const authResult = await verifyAuthToken(req)
     if (authResult instanceof NextResponse) {
@@ -67,6 +68,7 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     // 인증 확인
     const authResult = await verifyAuthToken(req)
     if (authResult instanceof NextResponse) {

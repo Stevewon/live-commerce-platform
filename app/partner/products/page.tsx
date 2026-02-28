@@ -39,8 +39,6 @@ export default function PartnerProducts() {
 
   const fetchData = async () => {
     try {
-      }
-
       // 모든 제품 조회
       const allResponse = await fetch('/api/admin/products', {
         credentials: 'include',

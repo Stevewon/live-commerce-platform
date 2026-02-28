@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 export default function PartnerRegisterPage() {
   const router = useRouter()
-  const user = null, loading = false // Temp
+  const user = null, authLoading = false // Temp
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -85,7 +85,7 @@ export default function PartnerRegisterPage() {
             파트너 등록
           </h1>
           <p className="text-gray-600">
-            라이브 커머스 플랫폼 파트너로 등록하고 수익을 창출하세요
+            큐라이브 플랫폼 파트너로 등록하고 수익을 창출하세요
           </p>
         </div>
 

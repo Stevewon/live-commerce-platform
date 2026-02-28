@@ -5,9 +5,10 @@ import { verifyToken } from '@/lib/auth/jwt';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     // 인증 확인
     const cookieStore = await cookies();
     const token = cookieStore.get('auth-token')?.value;
@@ -39,10 +40,11 @@ export async function PATCH(
 
     // 정산 업데이트
     const settlement = await prisma.settlement.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         status,
-        settlementDate: status === 'COMPLETED' ? new Date() : undefined
+        completedAt: status === 'COMPLETED' ? new Date() : undefined,
+        processedAt: new Date()
       },
       include: {
         partner: {

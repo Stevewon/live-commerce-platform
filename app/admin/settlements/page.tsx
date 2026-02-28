@@ -2,6 +2,7 @@
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Settlement {
   id: string
@@ -47,6 +48,7 @@ interface Order {
 }
 
 export default function AdminSettlementsPage() {
+  const router = useRouter();
   const { user, loading: authLoading, logout } = useAdminAuth()
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,8 +66,6 @@ export default function AdminSettlementsPage() {
 
   useEffect(() => {
     // 인증 확인
-    }
-
     fetchSettlements()
   }, [statusFilter])
 

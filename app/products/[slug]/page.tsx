@@ -69,7 +69,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const user = null, loading = false // Temp;
+  const user = null, authLoading = false // Temp;
   const slug = params.slug as string;
 
   const [product, setProduct] = useState<Product | null>(null);

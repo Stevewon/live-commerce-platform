@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 export default function PartnerLoginPage() {
   const router = useRouter()
-  const user = null, isLoading = false // Temp
+  const user = null, authLoading = false // Temp
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -37,7 +37,7 @@ export default function PartnerLoginPage() {
             파트너 로그인
           </h1>
           <p className="text-gray-600">
-            라이브 커머스 플랫폼에 오신 것을 환영합니다
+            큐라이브 플랫폼에 오신 것을 환영합니다
           </p>
         </div>
 
