@@ -1,8 +1,8 @@
 'use client';
 import { useAuth } from '@/lib/contexts/AuthContext'
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 // Disable static generation for this page
@@ -73,10 +73,10 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 export default function ShopMainPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const user = null, authLoading = false // Temp;
   
-  const view = searchParams?.get('view') || 'products';
+  // Use state instead of searchParams to avoid SSG issues
+  const [view, setView] = useState<string>('products');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -89,6 +89,17 @@ export default function ShopMainPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Read view from URL on client side only
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const viewParam = params.get('view');
+      if (viewParam) {
+        setView(viewParam);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -98,6 +109,10 @@ export default function ShopMainPage() {
       fetchProducts();
     } else if (view === 'cart' && user) {
       fetchCart();
+    } else if (view === 'orders' && user) {
+      fetchOrders();
+    }
+  }, [view, selectedCategory, searchTerm, user]);
     } else if (view === 'orders' && user) {
       fetchOrders();
     }
