@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 export default function PartnerRegisterPage() {
   const router = useRouter()
-  const user = null, authLoading = false // Temp
+  const { user, loading: authLoading } = useAuth()
   const [formData, setFormData] = useState({
     email: '',
     password: '',

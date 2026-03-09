@@ -20,7 +20,7 @@ interface CartItem {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const user = null, authLoading = false // Temp;
+  const { user, loading: authLoading } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

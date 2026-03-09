@@ -7,7 +7,7 @@ import Link from 'next/link'
 
 export default function PartnerLoginPage() {
   const router = useRouter()
-  const user = null, authLoading = false // Temp
+  const { user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)

@@ -27,7 +27,7 @@ interface Live {
 
 export default function PartnerLivesPage() {
   const router = useRouter();
-  const user = null, authLoading = false // Temp;
+  const { user, loading: authLoading } = useAuth();
   
   const [lives, setLives] = useState<Live[]>([]);
   const [isLoading, setIsLoading] = useState(true);

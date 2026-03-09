@@ -73,7 +73,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 export default function ShopMainPage() {
   const router = useRouter();
-  const user = null, authLoading = false // Temp;
+  const { user, loading: authLoading } = useAuth();
   
   // Use state instead of searchParams to avoid SSG issues
   const [view, setView] = useState<string>('products');
