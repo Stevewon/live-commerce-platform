@@ -4,29 +4,29 @@ import prisma from '@/lib/prisma';
 import { verifyPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 
-// POST /api/auth/login - 로그인
+// POST /api/auth/login - 닉네임 + 비밀번호 로그인
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { nickname, password } = body;
     
     // 입력 검증
-    if (!email || !password) {
+    if (!nickname || !password) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Email and password are required',
+          error: '닉네임과 비밀번호를 입력해주세요.',
         },
         { status: 400 }
       );
     }
     
-    // 사용자 조회
+    // 사용자 조회 (닉네임으로)
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { nickname },
       select: {
         id: true,
-        email: true,
+        nickname: true,
         password: true,
         name: true,
         phone: true,
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Invalid email or password',
+          error: '닉네임 또는 비밀번호가 올바르지 않습니다.',
         },
         { status: 401 }
       );
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Invalid email or password',
+          error: '닉네임 또는 비밀번호가 올바르지 않습니다.',
         },
         { status: 401 }
       );
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // JWT 토큰 생성
     const token = generateToken({
       userId: user.id,
-      email: user.email,
+      nickname: user.nickname!,
       role: user.role,
       name: user.name,
     });
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     // 비밀번호 제외하고 반환
     const { password: _, ...userWithoutPassword } = user;
     
-    // HTTP-only 쿠키 설정 (30일 유효) - Next.js cookies 사용
+    // HTTP-only 쿠키 설정 (30일 유효)
     const cookieStore = await cookies();
     cookieStore.set('auth-token', token, {
       httpOnly: true,
@@ -94,14 +94,14 @@ export async function POST(request: NextRequest) {
         user: userWithoutPassword,
         token,
       },
-      message: 'Login successful',
+      message: '로그인 성공',
     });
   } catch (error) {
     console.error('[LOGIN_ERROR]', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Login failed',
+        error: '로그인 처리 중 오류가 발생했습니다.',
       },
       { status: 500 }
     );

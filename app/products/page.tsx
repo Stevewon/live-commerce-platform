@@ -113,10 +113,6 @@ export default function ShopMainPage() {
       fetchOrders();
     }
   }, [view, selectedCategory, searchTerm, user]);
-    } else if (view === 'orders' && user) {
-      fetchOrders();
-    }
-  }, [view, selectedCategory, searchTerm, user]);
 
   const fetchCategories = async () => {
     try {

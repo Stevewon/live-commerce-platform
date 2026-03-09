@@ -4,13 +4,14 @@ import prisma from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 
-// POST /api/auth/register - 회원가입
+// POST /api/auth/register - 간편 회원가입 (닉네임 + 비밀번호 + Securet QR 주소)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { 
-      email, 
+      nickname,
       password, 
+      securetQrUrl,
       name, 
       phone, 
       role = 'CUSTOMER',
@@ -21,11 +22,23 @@ export async function POST(request: NextRequest) {
     } = body;
     
     // 입력 검증
-    if (!email || !password || !name) {
+    if (!nickname || !password || !securetQrUrl) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Email, password, and name are required',
+          error: '닉네임, 비밀번호, 시큐릿 QR 주소는 필수입니다.',
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Securet QR URL 형식 검증
+    const securetUrlPattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick=.+&token=.+&voip=.+&os=.+$/;
+    if (!securetUrlPattern.test(securetQrUrl)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '올바른 시큐릿 QR 주소 형식이 아닙니다.',
         },
         { status: 400 }
       );
@@ -36,19 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Store name and slug are required for partners',
-        },
-        { status: 400 }
-      );
-    }
-    
-    // 이메일 형식 검증
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid email format',
+          error: '파트너 등록 시 상점 이름과 슬러그가 필요합니다.',
         },
         { status: 400 }
       );
@@ -59,22 +60,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Password must be at least 6 characters',
+          error: '비밀번호는 최소 6자 이상이어야 합니다.',
         },
         { status: 400 }
       );
     }
     
-    // 이메일 중복 확인
+    // 닉네임 중복 확인
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { nickname },
     });
     
     if (existingUser) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Email already exists',
+          error: '이미 사용 중인 닉네임입니다.',
         },
         { status: 409 }
       );
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            error: 'Store slug already exists',
+            error: '이미 사용 중인 상점 슬러그입니다.',
           },
           { status: 409 }
         );
@@ -105,15 +106,16 @@ export async function POST(request: NextRequest) {
       // 사용자 생성
       const user = await tx.user.create({
         data: {
-          email,
+          nickname,
           password: hashedPassword,
-          name,
+          securetQrUrl,
+          name: name || nickname, // name이 없으면 nickname 사용
           phone: phone || null,
           role,
         },
         select: {
           id: true,
-          email: true,
+          nickname: true,
           name: true,
           phone: true,
           role: true,
@@ -142,12 +144,12 @@ export async function POST(request: NextRequest) {
     // JWT 토큰 생성
     const token = generateToken({
       userId: result.user.id,
-      email: result.user.email,
+      nickname: result.user.nickname!,
       role: result.user.role,
       name: result.user.name,
     });
     
-    // HTTP-only 쿠키 설정 (30일 유효) - Next.js cookies 사용
+    // HTTP-only 쿠키 설정 (30일 유효)
     const cookieStore = await cookies();
     cookieStore.set('auth-token', token, {
       httpOnly: true,
@@ -173,14 +175,14 @@ export async function POST(request: NextRequest) {
         partner: result.partner,
         token,
       },
-      message: 'Registration successful',
+      message: '회원가입이 완료되었습니다.',
     });
   } catch (error) {
     console.error('[REGISTER_ERROR]', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Registration failed',
+        error: '회원가입 처리 중 오류가 발생했습니다.',
       },
       { status: 500 }
     );

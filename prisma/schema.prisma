@@ -40,13 +40,17 @@ datasource db {
 // 사용자 테이블
 model User {
   id            String    @id @default(uuid())
-  email         String    @unique
-  password      String    // 소셜 로그인 시 빈 문자열
+  email         String?   @unique // Optional for simple registration
+  nickname      String?   @unique // Primary login identifier (nullable for existing users)
+  password      String    // 해시된 비밀번호
   name          String
   phone         String?
   role          String    @default("CUSTOMER") // ADMIN, PARTNER, CUSTOMER
   
-  // NextAuth fields
+  // Securet QR 주소 (닉네임/비밀번호 찾기용) - nullable for existing users
+  securetQrUrl  String?   // https://securet.kr/securet.php?key=idcard&nick=...&token=...
+  
+  // NextAuth fields (social login - optional)
   emailVerified DateTime?
   image         String?
   
