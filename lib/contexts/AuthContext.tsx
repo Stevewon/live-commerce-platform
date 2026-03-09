@@ -5,28 +5,31 @@ import { useRouter } from 'next/navigation'
 
 interface User {
   id: string
-  email: string
+  email?: string  // Optional now
+  nickname?: string  // New primary identifier
   name: string
   role: 'CUSTOMER' | 'PARTNER' | 'ADMIN'
   phone?: string
   createdAt: string
-  updatedAt: string
+  updatedAt?: string
 }
 
 interface AuthContextType {
   user: User | null
   token: string | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (nicknameOrEmail: string, password: string) => Promise<void>
   logout: () => void
   register: (data: RegisterData) => Promise<void>
   refreshUser: () => Promise<void>
 }
 
 interface RegisterData {
-  email: string
+  nickname: string  // Required now
   password: string
-  name: string
+  securetQrUrl: string  // Required now
+  name?: string
+  email?: string  // Optional
   phone?: string
   role?: 'CUSTOMER' | 'PARTNER'
 }
@@ -72,13 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  // 로그인
-  const login = async (email: string, password: string) => {
+  // 로그인 (닉네임 기반)
+  const login = async (nicknameOrEmail: string, password: string) => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ nickname: nicknameOrEmail, password }),
         credentials: 'include', // 쿠키 포함
       })
 
@@ -96,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(tokenData)
       // localStorage에도 저장 (빠른 접근용)
       localStorage.setItem('user', JSON.stringify(userData))
+      localStorage.setItem('auth-token', tokenData)
 
       // 역할에 따라 리다이렉션
       if (userData.role === 'ADMIN') {
@@ -137,9 +141,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(tokenData)
       // localStorage에도 저장 (빠른 접근용)
       localStorage.setItem('user', JSON.stringify(userData))
+      localStorage.setItem('auth-token', tokenData)
 
       // 역할에 따라 리다이렉션
-      if (userData.role === 'PARTNER') {
+      if (userData.role === 'ADMIN') {
+        router.push('/admin/dashboard')
+      } else if (userData.role === 'PARTNER') {
         router.push('/partner/dashboard')
       } else {
         router.push('/products')
@@ -167,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setToken(null)
     localStorage.removeItem('user')
+    localStorage.removeItem('auth-token')
     router.push('/')
     router.refresh()
   }

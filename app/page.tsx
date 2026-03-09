@@ -123,7 +123,7 @@ function HostCard({ host, index }: { host: typeof hostProfiles[0], index: number
 }
 
 export default function HomePage() {
-  const user = null, loading = false // Temp
+  const { user, loading, logout } = useAuth()
   const [scrollY, setScrollY] = useState(0)
   // 실시간 카운터 상태
   const [liveStats, setLiveStats] = useState({
