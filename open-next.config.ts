@@ -1,7 +1,6 @@
-// @ts-check
+import type { OpenNextConfig } from "@opennextjs/cloudflare";
 
-/** @type {import("@opennextjs/cloudflare").OpenNextConfig} */
-const config = {
+const config: OpenNextConfig = {
   default: {
     override: {
       wrapper: "cloudflare-node",
@@ -26,4 +25,4 @@ const config = {
   },
 };
 
-module.exports = config;
+export default config;
