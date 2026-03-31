@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "clean": "node -e \"const fs=require('fs');['.open-next','.next'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch{}})\"",
-    "build": "prisma generate && next build",
+    "build": "DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} prisma generate && next build",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
