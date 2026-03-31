@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyToken, extractToken } from '@/lib/auth/jwt';
 
 // GET /api/auth/session - 현재 로그인한 사용자 정보 조회
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // Authorization 헤더에서 토큰 추출
     const authHeader = request.headers.get('authorization');

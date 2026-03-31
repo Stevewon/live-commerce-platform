@@ -2,7 +2,7 @@
 // 개별 라이브 관리 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // GET /api/partner/lives/[id] - 라이브 상세
@@ -10,6 +10,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;
@@ -82,6 +83,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;
@@ -199,6 +201,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;

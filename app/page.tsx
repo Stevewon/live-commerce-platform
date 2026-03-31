@@ -34,13 +34,15 @@ function HostCard({ host, index }: { host: typeof hostProfiles[0], index: number
   const [currentChats, setCurrentChats] = useState(host.chats)
   const [currentLikes, setCurrentLikes] = useState(host.likes)
 
+  // 모바일에서는 interval 비활성화하여 배터리/성능 절약
   useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    if (isMobile) return // 모바일에서 실시간 업데이트 비활성화
     const interval = setInterval(() => {
       setCurrentViewers(prev => prev + Math.floor(Math.random() * 20) - 5)
       setCurrentChats(prev => prev + Math.floor(Math.random() * 10))
       setCurrentLikes(prev => prev + Math.floor(Math.random() * 30))
-    }, 2000 + index * 100) // 각 카드마다 다른 업데이트 주기
-
+    }, 3000 + index * 200)
     return () => clearInterval(interval)
   }, [index])
 
@@ -138,16 +140,16 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // 실시간 통계 업데이트
+  // 실시간 통계 업데이트 - 모바일에서는 덜 빈번하게
   useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
     const interval = setInterval(() => {
       setLiveStats(prev => ({
         totalViewers: prev.totalViewers + Math.floor(Math.random() * 50) + 10,
         totalOrders: prev.totalOrders + Math.floor(Math.random() * 3),
         totalRevenue: prev.totalRevenue + (Math.floor(Math.random() * 50) + 10) * 1000
       }))
-    }, 3000) // 3초마다 업데이트
-
+    }, isMobile ? 8000 : 3000)
     return () => clearInterval(interval)
   }, [])
 
@@ -326,13 +328,13 @@ export default function HomePage() {
       </section>
 
       {/* Supported Platforms */}
-      <section id="platforms" className="py-20 bg-gray-800">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-white mb-4">지원하는 라이브 플랫폼</h2>
-            <p className="text-gray-400 text-lg">6개의 주요 라이브 스트리밍 플랫폼과 연동 가능</p>
+      <section id="platforms" className="py-12 sm:py-16 lg:py-20 bg-gray-800">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 sm:mb-4">지원하는 라이브 플랫폼</h2>
+            <p className="text-gray-400 text-sm sm:text-base lg:text-lg">6개의 주요 라이브 스트리밍 플랫폼과 연동 가능</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6 lg:gap-8 max-w-6xl mx-auto">
             {[
               { 
                 name: 'YouTube', 
@@ -372,21 +374,21 @@ export default function HomePage() {
               }
             ].map((platform) => (
               <div key={platform.name} className="group">
-                <div className={`${platform.bgColor} bg-gray-700/30 backdrop-blur-lg p-6 rounded-2xl border border-gray-600 ${platform.borderColor} transition-all duration-300 transform hover:-translate-y-2 hover:shadow-xl`}>
-                  <div className="h-20 flex items-center justify-center mb-4">
+                <div className={`${platform.bgColor} bg-gray-700/30 backdrop-blur-lg p-3 sm:p-4 lg:p-6 rounded-xl sm:rounded-2xl border border-gray-600 ${platform.borderColor} transition-all duration-300 transform hover:-translate-y-2 hover:shadow-xl`}>
+                  <div className="h-12 sm:h-16 lg:h-20 flex items-center justify-center mb-2 sm:mb-4">
                     {'logo' in platform ? (
                       <img 
                         src={platform.logo} 
                         alt={`${platform.name} 로고`}
-                        className="max-h-14 max-w-full object-contain transform group-hover:scale-110 transition-transform duration-300"
+                        className="max-h-8 sm:max-h-10 lg:max-h-14 max-w-full object-contain transform group-hover:scale-110 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="text-5xl transform group-hover:scale-110 transition-transform">
+                      <div className="text-3xl sm:text-4xl lg:text-5xl transform group-hover:scale-110 transition-transform">
                         {platform.icon}
                       </div>
                     )}
                   </div>
-                  <div className="text-white text-center font-semibold text-sm">{platform.name}</div>
+                  <div className="text-white text-center font-semibold text-[10px] sm:text-xs lg:text-sm">{platform.name}</div>
                 </div>
               </div>
             ))}
@@ -395,18 +397,18 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-32 bg-gradient-to-b from-gray-900 to-gray-800">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6">
+      <section id="features" className="py-12 sm:py-16 lg:py-24 bg-gradient-to-b from-gray-900 to-gray-800">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-white mb-2 sm:mb-4">
               왜 QRLIVE인가?
             </h2>
-            <p className="text-2xl sm:text-3xl text-gray-400 max-w-3xl mx-auto">
+            <p className="text-sm sm:text-base lg:text-lg xl:text-xl text-gray-400 max-w-3xl mx-auto">
               QR 코드 기반 실시간 라이브 커머스 플랫폼
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
             {[
               {
                 icon: '🏪',
@@ -447,17 +449,17 @@ export default function HomePage() {
             ].map((feature, index) => (
               <div
                 key={index}
-                className="group relative bg-gray-700/30 backdrop-blur-lg p-8 rounded-2xl border border-gray-600 hover:border-transparent transition-all duration-300 transform hover:-translate-y-2"
+                className="group relative bg-gray-700/30 backdrop-blur-lg p-4 sm:p-6 lg:p-8 rounded-xl sm:rounded-2xl border border-gray-600 hover:border-transparent transition-all duration-300 transform hover:-translate-y-2"
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`}></div>
                 <div className="relative">
-                  <div className="text-7xl sm:text-8xl mb-6 transform group-hover:scale-110 transition-transform">
+                  <div className="text-3xl sm:text-4xl lg:text-5xl mb-2 sm:mb-3 lg:mb-4 transform group-hover:scale-110 transition-transform">
                     {feature.icon}
                   </div>
-                  <h3 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+                  <h3 className="text-sm sm:text-lg lg:text-xl xl:text-2xl font-bold text-white mb-1 sm:mb-2">
                     {feature.title}
                   </h3>
-                  <p className="text-lg sm:text-xl text-gray-400 leading-relaxed">
+                  <p className="text-[11px] sm:text-sm lg:text-base text-gray-400 leading-relaxed">
                     {feature.description}
                   </p>
                 </div>
@@ -468,13 +470,13 @@ export default function HomePage() {
       </section>
 
       {/* How It Works */}
-      <section id="how" className="py-32 bg-gray-800">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6">
+      <section id="how" className="py-12 sm:py-16 lg:py-24 bg-gray-800">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-white mb-2 sm:mb-4">
               시작하는 방법
             </h2>
-            <p className="text-2xl sm:text-3xl text-gray-400">
+            <p className="text-sm sm:text-base lg:text-lg xl:text-xl text-gray-400">
               단 4단계로 바로 시작할 수 있습니다
             </p>
           </div>
@@ -510,16 +512,16 @@ export default function HomePage() {
                   icon: '💎'
                 }
               ].map((item, index) => (
-                <div key={index} className={`relative flex items-center mb-24 last:mb-0 ${
+                <div key={index} className={`relative flex items-center mb-8 sm:mb-12 lg:mb-24 last:mb-0 ${
                   index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'
                 }`}>
                   {/* Content */}
                   <div className={`w-full lg:w-5/12 ${index % 2 === 0 ? 'lg:pr-16 lg:text-right' : 'lg:pl-16'}`}>
-                    <div className="bg-gray-700/50 backdrop-blur-lg p-8 rounded-2xl border border-gray-600 hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-2">
-                      <div className="text-5xl mb-4">{item.icon}</div>
-                      <div className="text-blue-400 font-bold text-sm mb-2">STEP {item.step}</div>
-                      <h3 className="text-2xl font-bold text-white mb-4">{item.title}</h3>
-                      <p className="text-gray-400 leading-relaxed">{item.description}</p>
+                    <div className="bg-gray-700/50 backdrop-blur-lg p-4 sm:p-6 lg:p-8 rounded-xl sm:rounded-2xl border border-gray-600 hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-2">
+                      <div className="text-3xl sm:text-4xl lg:text-5xl mb-2 sm:mb-4">{item.icon}</div>
+                      <div className="text-blue-400 font-bold text-xs sm:text-sm mb-1 sm:mb-2">STEP {item.step}</div>
+                      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-white mb-2 sm:mb-4">{item.title}</h3>
+                      <p className="text-xs sm:text-sm lg:text-base text-gray-400 leading-relaxed">{item.description}</p>
                     </div>
                   </div>
 
@@ -538,29 +540,29 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="relative py-32 overflow-hidden">
+      <section className="relative py-12 sm:py-16 lg:py-24 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600"></div>
         <div className="absolute inset-0 bg-black/30"></div>
         
-        <div className="relative container mx-auto px-6 text-center">
-          <h2 className="text-5xl md:text-6xl font-bold text-white mb-6">
+        <div className="relative container mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-white mb-3 sm:mb-6">
             지금 바로 시작하세요
           </h2>
-          <p className="text-xl text-white/90 mb-12 max-w-2xl mx-auto">
+          <p className="text-sm sm:text-base lg:text-xl text-white/90 mb-8 sm:mb-12 max-w-2xl mx-auto">
             당신의 구독자를 고객으로 만들 수 있는 최고의 기회.
             <br />
             설치비, 유지비 없이 무료로 시작하세요.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
             <Link 
               href="/partner/register"
-              className="group relative px-10 py-5 bg-white text-gray-900 text-lg font-bold rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+              className="group relative px-6 sm:px-10 py-3 sm:py-5 bg-white text-gray-900 text-base sm:text-lg font-bold rounded-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
             >
               <span className="relative z-10">무료로 시작하기 →</span>
             </Link>
             <Link 
               href="/admin/login"
-              className="px-10 py-5 bg-white/20 backdrop-blur-lg text-white text-lg font-bold rounded-xl border-2 border-white hover:bg-white/30 transition-all duration-300"
+              className="px-6 sm:px-10 py-3 sm:py-5 bg-white/20 backdrop-blur-lg text-white text-base sm:text-lg font-bold rounded-xl border-2 border-white hover:bg-white/30 transition-all duration-300"
             >
               관리자 로그인
             </Link>
@@ -569,7 +571,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 border-t border-gray-800 py-12 sm:py-16">
+      <footer className="bg-gray-900 border-t border-gray-800 py-12 sm:py-16 pb-20 md:pb-16">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-8 sm:gap-12 mb-8 sm:mb-12">
             <div>

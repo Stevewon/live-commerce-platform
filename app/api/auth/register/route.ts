@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 
 // POST /api/auth/register - 간편 회원가입 (닉네임 + 비밀번호 + Securet QR 주소)
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const body = await request.json();
     const { 
       nickname,
       password, 
       securetQrUrl,
+      email,
       name, 
       phone, 
       role = 'CUSTOMER',
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest) {
           nickname,
           password: hashedPassword,
           securetQrUrl,
+          email: email || null,
           name: name || nickname, // name이 없으면 nickname 사용
           phone: phone || null,
           role,
@@ -168,10 +171,13 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
     
+    // password 해시는 응답에서 제거
+    const { password: _pw, securetQrUrl: _qr, ...safeUser } = result.user as any;
+    
     return NextResponse.json({
       success: true,
       data: {
-        user: result.user,
+        user: safeUser,
         partner: result.partner,
         token,
       },

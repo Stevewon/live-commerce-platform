@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
-import prisma from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 인증 확인
     const authResult = await verifyAuthToken(request);

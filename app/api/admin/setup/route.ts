@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+
 
 // POST /api/admin/setup - 테스트 계정 생성 (개발용)
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     console.log('🔐 테스트 계정 생성 시작...\n');
 

@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 export default function AdminLoginPage() {
   const router = useRouter()
   const { login } = useAuth()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -19,8 +19,8 @@ export default function AdminLoginPage() {
     setError('')
 
     try {
-      // AuthContext의 login 함수 사용
-      await login(email, password)
+      // AuthContext의 login 함수 사용 (닉네임 또는 이메일)
+      await login(identifier, password)
       // login 함수에서 자동으로 /admin/dashboard로 리다이렉션됨
     } catch (err: any) {
       setError(err.message || '로그인에 실패했습니다')
@@ -49,7 +49,7 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="card">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                 {error}
@@ -57,13 +57,17 @@ export default function AdminLoginPage() {
             )}
 
             <div>
-              <label className="label">이메일</label>
+              <label className="label">닉네임 또는 이메일</label>
               <input
-                type="email"
+                type="text"
+                name="admin-id"
                 className="input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@qrlive.io"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 required
               />
             </div>
@@ -72,10 +76,14 @@ export default function AdminLoginPage() {
               <label className="label">비밀번호</label>
               <input
                 type="password"
+                name="admin-pw"
                 className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 required
               />
             </div>
@@ -98,9 +106,9 @@ export default function AdminLoginPage() {
 
         {/* 테스트 계정 안내 */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800 font-medium mb-2">📋 테스트 계정</p>
+          <p className="text-sm text-blue-800 font-medium mb-2">📋 관리자 계정</p>
           <p className="text-xs text-blue-700">
-            이메일: admin@example.com<br />
+            닉네임: admin<br />
             비밀번호: admin123
           </p>
         </div>

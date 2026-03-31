@@ -31,3 +31,23 @@
     @apply block text-sm font-medium text-gray-700 mb-2;
   }
 }
+
+/* 모바일 하단 네비게이션을 위한 safe area */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 모바일 하단 네비게이션이 있을 때 콘텐츠에 여백 추가 */
+@media (max-width: 767px) {
+  .mobile-bottom-pad {
+    padding-bottom: 3.75rem; /* 60px = h-14 + safe area */
+  }
+}
+
+/* 터치 최적화 - 모바일 탭 타겟 최소 44px */
+@media (max-width: 767px) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

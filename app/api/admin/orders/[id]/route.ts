@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { cancelTossPayment } from '@/lib/toss';
 
-const prisma = new PrismaClient();
+
 
 // PATCH /api/admin/orders/[id] - 주문 상태 변경
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   const { id } = await params;
   try {
     const authResult = await verifyAuthToken(req);
@@ -21,7 +23,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { status } = body;
+    const { status, trackingCompany, trackingNumber } = body;
 
     // 유효한 상태 확인
     const validStatuses = ['PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
@@ -59,10 +61,61 @@ export async function PATCH(
       }
     }
 
+    // 업데이트 데이터 구성
+    const updateData: any = { status };
+
+    // 배송 추적 정보 추가
+    if (trackingCompany !== undefined) updateData.trackingCompany = trackingCompany;
+    if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber;
+
+    // 상태별 자동 시각 기록
+    if (status === 'SHIPPING' && order.status !== 'SHIPPING') {
+      updateData.shippedAt = new Date();
+    }
+    if (status === 'DELIVERED' && order.status !== 'DELIVERED') {
+      updateData.deliveredAt = new Date();
+    }
+    if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+      updateData.cancelledAt = new Date();
+      
+      // Toss Payments 실결제 취소
+      if (order.paymentKey) {
+        try {
+          const cancelResult = await cancelTossPayment(
+            order.paymentKey,
+            body.cancelReason || '관리자에 의한 주문 취소'
+          );
+          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total;
+          updateData.refundedAt = new Date();
+        } catch (tossError: any) {
+          console.error('Toss payment cancel failed (admin):', tossError.message);
+          // Toss 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
+        }
+      }
+    }
+
+    // REFUNDED 상태 처리
+    if (status === 'REFUNDED' && order.status !== 'REFUNDED') {
+      updateData.refundedAt = new Date();
+      
+      // Toss Payments 실결제 취소 (환불)
+      if (order.paymentKey) {
+        try {
+          const cancelResult = await cancelTossPayment(
+            order.paymentKey,
+            body.cancelReason || '관리자에 의한 환불 처리'
+          );
+          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total;
+        } catch (tossError: any) {
+          console.error('Toss payment refund failed (admin):', tossError.message);
+        }
+      }
+    }
+
     // 주문 상태 업데이트
     const updatedOrder = await prisma.order.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: {
         user: {
           select: {
@@ -104,6 +157,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   const { id } = await params;
   try {
     const authResult = await verifyAuthToken(req);

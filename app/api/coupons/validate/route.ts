@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
+
 
 // GET: 쿠폰 유효성 검증 (공개 API)
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');

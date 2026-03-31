@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // 관리자 상품 상세 조회 (GET)
@@ -7,6 +7,7 @@ export async function GET(
   req: NextRequest,
   segmentData: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await segmentData.params;
     // 관리자 인증 확인
@@ -42,6 +43,9 @@ export async function GET(
               }
             }
           }
+        },
+        variants: {
+          orderBy: { createdAt: 'asc' }
         }
       }
     });
@@ -72,6 +76,7 @@ export async function PATCH(
   req: NextRequest,
   segmentData: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await segmentData.params;
     // 관리자 인증 확인
@@ -88,7 +93,16 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name, description, price, stock, categoryId, isActive, imageUrl } = body;
+    const {
+      name, slug, description, detailContent,
+      price, comparePrice, stock, sku,
+      images, detailImages, thumbnail,
+      specifications, shippingInfo, returnInfo,
+      categoryId, isActive, isFeatured,
+      imageUrl, // 하위호환
+      origin, manufacturer, brand, tags,
+      hasOptions, optionNames, variants
+    } = body;
 
     // 상품 존재 확인
     const existingProduct = await prisma.product.findUnique({
@@ -115,18 +129,60 @@ export async function PATCH(
       }
     }
 
+    // 업데이트 데이터 구성 (전달된 필드만 업데이트)
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (slug !== undefined) updateData.slug = slug;
+    if (description !== undefined) updateData.description = description;
+    if (detailContent !== undefined) updateData.detailContent = detailContent;
+    if (price !== undefined) updateData.price = parseFloat(price);
+    if (comparePrice !== undefined) updateData.comparePrice = comparePrice ? parseFloat(comparePrice) : null;
+    if (stock !== undefined) updateData.stock = parseInt(stock);
+    if (sku !== undefined) updateData.sku = sku || null;
+    if (images !== undefined) updateData.images = typeof images === 'string' ? images : JSON.stringify(images);
+    if (detailImages !== undefined) updateData.detailImages = detailImages ? (typeof detailImages === 'string' ? detailImages : JSON.stringify(detailImages)) : null;
+    if (thumbnail !== undefined) updateData.thumbnail = thumbnail;
+    if (imageUrl && !thumbnail) updateData.thumbnail = imageUrl; // 하위호환
+    if (specifications !== undefined) updateData.specifications = specifications ? (typeof specifications === 'string' ? specifications : JSON.stringify(specifications)) : null;
+    if (shippingInfo !== undefined) updateData.shippingInfo = shippingInfo || null;
+    if (returnInfo !== undefined) updateData.returnInfo = returnInfo || null;
+    if (categoryId !== undefined) updateData.categoryId = categoryId;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (isFeatured !== undefined) updateData.isFeatured = isFeatured;
+    if (origin !== undefined) updateData.origin = origin || null;
+    if (manufacturer !== undefined) updateData.manufacturer = manufacturer || null;
+    if (brand !== undefined) updateData.brand = brand || null;
+    if (tags !== undefined) updateData.tags = tags || null;
+    if (hasOptions !== undefined) updateData.hasOptions = hasOptions;
+    if (optionNames !== undefined) updateData.optionNames = optionNames ? (typeof optionNames === 'string' ? optionNames : JSON.stringify(optionNames)) : null;
+
+    // 변형(variants) 처리: 기존 삭제 후 새로 생성 (upsert 패턴)
+    if (hasOptions !== undefined && Array.isArray(variants)) {
+      // 기존 variants 모두 삭제
+      await prisma.productVariant.deleteMany({
+        where: { productId: id }
+      });
+      // 새 variants 생성
+      if (variants.length > 0) {
+        await prisma.productVariant.createMany({
+          data: variants.map((v: any) => ({
+            productId: id,
+            optionValues: typeof v.optionValues === 'string' ? v.optionValues : JSON.stringify(v.optionValues),
+            price: v.price ? parseFloat(v.price) : null,
+            comparePrice: v.comparePrice ? parseFloat(v.comparePrice) : null,
+            stock: parseInt(v.stock) || 0,
+            sku: v.sku || null,
+            thumbnail: v.thumbnail || null,
+            isActive: v.isActive !== undefined ? v.isActive : true,
+          }))
+        });
+      }
+    }
+
     // 상품 수정
     const updatedProduct = await prisma.product.update({
       where: { id: id },
-      data: {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(price !== undefined && { price }),
-        ...(stock !== undefined && { stock }),
-        ...(categoryId && { categoryId }),
-        ...(isActive !== undefined && { isActive }),
-        ...(imageUrl && { imageUrl })
-      },
+      data: updateData,
       include: {
         category: {
           select: {
@@ -142,7 +198,8 @@ export async function PATCH(
               }
             }
           }
-        }
+        },
+        variants: true
       }
     });
 
@@ -166,6 +223,7 @@ export async function DELETE(
   req: NextRequest,
   segmentData: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await segmentData.params;
     // 관리자 인증 확인

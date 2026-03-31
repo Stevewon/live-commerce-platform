@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // 관리자 파트너 상세 조회 (GET)
@@ -7,6 +7,7 @@ export async function GET(
   req: NextRequest,
   segmentData: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await segmentData.params;
     // 관리자 인증 확인
@@ -81,6 +82,7 @@ export async function PATCH(
   req: NextRequest,
   segmentData: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await segmentData.params;
     // 관리자 인증 확인
@@ -152,6 +154,7 @@ export async function DELETE(
   req: NextRequest,
   segmentData: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await segmentData.params;
     // 관리자 인증 확인

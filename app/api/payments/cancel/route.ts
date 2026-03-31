@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cancelTossPayment } from '@/lib/toss';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const { orderId, cancelReason } = await request.json();
@@ -35,17 +36,43 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const updateData: any = {
+        status: 'CANCELLED',
+        cancelReason,
+        cancelledAt: new Date(),
+      };
+
+      // Toss Payments 실결제 취소
+      if (order.paymentKey) {
+        try {
+          const cancelResult = await cancelTossPayment(order.paymentKey, cancelReason);
+          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total;
+          updateData.refundedAt = new Date();
+        } catch (tossError: any) {
+          console.error('Toss payment cancel failed:', tossError.message);
+          // Toss 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
+        }
+      }
+
       // DB 주문 상태 업데이트
       await prisma.order.update({
         where: { id: orderId },
-        data: { status: 'CANCELLED' },
+        data: updateData,
       });
 
-      // 실제 결제 취소 API는 주문에 payment 정보가 있을 경우 호출
-      // TODO: Toss Payments API 연동
-      // if (order.paymentKey) {
-      //   const cancelData = await cancelTossPayment(order.paymentKey, cancelReason);
-      // }
+      // 재고 복구
+      const orderWithItems = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (orderWithItems?.items) {
+        for (const item of orderWithItems.items) {
+          await prisma.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+      }
 
       return NextResponse.json({
         success: true,

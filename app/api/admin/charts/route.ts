@@ -2,10 +2,11 @@
 // 관리자 대시보드 차트 데이터 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // 리뷰 수정 (PATCH)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await params;
     const authResult = await verifyAuthToken(request);
@@ -103,6 +104,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await params;
     const authResult = await verifyAuthToken(request);

@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login: authLogin } = useAuth();
   const [formData, setFormData] = useState({
     nickname: '',
     password: '',
@@ -25,37 +27,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nickname: formData.nickname,
-          password: formData.password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '로그인에 실패했습니다.');
-      }
-
-      if (data.success) {
-        // Store token and user info
-        localStorage.setItem('auth-token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-
-        // Redirect based on role
-        if (data.data.user.role === 'ADMIN') {
-          router.push('/admin/dashboard');
-        } else if (data.data.user.role === 'PARTNER') {
-          router.push('/partner/dashboard');
-        } else {
-          router.push('/products');
-        }
-      }
+      // AuthContext의 login 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
+      await authLogin(formData.nickname, formData.password);
+      // authLogin 성공 시 자동으로 역할 기반 리다이렉트됨
     } catch (err: any) {
       setError(err.message || '로그인에 실패했습니다.');
     } finally {
@@ -64,15 +38,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-8 sm:py-12 px-4">
+      <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
           <Link href="/" className="inline-block">
-            <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               QRLIVE
             </div>
           </Link>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900">
             로그인
           </h2>
           <p className="mt-2 text-sm text-gray-600">
@@ -80,7 +54,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-lg" onSubmit={handleSubmit}>
+        <form className="mt-6 sm:mt-8 space-y-5 sm:space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-lg" onSubmit={handleSubmit} autoComplete="off">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {error}
@@ -98,7 +72,10 @@ export default function LoginPage() {
                 name="nickname"
                 type="text"
                 required
-                placeholder="닉네임을 입력하세요"
+                placeholder=""
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.nickname}
                 onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
@@ -115,7 +92,10 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 required
-                placeholder="비밀번호를 입력하세요"
+                placeholder=""
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}

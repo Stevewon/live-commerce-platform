@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
-const prisma = new PrismaClient();
+
 
 // GET: 쿠폰 상세 조회
 export async function GET(
@@ -10,6 +10,7 @@ export async function GET(
   segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id } = await segmentData.params;
 
     // 인증 확인
@@ -58,6 +59,7 @@ export async function PATCH(
   segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id } = await segmentData.params;
 
     // 인증 확인
@@ -131,6 +133,7 @@ export async function DELETE(
   segmentData: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id } = await segmentData.params;
 
     // 인증 확인

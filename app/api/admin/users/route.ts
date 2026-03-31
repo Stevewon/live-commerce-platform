@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/jwt';
 
 // GET: 모든 회원 조회
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get('auth-token')?.value;

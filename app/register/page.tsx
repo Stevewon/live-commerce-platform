@@ -3,15 +3,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register: authRegister } = useAuth();
   const [formData, setFormData] = useState({
     securetQrUrl: '',
     nickname: '',
     password: '',
     confirmPassword: '',
   });
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,43 +49,23 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!agreeTerms) {
+      setError('이용약관 및 개인정보처리방침에 동의해주세요.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nickname: formData.nickname,
-          password: formData.password,
-          securetQrUrl: formData.securetQrUrl,
-          name: formData.nickname, // Use nickname as name initially
-          role: 'CUSTOMER',
-        }),
+      // AuthContext의 register 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
+      await authRegister({
+        nickname: formData.nickname,
+        password: formData.password,
+        securetQrUrl: formData.securetQrUrl,
+        name: formData.nickname,
+        role: 'CUSTOMER',
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '회원가입에 실패했습니다.');
-      }
-
-      if (data.success) {
-        // Store token and user info
-        localStorage.setItem('auth-token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-
-        // Redirect based on role
-        if (data.data.user.role === 'ADMIN') {
-          router.push('/admin/dashboard');
-        } else if (data.data.user.role === 'PARTNER') {
-          router.push('/partner/dashboard');
-        } else {
-          router.push('/products');
-        }
-      }
+      // authRegister 성공 시 자동으로 리다이렉트됨
     } catch (err: any) {
       setError(err.message || '회원가입에 실패했습니다.');
     } finally {
@@ -91,15 +74,15 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-8 sm:py-12 px-4">
+      <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
           <Link href="/" className="inline-block">
-            <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               QRLIVE
             </div>
           </Link>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900">
             간편 회원가입
           </h2>
           <p className="mt-2 text-sm text-gray-600">
@@ -107,7 +90,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-lg" onSubmit={handleSubmit}>
+        <form className="mt-6 sm:mt-8 space-y-5 sm:space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-lg" onSubmit={handleSubmit} autoComplete="off">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm whitespace-pre-line">
               {error}
@@ -125,7 +108,10 @@ export default function RegisterPage() {
                 name="securetQrUrl"
                 type="text"
                 required
-                placeholder="https://securet.kr/securet.php?key=idcard&nick=..."
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.securetQrUrl}
                 onChange={(e) => setFormData({ ...formData, securetQrUrl: e.target.value })}
@@ -145,7 +131,10 @@ export default function RegisterPage() {
                 name="nickname"
                 type="text"
                 required
-                placeholder="사용하실 닉네임을 입력하세요"
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.nickname}
                 onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
@@ -159,10 +148,13 @@ export default function RegisterPage() {
               </label>
               <input
                 id="password"
-                name="password"
+                name="new-password"
                 type="password"
                 required
-                placeholder="최소 6자 이상"
+                autoComplete="new-password"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -179,12 +171,31 @@ export default function RegisterPage() {
                 name="confirmPassword"
                 type="password"
                 required
-                placeholder="비밀번호를 다시 입력하세요"
+                autoComplete="new-password"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               />
             </div>
+          </div>
+
+          {/* 이용약관 동의 */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <label className="flex items-start space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">
+                <Link href="/terms" target="_blank" className="text-blue-600 hover:underline font-medium">이용약관</Link> 및{' '}
+                <Link href="/privacy" target="_blank" className="text-blue-600 hover:underline font-medium">개인정보처리방침</Link>에 동의합니다 *
+              </span>
+            </label>
           </div>
 
           <div>

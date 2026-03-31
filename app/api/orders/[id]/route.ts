@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
-import prisma from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma';
+import { cancelTossPayment } from '@/lib/toss';
 
 // 주문 상세 조회 (GET)
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await context.params;
     // 인증 확인
@@ -67,6 +69,7 @@ export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await context.params;
     // 인증 확인
@@ -108,9 +111,28 @@ export async function PATCH(
     }
 
     // 주문 상태 업데이트
+    const updateData: any = { status }
+
+    // 취소 시 Toss 결제 취소 및 재고 복구
+    if (status === 'CANCELLED') {
+      updateData.cancelledAt = new Date()
+      
+      // Toss Payments 실결제 취소
+      if (order.paymentKey) {
+        try {
+          const cancelResult = await cancelTossPayment(order.paymentKey, '고객 요청에 의한 주문 취소')
+          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total
+          updateData.refundedAt = new Date()
+        } catch (tossError: any) {
+          console.error('Toss payment cancel failed:', tossError.message)
+          // Toss 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
+        }
+      }
+    }
+
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status },
+      data: updateData,
       include: {
         items: {
           include: {

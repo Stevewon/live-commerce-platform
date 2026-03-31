@@ -2,13 +2,14 @@
 // 공개 라이브 상세 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // GET /api/lives/[id] - 라이브 상세 (공개)
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id } = await params;
 

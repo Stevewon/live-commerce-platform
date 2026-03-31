@@ -32,6 +32,10 @@ interface RegisterData {
   email?: string  // Optional
   phone?: string
   role?: 'CUSTOMER' | 'PARTNER'
+  // Partner-specific fields
+  storeName?: string
+  storeSlug?: string
+  description?: string
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // 관리자 통계 조회 (GET)
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);

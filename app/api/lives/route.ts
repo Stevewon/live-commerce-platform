@@ -2,10 +2,11 @@
 // 공개 라이브 목록 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // GET /api/lives - 라이브 목록 (공개)
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const { searchParams } = new URL(req.url);
     

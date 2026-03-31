@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/jwt';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // GET /api/auth/me - 현재 로그인한 사용자 정보 조회
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 쿠키에서 토큰 가져오기 - Next.js cookies 사용
     const cookieStore = await cookies();
@@ -36,15 +37,12 @@ export async function GET(request: NextRequest) {
     // 사용자 정보 조회
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
     });
+    
+    // 비밀번호 제거
+    if (user) {
+      delete (user as any).password;
+    }
     
     if (!user) {
       return NextResponse.json(

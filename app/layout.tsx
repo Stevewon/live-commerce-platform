@@ -1,6 +1,14 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import ClientLayout from '@/components/ClientLayout'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+  themeColor: '#1f2937',
+}
 
 export const metadata: Metadata = {
   title: {
@@ -17,11 +25,11 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io'),
   openGraph: {
     title: '큐라이브 플랫폼',
     description: '라이브 스트리머를 위한 분양형 쇼핑몰 플랫폼',
-    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io',
     siteName: '큐라이브 플랫폼',
     locale: 'ko_KR',
     type: 'website',

@@ -1,10 +1,9 @@
 'use client';
 
 // lib/hooks/useSocket.ts
-// Socket.io 클라이언트 훅
+// API 폴링 기반 라이브 채팅 훅 (Cloudflare Workers 호환)
 
-import { useEffect, useState, useRef } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 interface ChatMessage {
   id: string;
@@ -24,147 +23,117 @@ interface UseSocketProps {
   userRole?: string;
 }
 
+const POLL_INTERVAL = 3000; // 3초마다 폴링
+
 export function useSocket({ liveId, userId, userName, userRole }: UseSocketProps) {
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [viewerCount, setViewerCount] = useState(0);
-  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const [typingUsers] = useState<string[]>([]);
   
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Socket 연결
+  // 초기 메시지 로드 및 폴링 시작
   useEffect(() => {
-    const socketInstance = io({
-      path: '/socket.io',
-    });
-
-    socketInstance.on('connect', () => {
-      console.log('✅ Socket connected:', socketInstance.id);
-      setConnected(true);
-      setSocket(socketInstance);
-
-      // 라이브 방 입장
-      if (userId && userName && userRole) {
-        socketInstance.emit('join-live', {
-          liveId,
-          userId,
-          userName,
-          userRole,
-        });
-      }
-    });
-
-    socketInstance.on('disconnect', () => {
-      console.log('❌ Socket disconnected');
-      setConnected(false);
-    });
-
-    // 새 메시지 수신
-    socketInstance.on('new-message', (message: ChatMessage) => {
-      setMessages((prev) => [message, ...prev]);
-    });
-
-    // 접속자 수 업데이트
-    socketInstance.on('viewer-count', (count: number) => {
-      setViewerCount(count);
-    });
-
-    // 사용자 입장
-    socketInstance.on('user-joined', (data: { userName: string; viewerCount: number }) => {
-      console.log(`${data.userName} joined. Viewers: ${data.viewerCount}`);
-    });
-
-    // 사용자 퇴장
-    socketInstance.on('user-left', (data: { userName: string; viewerCount: number }) => {
-      console.log(`${data.userName} left. Viewers: ${data.viewerCount}`);
-    });
-
-    // 타이핑 인디케이터
-    socketInstance.on('user-typing', (data: { userName: string; isTyping: boolean }) => {
-      setTypingUsers((prev) => {
-        const newSet = new Set(prev);
-        if (data.isTyping) {
-          newSet.add(data.userName);
-        } else {
-          newSet.delete(data.userName);
+    const fetchMessages = async () => {
+      try {
+        const params = new URLSearchParams({ limit: '50' });
+        if (lastMessageIdRef.current) {
+          params.set('afterId', lastMessageIdRef.current);
         }
-        return newSet;
-      });
-    });
+        
+        const res = await fetch(`/api/lives/${liveId}/chat?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.data?.length > 0) {
+            if (lastMessageIdRef.current) {
+              // 새 메시지만 추가 (폴링)
+              setMessages(prev => {
+                const existingIds = new Set(prev.map(m => m.id));
+                const newMessages = data.data.filter((m: ChatMessage) => !existingIds.has(m.id));
+                return [...newMessages, ...prev];
+              });
+            } else {
+              // 초기 로드
+              setMessages(data.data);
+            }
+            lastMessageIdRef.current = data.data[0]?.id || null;
+          }
+          setConnected(true);
+        }
+      } catch (error) {
+        console.error('Chat fetch error:', error);
+        setConnected(false);
+      }
+    };
 
-    // 메시지 삭제
-    socketInstance.on('message-deleted', (messageId: string) => {
-      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-    });
+    // 초기 로드
+    fetchMessages();
 
-    // 에러
-    socketInstance.on('error', (error: string) => {
-      console.error('Socket error:', error);
-      alert(error);
-    });
+    // 폴링 시작
+    pollIntervalRef.current = setInterval(fetchMessages, POLL_INTERVAL);
 
     return () => {
-      if (userId) {
-        socketInstance.emit('leave-live', liveId);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
       }
-      socketInstance.disconnect();
     };
-  }, [liveId, userId, userName, userRole]);
+  }, [liveId]);
 
   // 메시지 전송
-  const sendMessage = (message: string) => {
-    if (socket && connected && userId && userName && userRole) {
-      socket.emit('send-message', {
-        liveId,
-        userId,
-        userName,
-        userRole,
-        message,
+  const sendMessage = useCallback(async (message: string) => {
+    if (!userId || !userName || !userRole) return;
+    
+    try {
+      const res = await fetch(`/api/lives/${liveId}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
       });
-    }
-  };
-
-  // 타이핑 시작
-  const startTyping = () => {
-    if (socket && connected && userName) {
-      socket.emit('typing-start', { liveId, userName });
       
-      // 3초 후 자동으로 타이핑 중지
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          setMessages(prev => {
+            const exists = prev.some(m => m.id === data.data.id);
+            if (exists) return prev;
+            return [data.data, ...prev];
+          });
+          lastMessageIdRef.current = data.data.id;
+        }
       }
-      typingTimeoutRef.current = setTimeout(() => {
-        stopTyping();
-      }, 3000);
+    } catch (error) {
+      console.error('Send message error:', error);
     }
-  };
+  }, [liveId, userId, userName, userRole]);
 
-  // 타이핑 중지
-  const stopTyping = () => {
-    if (socket && connected && userName) {
-      socket.emit('typing-stop', { liveId, userName });
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-        typingTimeoutRef.current = null;
-      }
-    }
-  };
+  // 타이핑 시작/중지 (API 폴링에서는 noop)
+  const startTyping = useCallback(() => {}, []);
+  const stopTyping = useCallback(() => {}, []);
 
   // 메시지 삭제
-  const deleteMessage = (messageId: string) => {
-    if (socket && connected) {
-      socket.emit('delete-message', { messageId, liveId });
+  const deleteMessage = useCallback(async (messageId: string) => {
+    try {
+      const res = await fetch(`/api/lives/${liveId}/chat?messageId=${messageId}`, {
+        method: 'DELETE',
+      });
+      
+      if (res.ok) {
+        setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      }
+    } catch (error) {
+      console.error('Delete message error:', error);
     }
-  };
+  }, [liveId]);
 
   return {
-    socket,
+    socket: null,
     connected,
     messages,
     setMessages,
     viewerCount,
-    typingUsers: Array.from(typingUsers),
+    typingUsers,
     sendMessage,
     startTyping,
     stopTyping,

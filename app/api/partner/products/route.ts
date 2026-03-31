@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this'
@@ -20,6 +20,7 @@ function verifyToken(request: NextRequest) {
 
 // 파트너가 선택한 제품 목록 조회
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const decoded = verifyToken(request)
     if (!decoded || decoded.role !== 'PARTNER') {
@@ -64,6 +65,7 @@ export async function GET(request: NextRequest) {
 
 // 제품 추가/제거
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const decoded = verifyToken(request)
     if (!decoded || decoded.role !== 'PARTNER') {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // 플레이스홀더 이미지 URL - 다양한 카테고리별
 const imageUrls: Record<string, string[]> = {
@@ -47,6 +47,7 @@ const imageUrls: Record<string, string[]> = {
 
 // POST /api/products/update-images - 모든 상품의 이미지 업데이트
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     console.log('📸 상품 이미지 업데이트 시작...');
 

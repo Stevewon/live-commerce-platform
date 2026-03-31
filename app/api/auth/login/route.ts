@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 
-// POST /api/auth/login - 닉네임 + 비밀번호 로그인
+// POST /api/auth/login - 닉네임/이메일 + 비밀번호 로그인
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const body = await request.json();
     const { nickname, password } = body;
@@ -15,31 +16,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: '닉네임과 비밀번호를 입력해주세요.',
+          error: '닉네임/이메일과 비밀번호를 입력해주세요.',
         },
         { status: 400 }
       );
     }
     
-    // 사용자 조회 (닉네임으로)
-    const user = await prisma.user.findUnique({
+    const selectFields = {
+      id: true,
+      email: true,
+      nickname: true,
+      password: true,
+      name: true,
+      phone: true,
+      role: true,
+      createdAt: true,
+    };
+    
+    // 사용자 조회 (닉네임으로 먼저, 없으면 이메일로)
+    let user = await prisma.user.findUnique({
       where: { nickname },
-      select: {
-        id: true,
-        nickname: true,
-        password: true,
-        name: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
+      select: selectFields,
     });
+    
+    // 닉네임으로 못 찾으면 이메일로 검색
+    if (!user && nickname.includes('@')) {
+      user = await prisma.user.findUnique({
+        where: { email: nickname },
+        select: selectFields,
+      });
+    }
     
     if (!user) {
       return NextResponse.json(
         {
           success: false,
-          error: '닉네임 또는 비밀번호가 올바르지 않습니다.',
+          error: '닉네임/이메일 또는 비밀번호가 올바르지 않습니다.',
         },
         { status: 401 }
       );
@@ -61,7 +73,7 @@ export async function POST(request: NextRequest) {
     // JWT 토큰 생성
     const token = generateToken({
       userId: user.id,
-      nickname: user.nickname!,
+      nickname: user.nickname || user.email || user.id,
       role: user.role,
       name: user.name,
     });

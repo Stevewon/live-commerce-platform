@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/jwt';
 
 // 쿠폰 목록 조회 (GET) - 사용자용
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const { searchParams } = new URL(request.url);
     const available = searchParams.get('available') === 'true';
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
 
 // 쿠폰 생성 (POST) - 관리자 전용
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 관리자 인증
     const cookieStore = await cookies();

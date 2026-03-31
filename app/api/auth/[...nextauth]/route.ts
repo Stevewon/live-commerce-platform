@@ -3,12 +3,11 @@ import GoogleProvider from "next-auth/providers/google"
 import KakaoProvider from "next-auth/providers/kakao"
 import NaverProvider from "next-auth/providers/naver"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { prisma } from "@/lib/prisma"
+import { getPrisma } from '@/lib/prisma'
 import bcrypt from "bcryptjs"
 
 // OAuth Providers 동적 구성
-const providers = [];
+const providers: any[] = [];
 
 // Google OAuth (클라이언트 ID가 설정된 경우에만)
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_ID !== 'your-google-client-id') {
@@ -43,32 +42,26 @@ if (process.env.KAKAO_CLIENT_ID && process.env.KAKAO_CLIENT_ID !== 'your-kakao-c
 // 기존 이메일/비밀번호 로그인 (항상 활성화)
 providers.push(
   CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
+    name: "Credentials",
+    credentials: {
+      email: { label: "Email", type: "email" },
+      password: { label: "Password", type: "password" }
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials?.password) {
+        return null
+      }
 
+      const prisma = await getPrisma();
+      try {
         const user = await prisma.user.findUnique({
           where: { email: credentials.email }
         })
 
-        if (!user) {
-          return null
-        }
+        if (!user) return null
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          return null
-        }
+        const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+        if (!isPasswordValid) return null
 
         return {
           id: user.id,
@@ -76,12 +69,14 @@ providers.push(
           name: user.name,
           role: user.role,
         }
+      } finally {
+        await prisma.$disconnect().catch(() => {});
       }
-    })
+    }
+  })
 );
 
 const authOptions = {
-  adapter: PrismaAdapter(prisma),
   providers,
   
   callbacks: {
@@ -91,16 +86,18 @@ const authOptions = {
         token.role = user.role
       }
       
-      // 소셜 로그인 시 계정 연결
       if (account?.provider && account?.provider !== "credentials") {
-        // 이미 존재하는 사용자인지 확인
-        const existingUser = await prisma.user.findUnique({
-          where: { email: token.email as string }
-        })
-        
-        if (existingUser) {
-          token.id = existingUser.id
-          token.role = existingUser.role
+        const prisma = await getPrisma();
+        try {
+          const existingUser = await prisma.user.findUnique({
+            where: { email: token.email as string }
+          })
+          if (existingUser) {
+            token.id = existingUser.id
+            token.role = existingUser.role
+          }
+        } finally {
+          await prisma.$disconnect().catch(() => {});
         }
       }
       
@@ -115,33 +112,32 @@ const authOptions = {
       return session
     },
     
-    async signIn({ user, account, profile }: any) {
-      // 소셜 로그인 시 사용자 생성 또는 업데이트
+    async signIn({ user, account }: any) {
       if (account?.provider && account?.provider !== "credentials") {
+        const prisma = await getPrisma();
         try {
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email as string }
           })
           
           if (!existingUser) {
-            // 새 사용자 생성 (소셜 로그인)
             await prisma.user.create({
               data: {
                 email: user.email as string,
                 name: user.name || "User",
-                password: "", // 소셜 로그인은 비밀번호 불필요
+                password: "",
                 role: "CUSTOMER",
               }
             })
           }
-          
           return true
         } catch (error) {
           console.error("Sign in error:", error)
           return false
+        } finally {
+          await prisma.$disconnect().catch(() => {});
         }
       }
-      
       return true
     }
   },
@@ -153,12 +149,10 @@ const authOptions = {
   
   session: {
     strategy: "jwt" as const,
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
   },
   
   secret: process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET,
-  
-  // Cloudflare Workers에서 필수
   trustHost: true,
 }
 
