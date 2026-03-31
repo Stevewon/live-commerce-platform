@@ -4,7 +4,8 @@
   "description": "큐라이브 분양형 쇼핑몰 플랫폼",
   "scripts": {
     "dev": "next dev",
-    "build": "rm -rf .open-next .next && prisma generate && opennextjs-cloudflare build",
+    "clean": "node -e \"const fs=require('fs');['.open-next','.next'].forEach(d=>{try{fs.rmSync(d,{recursive:true,force:true})}catch{}})\"",
+    "build": "npm run clean && prisma generate && opennextjs-cloudflare build",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
