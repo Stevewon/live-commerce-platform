@@ -4,10 +4,7 @@
   "description": "큐라이브 분양형 쇼핑몰 플랫폼",
   "scripts": {
     "dev": "next dev",
-    "dev:custom": "node server.js",
-    "build": "rm -rf .open-next .next && prisma generate && npx opennextjs-cloudflare build",
-    "build:local": "prisma generate && next build",
-    "start": "next start",
+    "build": "rm -rf .open-next .next && prisma generate && opennextjs-cloudflare build",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
@@ -16,7 +13,7 @@
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv"
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

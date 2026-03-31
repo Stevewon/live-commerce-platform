@@ -204,20 +204,25 @@ npm run db:push
 npm run db:studio
 ```
 
-## 🌐 배포
+## 🌐 배포 (Cloudflare Workers)
 
-### Vercel 배포 (권장)
-1. GitHub 저장소에 푸시
-2. Vercel에 연결
-3. 환경 변수 설정
-4. 자동 배포
+### 프리뷰
+```bash
+npm run preview
+```
+
+### 프로덕션 배포
+```bash
+CLOUDFLARE_API_TOKEN=<토큰> npm run deploy
+```
 
 ### 환경 변수 (프로덕션)
+wrangler.jsonc의 `vars` 섹션에서 관리합니다.
 ```env
 NODE_ENV=production
-DATABASE_URL="postgresql://..."
 JWT_SECRET="강력한-랜덤-시크릿-키"
-NEXT_PUBLIC_API_URL="https://yourdomain.com"
+NEXT_PUBLIC_APP_URL="https://qrlive.io"
+NEXT_PUBLIC_API_URL="https://qrlive.io"
 ```
 
 ## 📈 다음 단계

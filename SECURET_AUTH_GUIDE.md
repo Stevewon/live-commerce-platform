@@ -228,11 +228,11 @@ const securetUrlPattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick
 
 ## 🚀 배포 상태
 
-### Vercel 배포
-- ✅ 빌드 성공
+### Cloudflare Workers 배포
+- ✅ OpenNext 빌드 성공
 - ✅ TypeScript 오류 해결
 - ✅ 모든 페이지 정상 작동
-- 🔄 자동 배포 대기 중
+- ✅ Cloudflare Workers 배포 완료
 
 ### 접속 URL (배포 후)
 - Production: https://qrlive.io
@@ -243,7 +243,7 @@ const securetUrlPattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick
 
 ## 📝 다음 단계
 
-1. ✅ Vercel 배포 완료 대기
+1. ✅ Cloudflare Workers 배포 완료
 2. ✅ 프로덕션 환경 테스트
 3. ✅ 사용자 피드백 수집
 4. ⏳ 필요시 UI/UX 개선
@@ -257,7 +257,7 @@ const securetUrlPattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick
 - **Database**: Prisma + SQLite (개발) / PostgreSQL (프로덕션)
 - **Authentication**: JWT (JSON Web Token)
 - **Password**: bcryptjs (해싱)
-- **Deployment**: Vercel
+- **Deployment**: Cloudflare Workers (OpenNext)
 
 ---
 
