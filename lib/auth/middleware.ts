@@ -5,7 +5,8 @@ import { verifyToken } from '@/lib/auth/jwt';
 export interface AuthenticatedRequest extends NextRequest {
   user?: {
     userId: string;
-    email: string;
+    email?: string;
+    nickname?: string;
     role: string;
     name: string;
   };
@@ -14,7 +15,7 @@ export interface AuthenticatedRequest extends NextRequest {
 // 인증 헬퍼 함수 - userId 반환 또는 에러 응답 반환
 export async function verifyAuthToken(
   request: NextRequest
-): Promise<{ userId: string; email: string; role: string; name: string } | NextResponse> {
+): Promise<{ userId: string; email?: string; nickname?: string; role: string; name: string } | NextResponse> {
   try {
     let token: string | undefined;
     
