@@ -44,19 +44,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 파일 버퍼를 한 번만 읽기 (스트림 소비 문제 방지)
+    const buffer = await file.arrayBuffer();
     const timestamp = Date.now();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\s+/g, '_');
     const key = `products/${timestamp}_${safeName}`;
 
     // Cloudflare R2 업로드 시도
-    let r2UploadError: string | null = null;
     try {
       const { getCloudflareContext } = await import('@opennextjs/cloudflare');
       const ctx = await getCloudflareContext();
       const r2 = (ctx.env as any).R2_BUCKET;
 
       if (r2) {
-        const buffer = await file.arrayBuffer();
         await r2.put(key, buffer, {
           httpMetadata: {
             contentType: file.type,
@@ -80,17 +80,15 @@ export async function POST(req: NextRequest) {
           },
           message: '이미지가 성공적으로 업로드되었습니다'
         });
-      } else {
-        r2UploadError = 'R2_BUCKET binding not found';
       }
+      // R2 바인딩 없으면 아래 base64 fallback으로
+      console.log('[UPLOAD] R2_BUCKET binding not found, falling back to base64');
     } catch (e: any) {
-      r2UploadError = e?.message || 'R2 context unavailable';
-      console.log('R2 not available, using base64 fallback:', r2UploadError);
+      console.log('[UPLOAD] R2 unavailable:', e?.message || 'unknown error');
     }
 
     // Fallback: Base64 데이터 URL (R2 미설정 시, 로컬 개발 등)
-    // chunk-safe base64 conversion (avoid spread operator call stack overflow)
-    const buffer = await file.arrayBuffer();
+    // chunk-safe base64 conversion (Cloudflare Workers 스택 오버플로 방지)
     const bytes = new Uint8Array(buffer);
     let binary = '';
     const chunkSize = 8192;
@@ -111,13 +109,11 @@ export async function POST(req: NextRequest) {
         fileSize: file.size,
         fileType: file.type
       },
-      message: r2UploadError 
-        ? `이미지 업로드 완료 (base64 모드: ${r2UploadError})`
-        : '이미지가 업로드되었습니다'
+      message: '이미지가 업로드되었습니다 (base64 모드)'
     });
 
   } catch (error: any) {
-    console.error('이미지 업로드 실패:', error?.message || error);
+    console.error('[UPLOAD_ERROR]', error?.message || error);
     return NextResponse.json(
       { success: false, error: `이미지 업로드에 실패했습니다: ${error?.message || '알 수 없는 오류'}` },
       { status: 500 }
