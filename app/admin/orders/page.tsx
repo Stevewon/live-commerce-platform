@@ -78,6 +78,8 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [trackingCompany, setTrackingCompany] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
 
   useEffect(() => {
     if (user && user.role === 'ADMIN') {
@@ -116,19 +118,23 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
+  const handleStatusChange = async (orderId: string, newStatus: string, tracking?: { company: string; number: string }) => {
     if (!confirm(`주문 상태를 "${STATUS_LABELS[newStatus]}"(으)로 변경하시겠습니까?`)) {
       return;
     }
 
     try {
+      const body: any = { status: newStatus };
+      if (tracking?.company) body.trackingCompany = tracking.company;
+      if (tracking?.number) body.trackingNumber = tracking.number;
+
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) throw new Error('상태 변경 실패');
@@ -561,6 +567,63 @@ export default function AdminOrdersPage() {
                     {formatCurrency(selectedOrder.total)}
                   </span>
                 </div>
+              </div>
+
+              {/* 배송 추적 정보 입력 */}
+              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-indigo-200">
+                <h4 className="font-black text-gray-900 mb-4 text-lg flex items-center">
+                  <span className="text-2xl mr-2">🚚</span>
+                  배송 추적 정보
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">택배사</label>
+                    <select
+                      value={trackingCompany}
+                      onChange={(e) => setTrackingCompany(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl text-sm font-medium focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500"
+                    >
+                      <option value="">택배사 선택</option>
+                      <option value="CJ대한통운">CJ대한통운</option>
+                      <option value="롯데택배">롯데택배</option>
+                      <option value="한진택배">한진택배</option>
+                      <option value="로젠택배">로젠택배</option>
+                      <option value="우체국택배">우체국택배</option>
+                      <option value="경동택배">경동택배</option>
+                      <option value="대신택배">대신택배</option>
+                      <option value="GS편의점택배">GS편의점택배</option>
+                      <option value="EMS">EMS (국제우편)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">운송장 번호</label>
+                    <input
+                      type="text"
+                      value={trackingNumber}
+                      onChange={(e) => setTrackingNumber(e.target.value)}
+                      placeholder="운송장 번호 입력"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl text-sm font-medium focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!trackingCompany || !trackingNumber) {
+                      alert('택배사와 운송장 번호를 모두 입력해주세요.');
+                      return;
+                    }
+                    await handleStatusChange(selectedOrder.id, 'SHIPPING', {
+                      company: trackingCompany,
+                      number: trackingNumber,
+                    });
+                    setSelectedOrder(null);
+                    setTrackingCompany('');
+                    setTrackingNumber('');
+                  }}
+                  className="mt-4 w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl font-bold hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-lg"
+                >
+                  🚚 운송장 등록 및 배송중 처리
+                </button>
               </div>
             </div>
 

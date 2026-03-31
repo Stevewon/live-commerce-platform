@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useSocket } from '@/lib/hooks/useSocket'
+import { useChat } from '@/lib/hooks/useChat'
 
 interface LiveData {
   id: string;
@@ -46,7 +46,7 @@ export default function LiveViewPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
 
-  // Socket.io 연결
+  // API 폴링 채팅
   const {
     connected,
     messages,
@@ -56,7 +56,7 @@ export default function LiveViewPage() {
     sendMessage,
     startTyping,
     stopTyping,
-  } = useSocket({
+  } = useChat({
     liveId,
     userId: user?.userId,
     userName: user?.name,
@@ -136,7 +136,7 @@ export default function LiveViewPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">

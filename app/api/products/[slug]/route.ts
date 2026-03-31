@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // GET /api/products/[slug] - 상품 상세 조회
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ slug: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const resolvedParams = await context.params;
     const { slug } = resolvedParams;

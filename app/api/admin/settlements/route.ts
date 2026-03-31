@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/jwt';
 
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 인증 확인
     const cookieStore = await cookies();
@@ -79,6 +80,7 @@ export async function GET(request: NextRequest) {
 
 // 정산 자동 생성 API (POST)
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 인증 확인
     const cookieStore = await cookies();

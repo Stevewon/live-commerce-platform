@@ -7,8 +7,8 @@ import Link from 'next/link'
 
 export default function PartnerLoginPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
-  const [email, setEmail] = useState('')
+  const { login: authLogin } = useAuth()
+  const [nickname, setNickname] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -19,19 +19,9 @@ export default function PartnerLoginPage() {
     setError('')
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, role: 'PARTNER' }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        router.push('/partner/dashboard')
-      } else {
-        setError(data.error || '로그인에 실패했습니다.')
-      }
+      // AuthContext의 login 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
+      await authLogin(nickname, password)
+      // authLogin 성공 시 자동으로 역할 기반 리다이렉트됨
     } catch (err: any) {
       setError(err.message || '로그인 중 오류가 발생했습니다.')
     } finally {
@@ -59,7 +49,7 @@ export default function PartnerLoginPage() {
         </div>
 
         <div className="card">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                 {error}
@@ -67,13 +57,17 @@ export default function PartnerLoginPage() {
             )}
 
             <div>
-              <label className="label">이메일</label>
+              <label className="label">닉네임</label>
               <input
-                type="email"
+                type="text"
+                name="partner-login-nickname"
                 className="input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 required
               />
             </div>
@@ -82,10 +76,14 @@ export default function PartnerLoginPage() {
               <label className="label">비밀번호</label>
               <input
                 type="password"
+                name="partner-login-pw"
                 className="input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                autoComplete="off"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder=""
                 required
               />
             </div>

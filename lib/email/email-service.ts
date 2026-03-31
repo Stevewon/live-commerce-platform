@@ -124,7 +124,7 @@ export async function sendOrderConfirmationEmail(orderData: {
       </div>
 
       <div style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/orders/${orderData.orderNumber}" class="button">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io'}/orders/${orderData.orderNumber}" class="button">
           주문 상세보기
         </a>
       </div>
@@ -185,7 +185,7 @@ export async function sendShippingStartEmail(data: {
       </p>
 
       <div style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/orders/${data.orderNumber}" class="button">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io'}/orders/${data.orderNumber}" class="button">
           배송 조회하기
         </a>
       </div>
@@ -230,7 +230,7 @@ export async function sendDeliveryCompleteEmail(data: {
       다른 고객님들께 큰 도움이 됩니다. 😊</p>
 
       <div style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/orders/${data.orderNumber}/review" class="button">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io'}/orders/${data.orderNumber}/review" class="button">
           리뷰 작성하기
         </a>
       </div>
@@ -284,7 +284,7 @@ export async function sendPartnerApprovalEmail(data: {
       </ul>
 
       <div style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/partner/dashboard" class="button">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io'}/partner/dashboard" class="button">
           파트너 대시보드 바로가기
         </a>
       </div>
@@ -335,7 +335,7 @@ export async function sendSettlementCompleteEmail(data: {
       </p>
 
       <div style="text-align: center;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/partner/settlements" class="button">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io'}/partner/settlements" class="button">
           정산 내역 보기
         </a>
       </div>

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth/middleware';
 
 // GET /api/wishlist - 위시리스트 조회
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const userId = req.user!.userId;
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/wishlist - 위시리스트에 추가
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const userId = req.user!.userId;
@@ -126,6 +128,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/wishlist - 위시리스트에서 삭제
 export async function DELETE(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const userId = req.user!.userId;

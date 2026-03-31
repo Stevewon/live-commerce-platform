@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 export async function POST(req: NextRequest) {
@@ -38,43 +35,77 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 파일 크기 검증 (최대 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // 파일 크기 검증 (최대 10MB)
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
-        { success: false, error: '파일 크기는 5MB 이하여야 합니다' },
+        { success: false, error: '파일 크기는 10MB 이하여야 합니다' },
         { status: 400 }
       );
     }
 
-    // 파일명 생성 (타임스탬프 + 원본 파일명)
-    const timestamp = Date.now();
-    const originalName = file.name.replace(/\s+/g, '_');
-    const fileName = `${timestamp}_${originalName}`;
+    // Cloudflare R2 업로드
+    try {
+      const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+      const ctx = await getCloudflareContext();
+      const r2 = (ctx.env as any).R2_BUCKET;
 
-    // 업로드 디렉토리 확인 및 생성
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'products');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+      if (r2) {
+        // R2 사용 가능 - 클라우드 스토리지에 업로드
+        const timestamp = Date.now();
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\s+/g, '_');
+        const key = `products/${timestamp}_${safeName}`;
+
+        const buffer = await file.arrayBuffer();
+        await r2.put(key, buffer, {
+          httpMetadata: {
+            contentType: file.type,
+          },
+        });
+
+        // R2 공개 URL (커스텀 도메인 또는 R2 퍼블릭 URL)
+        const r2PublicUrl = (ctx.env as any).R2_PUBLIC_URL;
+        const publicUrl = r2PublicUrl 
+          ? `${r2PublicUrl}/${key}`
+          : `/api/images/${key}`;
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            url: publicUrl,
+            key: key,
+            fileName: safeName,
+            fileSize: file.size,
+            fileType: file.type
+          },
+          message: '이미지가 성공적으로 업로드되었습니다'
+        });
+      }
+    } catch (e) {
+      // R2 not available, fallback below
+      console.log('R2 not available, using base64 fallback');
     }
 
-    // 파일 저장
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const filePath = join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
-
-    // 공개 URL 생성
-    const publicUrl = `/uploads/products/${fileName}`;
-
+    // Fallback: Base64 데이터 URL (R2 미설정 시)
+    const buffer = await file.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    const dataUrl = `data:${file.type};base64,${base64}`;
+    
+    // For large files, store as base64 is not ideal but works as fallback
+    // In production, R2 should be configured
+    const timestamp = Date.now();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    
     return NextResponse.json({
       success: true,
       data: {
-        url: publicUrl,
-        fileName: fileName,
+        url: dataUrl,
+        fileName: safeName,
         fileSize: file.size,
         fileType: file.type
       },
-      message: '이미지가 성공적으로 업로드되었습니다'
+      message: '이미지가 업로드되었습니다 (R2 미설정 - base64 모드)'
     });
 
   } catch (error) {
@@ -84,13 +115,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// 파일 크기를 인간이 읽기 쉬운 형식으로 변환
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }

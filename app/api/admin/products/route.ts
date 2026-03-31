@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // 관리자 상품 조회 (GET)
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
@@ -79,6 +80,7 @@ export async function GET(req: NextRequest) {
 
 // 관리자 상품 등록 (POST)
 export async function POST(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 관리자 인증 확인
     const authResult = await verifyAuthToken(req);
@@ -111,7 +113,14 @@ export async function POST(req: NextRequest) {
       specifications,
       shippingInfo,
       returnInfo,
-      isFeatured
+      isFeatured,
+      origin,
+      manufacturer,
+      brand,
+      tags,
+      hasOptions,
+      optionNames,
+      variants
     } = body;
 
     // 필수 필드 검증
@@ -143,7 +152,27 @@ export async function POST(req: NextRequest) {
         shippingInfo: shippingInfo || null,
         returnInfo: returnInfo || null,
         isActive: isActive !== undefined ? isActive : true,
-        isFeatured: isFeatured !== undefined ? isFeatured : false
+        isFeatured: isFeatured !== undefined ? isFeatured : false,
+        origin: origin || null,
+        manufacturer: manufacturer || null,
+        brand: brand || null,
+        tags: tags || null,
+        hasOptions: hasOptions || false,
+        optionNames: optionNames || null,
+        // 변형(variants) 동시 생성
+        ...(hasOptions && Array.isArray(variants) && variants.length > 0 ? {
+          variants: {
+            create: variants.map((v: any) => ({
+              optionValues: typeof v.optionValues === 'string' ? v.optionValues : JSON.stringify(v.optionValues),
+              price: v.price ? parseFloat(v.price) : null,
+              comparePrice: v.comparePrice ? parseFloat(v.comparePrice) : null,
+              stock: parseInt(v.stock) || 0,
+              sku: v.sku || null,
+              thumbnail: v.thumbnail || null,
+              isActive: v.isActive !== undefined ? v.isActive : true,
+            }))
+          }
+        } : {}),
       },
       include: {
         category: {
@@ -151,7 +180,8 @@ export async function POST(req: NextRequest) {
             name: true,
             slug: true
           }
-        }
+        },
+        variants: true
       }
     });
 

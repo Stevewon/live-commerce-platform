@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth/password';
 
 // POST /api/auth/reset-password - 시큐릿 QR 주소로 비밀번호 재설정
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const body = await request.json();
     const { securetQrUrl, newPassword } = body;

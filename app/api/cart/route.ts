@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth/middleware';
 
 // GET /api/cart - 장바구니 조회
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const userId = req.user!.userId;
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/cart - 장바구니에 추가
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const userId = req.user!.userId;
@@ -80,12 +82,11 @@ export async function POST(request: NextRequest) {
       }
       
       // 이미 장바구니에 있는지 확인
-      const existingItem = await prisma.cartItem.findUnique({
+      const existingItem = await prisma.cartItem.findFirst({
         where: {
-          userId_productId: {
-            userId,
-            productId,
-          },
+          userId,
+          productId,
+          variantId: null,
         },
       });
       
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/cart - 장바구니에서 삭제 (특정 상품 또는 전체)
 export async function DELETE(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const userId = req.user!.userId;
@@ -184,6 +186,7 @@ export async function DELETE(request: NextRequest) {
 
 // PATCH /api/cart - 장바구니 수량 업데이트
 export async function PATCH(request: NextRequest) {
+  const prisma = await getPrisma();
   return requireAuth(request, async (req: AuthenticatedRequest) => {
     try {
       const userId = req.user!.userId;

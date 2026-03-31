@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // GET /api/categories - 카테고리 목록 조회
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const categories = await prisma.category.findMany({
       select: {

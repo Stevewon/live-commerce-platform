@@ -3,20 +3,32 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function EmailRegisterPage() {
   const router = useRouter();
+  const { register: authRegister } = useAuth();
   
   const [formData, setFormData] = useState({
+    securetQrUrl: '',
+    nickname: '',
     name: '',
     email: '',
     password: '',
+    confirmPassword: '',
     phone: '',
   });
   
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState('');
+
+  // Securet QR URL 형식 검증
+  const validateSecuretUrl = (url: string): boolean => {
+    const pattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick=.+&token=.+&voip=.+&os=.+$/;
+    return pattern.test(url);
+  };
 
   // 이메일 유효성 검증
   const validateEmail = (email: string) => {
@@ -36,6 +48,16 @@ export default function EmailRegisterPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
+    if (!formData.securetQrUrl.trim()) {
+      newErrors.securetQrUrl = '시큐릿 QR 주소를 입력해주세요.';
+    } else if (!validateSecuretUrl(formData.securetQrUrl)) {
+      newErrors.securetQrUrl = '올바른 시큐릿 QR 주소 형식이 아닙니다.';
+    }
+
+    if (!formData.nickname.trim()) {
+      newErrors.nickname = '닉네임을 입력해주세요.';
+    }
+
     if (!formData.name.trim()) {
       newErrors.name = '이름을 입력해주세요.';
     }
@@ -50,8 +72,16 @@ export default function EmailRegisterPage() {
       newErrors.password = '비밀번호는 최소 6자 이상이어야 합니다.';
     }
 
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = '비밀번호가 일치하지 않습니다.';
+    }
+
     if (formData.phone && formData.phone.replace(/[^\d]/g, '').length < 10) {
       newErrors.phone = '올바른 전화번호를 입력해주세요.';
+    }
+
+    if (!agreeTerms) {
+      newErrors.terms = '이용약관 및 개인정보처리방침에 동의해주세요.';
     }
 
     setErrors(newErrors);
@@ -70,28 +100,20 @@ export default function EmailRegisterPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.phone.replace(/[^\d]/g, ''),
-        }),
+      // AuthContext의 register 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
+      await authRegister({
+        nickname: formData.nickname,
+        password: formData.password,
+        securetQrUrl: formData.securetQrUrl,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone.replace(/[^\d]/g, '') || undefined,
+        role: 'CUSTOMER',
       });
-
-      const data = await response.json();
-
-      if (data.success) {
-        alert('✅ 회원가입이 완료되었습니다!');
-        router.push('/login');
-      } else {
-        setGeneralError(data.error || '회원가입에 실패했습니다.');
-      }
+      // authRegister 성공 시 자동으로 리다이렉트됨
     } catch (error: any) {
       console.error('회원가입 오류:', error);
-      setGeneralError('회원가입 중 오류가 발생했습니다.');
+      setGeneralError(error.message || '회원가입 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -114,20 +136,15 @@ export default function EmailRegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full">
         {/* 헤더 */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block mb-6">
+        <div className="text-center mb-6 sm:mb-8">
+          <Link href="/" className="inline-block mb-4 sm:mb-6">
             <div className="flex items-center justify-center space-x-2">
-              <img 
-                src="/logos/qrlive-logo.png" 
-                alt="QRLIVE" 
-                className="w-12 h-12"
-              />
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                 QRLIVE
-              </h1>
+              </div>
             </div>
           </Link>
           <Link 
@@ -142,15 +159,69 @@ export default function EmailRegisterPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             이메일로 가입하기
           </h2>
+          <p className="text-sm text-gray-600">
+            시큐릿 QR 주소와 함께 이메일로 가입합니다
+          </p>
         </div>
 
         {/* 회원가입 폼 */}
-        <form className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-5" onSubmit={handleSubmit}>
+        <form className="bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-5" onSubmit={handleSubmit} autoComplete="off">
           {generalError && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-red-600 text-sm">⚠️ {generalError}</p>
+              <p className="text-red-600 text-sm whitespace-pre-line">{generalError}</p>
             </div>
           )}
+
+          {/* 시큐릿 QR 주소 */}
+          <div>
+            <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1.5">
+              시큐릿 QR 주소 <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="securetQrUrl"
+              name="securetQrUrl"
+              type="text"
+              value={formData.securetQrUrl}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border ${
+                errors.securetQrUrl ? 'border-red-300' : 'border-gray-200'
+              } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
+              placeholder=""
+              autoComplete="off"
+              data-lpignore="true"
+              data-form-type="other"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              시큐릿 메신저의 QR 주소를 입력해주세요
+            </p>
+            {errors.securetQrUrl && (
+              <p className="mt-1.5 text-sm text-red-600">{errors.securetQrUrl}</p>
+            )}
+          </div>
+
+          {/* 닉네임 */}
+          <div>
+            <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1.5">
+              닉네임 <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="nickname"
+              name="nickname"
+              type="text"
+              value={formData.nickname}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border ${
+                errors.nickname ? 'border-red-300' : 'border-gray-200'
+              } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
+              placeholder=""
+              autoComplete="off"
+              data-lpignore="true"
+              data-form-type="other"
+            />
+            {errors.nickname && (
+              <p className="mt-1.5 text-sm text-red-600">{errors.nickname}</p>
+            )}
+          </div>
 
           {/* 이름 */}
           <div>
@@ -166,7 +237,10 @@ export default function EmailRegisterPage() {
               className={`w-full px-4 py-3 border ${
                 errors.name ? 'border-red-300' : 'border-gray-200'
               } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
-              placeholder="홍길동"
+              placeholder=""
+              autoComplete="off"
+              data-lpignore="true"
+              data-form-type="other"
             />
             {errors.name && (
               <p className="mt-1.5 text-sm text-red-600">{errors.name}</p>
@@ -182,13 +256,15 @@ export default function EmailRegisterPage() {
               id="email"
               name="email"
               type="email"
-              autoComplete="email"
               value={formData.email}
               onChange={handleChange}
               className={`w-full px-4 py-3 border ${
                 errors.email ? 'border-red-300' : 'border-gray-200'
               } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
-              placeholder="example@email.com"
+              placeholder=""
+              autoComplete="off"
+              data-lpignore="true"
+              data-form-type="other"
             />
             {errors.email && (
               <p className="mt-1.5 text-sm text-red-600">{errors.email}</p>
@@ -210,10 +286,37 @@ export default function EmailRegisterPage() {
               className={`w-full px-4 py-3 border ${
                 errors.password ? 'border-red-300' : 'border-gray-200'
               } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
-              placeholder="6자 이상"
+              placeholder=""
+              data-lpignore="true"
+              data-form-type="other"
             />
+            <p className="mt-1 text-xs text-gray-500">최소 6자 이상</p>
             {errors.password && (
               <p className="mt-1.5 text-sm text-red-600">{errors.password}</p>
+            )}
+          </div>
+
+          {/* 비밀번호 확인 */}
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
+              비밀번호 확인 <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              className={`w-full px-4 py-3 border ${
+                errors.confirmPassword ? 'border-red-300' : 'border-gray-200'
+              } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
+              placeholder=""
+              data-lpignore="true"
+              data-form-type="other"
+            />
+            {errors.confirmPassword && (
+              <p className="mt-1.5 text-sm text-red-600">{errors.confirmPassword}</p>
             )}
           </div>
 
@@ -226,16 +329,42 @@ export default function EmailRegisterPage() {
               id="phone"
               name="phone"
               type="tel"
-              autoComplete="tel"
               value={formData.phone}
               onChange={handleChange}
               className={`w-full px-4 py-3 border ${
                 errors.phone ? 'border-red-300' : 'border-gray-200'
               } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
-              placeholder="010-1234-5678"
+              placeholder=""
+              autoComplete="off"
+              data-lpignore="true"
+              data-form-type="other"
             />
             {errors.phone && (
               <p className="mt-1.5 text-sm text-red-600">{errors.phone}</p>
+            )}
+          </div>
+
+          {/* 이용약관 동의 */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <label className="flex items-start space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreeTerms}
+                onChange={(e) => {
+                  setAgreeTerms(e.target.checked);
+                  if (errors.terms) {
+                    setErrors({ ...errors, terms: '' });
+                  }
+                }}
+                className="mt-1 h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+              />
+              <span className="text-sm text-gray-700">
+                <Link href="/terms" target="_blank" className="text-purple-600 hover:underline font-medium">이용약관</Link> 및{' '}
+                <Link href="/privacy" target="_blank" className="text-purple-600 hover:underline font-medium">개인정보처리방침</Link>에 동의합니다 *
+              </span>
+            </label>
+            {errors.terms && (
+              <p className="mt-1.5 text-sm text-red-600">{errors.terms}</p>
             )}
           </div>
 

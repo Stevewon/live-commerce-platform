@@ -2,11 +2,12 @@
 // 알림 목록 조회 & 생성 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // GET /api/notifications - 사용자 알림 목록 조회
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;
@@ -53,6 +54,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/notifications - 알림 생성 (시스템/관리자용)
 export async function POST(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;

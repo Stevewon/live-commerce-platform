@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
-const prisma = new PrismaClient();
+
 
 // GET /api/admin/orders - 관리자 주문 목록 조회
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const authResult = await verifyAuthToken(req);
     if (authResult instanceof NextResponse) {

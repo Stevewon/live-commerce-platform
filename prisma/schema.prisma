@@ -2,7 +2,8 @@
 // 분양형 라이브 커머스 쇼핑몰 플랫폼
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -182,6 +183,18 @@ model Product {
   // 상품 스펙 (JSON)
   specifications String?  // JSON object
   
+  // 전자상거래법 필수 표시 정보
+  origin        String?   // 원산지 (예: 대한민국, 중국 등)
+  manufacturer  String?   // 제조사
+  brand         String?   // 브랜드
+  
+  // 검색 태그 (쉼표 구분)
+  tags          String?   // 검색 키워드/태그 (쉼표 구분 예: "여름,면티,데일리")
+  
+  // 상품 옵션 (JSON) - 옵션명 정의 ["색상", "사이즈"]
+  optionNames   String?   // JSON array of option names
+  hasOptions    Boolean   @default(false) // 옵션 사용 여부
+  
   // 배송 정보
   shippingInfo  String?   // 배송 안내
   returnInfo    String?   // 교환/반품 안내
@@ -203,6 +216,38 @@ model Product {
   cartItems       CartItem[]
   wishlistItems   WishlistItem[]
   reviews         Review[]
+  variants        ProductVariant[]
+}
+
+// 상품 옵션 변형 (색상-사이즈 조합별 재고·가격)
+model ProductVariant {
+  id            String    @id @default(uuid())
+  
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // 옵션 값 (JSON) - {"색상": "빨강", "사이즈": "L"}
+  optionValues  String    // JSON object
+  
+  // 변형별 가격/재고
+  price         Float?    // null이면 상품 기본가 사용
+  comparePrice  Float?    // null이면 상품 기본 정가 사용
+  stock         Int       @default(0)
+  sku           String?   @unique
+  
+  // 변형별 이미지 (옵션 색상별 이미지)
+  thumbnail     String?
+  
+  isActive      Boolean   @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  orderItems    OrderItem[]
+  cartItems     CartItem[]
+  
+  @@index([productId])
 }
 
 // 파트너가 판매하는 제품 (파트너-제품 연결 테이블)
@@ -278,9 +323,14 @@ model Order {
   id                String        @id @default(uuid())
   orderNumber       String        @unique // 주문 번호
   
-  // 고객 정보
-  userId            String
-  user              User          @relation(fields: [userId], references: [id])
+  // 고객 정보 (회원 or 비회원)
+  userId            String?
+  user              User?         @relation(fields: [userId], references: [id])
+  
+  // 비회원 주문 정보
+  guestEmail        String?       // 비회원 이메일
+  guestPhone        String?       // 비회원 연락처
+  guestOrderToken   String?       // 비회원 주문조회 토큰
   
   // 파트너 정보 (어떤 파트너의 스토어에서 구매했는지) - optional로 변경
   partnerId         String?
@@ -315,9 +365,22 @@ model Order {
   shippingZipCode   String?
   shippingMemo      String?
   
+  // 취소/환불 정보
+  cancelReason      String?       // 취소 사유
+  cancelledAt       DateTime?     // 취소 시각
+  refundAmount      Float?        // 환불 금액
+  refundedAt        DateTime?     // 환불 완료 시각
+  
   // 결제 정보
   paymentMethod     String?       // card, bank, kakaopay 등
+  paymentKey        String?       // 토스 결제키 (환불용)
   paidAt            DateTime?
+  
+  // 배송 추적 정보
+  trackingCompany   String?       // 택배사 (CJ대한통운, 롯데택배, 한진택배 등)
+  trackingNumber    String?       // 운송장 번호
+  shippedAt         DateTime?     // 발송 시각
+  deliveredAt       DateTime?     // 배송 완료 시각
   
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -336,6 +399,11 @@ model OrderItem {
   
   productId   String
   product     Product   @relation(fields: [productId], references: [id])
+  
+  // 옵션 변형 (선택)
+  variantId   String?
+  variant     ProductVariant?  @relation(fields: [variantId], references: [id])
+  optionValues String?   // JSON - 주문 시점 옵션값 스냅샷 {"색상": "빨강", "사이즈": "L"}
   
   quantity    Int
   price       Float     // 구매 당시 가격
@@ -386,12 +454,16 @@ model CartItem {
   productId   String
   product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   
+  // 옵션 변형 (선택)
+  variantId   String?
+  variant     ProductVariant?  @relation(fields: [variantId], references: [id])
+  
   quantity    Int       @default(1)
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   
-  @@unique([userId, productId])
+  @@unique([userId, productId, variantId])
 }
 
 // 위시리스트 아이템

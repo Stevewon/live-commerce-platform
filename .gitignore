@@ -42,3 +42,7 @@ coverage/
 .turbo/
 .vercel/
 core
+
+# OpenNext build output
+.open-next
+.dev.vars

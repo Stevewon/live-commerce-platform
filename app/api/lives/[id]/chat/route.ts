@@ -2,7 +2,7 @@
 // 라이브 채팅 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // 욕설 필터 (간단한 버전)
@@ -22,6 +22,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const { id: liveStreamId } = await params;
     const { searchParams } = new URL(req.url);
@@ -94,6 +95,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;
@@ -169,6 +171,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;

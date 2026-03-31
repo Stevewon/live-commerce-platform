@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { confirmTossPayment } from '@/lib/toss';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const { paymentKey, orderId, amount } = await request.json();
 
@@ -36,8 +37,10 @@ export async function POST(request: NextRequest) {
     await prisma.order.update({
       where: { id: order.id },
       data: {
-        status: 'PAID',
+        status: 'CONFIRMED',
         paymentMethod: paymentData.method,
+        paymentKey: paymentData.paymentKey || paymentKey,
+        paidAt: paymentData.approvedAt ? new Date(paymentData.approvedAt) : new Date(),
       },
     });
 

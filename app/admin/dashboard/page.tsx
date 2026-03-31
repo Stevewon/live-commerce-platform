@@ -340,7 +340,7 @@ export default function AdminDashboardPage() {
                       </span>
                     </div>
                     <div className="flex justify-between items-center text-sm text-gray-500 pt-3 border-t border-gray-200">
-                      <span className="font-semibold">플랫폼 수익: {formatCurrency(order.platformRevenue)}</span>
+                      <span className="font-semibold">플랫폼 수익: {formatCurrency(order.platformRevenue || 0)}</span>
                       <span className="font-medium">🕐 {formatDate(order.createdAt)}</span>
                     </div>
                   </div>
@@ -373,8 +373,8 @@ export default function AdminDashboardPage() {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <p className="text-lg font-black text-gray-900">{partner.storeName}</p>
-                        <p className="text-sm text-gray-600 font-medium mt-1">👤 {partner.user.name}</p>
-                        <p className="text-sm text-gray-500 mt-1">📧 {partner.user.email}</p>
+                        <p className="text-sm text-gray-600 font-medium mt-1">👤 {partner.user?.name || '-'}</p>
+                        <p className="text-sm text-gray-500 mt-1">📧 {partner.user?.email || '-'}</p>
                         <p className="text-xs text-gray-400 mt-1 font-mono">/{partner.storeSlug}</p>
                       </div>
                       <span className={`px-4 py-2 rounded-xl text-sm font-black shadow-md ${
@@ -387,7 +387,7 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="flex justify-between items-center text-sm pt-3 border-t border-gray-200">
                       <span className="text-gray-700 font-bold">💳 수수료: {partner.commissionRate}%</span>
-                      <span className="text-gray-700 font-bold">📦 주문: {partner._count.orders}건</span>
+                      <span className="text-gray-700 font-bold">📦 주문: {partner._count?.orders || 0}건</span>
                     </div>
                   </div>
                 ))}

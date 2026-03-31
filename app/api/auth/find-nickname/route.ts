@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // POST /api/auth/find-nickname - 시큐릿 QR 주소로 닉네임 찾기
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const body = await request.json();
     const { securetQrUrl } = body;

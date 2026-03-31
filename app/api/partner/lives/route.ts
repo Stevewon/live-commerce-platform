@@ -2,11 +2,12 @@
 // 파트너 라이브 관리 API
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
 // GET /api/partner/lives - 내 라이브 목록
 export async function GET(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;
@@ -61,6 +62,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/partner/lives - 라이브 생성
 export async function POST(req: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const tokenResult = await verifyAuthToken(req);
     if (tokenResult instanceof NextResponse) return tokenResult;

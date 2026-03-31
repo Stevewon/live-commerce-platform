@@ -3,15 +3,19 @@
   "version": "1.0.0",
   "description": "큐라이브 분양형 쇼핑몰 플랫폼",
   "scripts": {
-    "dev": "node server.js",
+    "dev": "next dev",
+    "dev:custom": "node server.js",
     "build": "prisma generate && next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -25,21 +29,32 @@
   "license": "ISC",
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/client": "^5.22.0",
+    "@opennextjs/cloudflare": "^1.17.1",
+    "@prisma/adapter-d1": "^6.19.2",
+    "@prisma/client": "^6.19.2",
+    "@tiptap/extension-color": "^3.21.0",
+    "@tiptap/extension-highlight": "^3.21.0",
+    "@tiptap/extension-image": "^3.21.0",
+    "@tiptap/extension-link": "^3.21.0",
+    "@tiptap/extension-text-align": "^3.21.0",
+    "@tiptap/extension-text-style": "^3.21.0",
+    "@tiptap/extension-underline": "^3.21.0",
+    "@tiptap/pm": "^3.21.0",
+    "@tiptap/react": "^3.21.0",
+    "@tiptap/starter-kit": "^3.21.0",
     "@tosspayments/payment-sdk": "^1.9.2",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "^2.4.3",
+    "dotenv": "^17.3.1",
     "jsonwebtoken": "^9.0.2",
     "next": "^15.1.6",
     "next-auth": "^4.24.13",
     "nodemailer": "^7.0.13",
     "postcss": "^8.4.49",
-    "prisma": "^5.22.0",
+    "prisma": "^6.19.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.7.0",
-    "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2"
   },
@@ -51,6 +66,7 @@
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
     "ts-node": "^10.9.2",
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "wrangler": "^4.71.0"
   }
 }

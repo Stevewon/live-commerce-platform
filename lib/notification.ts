@@ -1,7 +1,7 @@
 // 알림 전송 헬퍼 (사용자 설정 확인 포함)
 import { sendEmail } from './email';
 import { sendSMS } from './sms';
-import prisma from './prisma';
+import { getPrisma } from './prisma';
 
 /**
  * 사용자 설정을 확인하고 이메일 전송
@@ -15,7 +15,8 @@ export async function sendEmailWithPreferences(params: {
 }) {
   try {
     // 사용자 알림 설정 조회
-    const preferences = await prisma.userPreferences.findUnique({
+    const prisma = await getPrisma();
+    const preferences = await (prisma as any).userPreferences?.findUnique?.({
       where: { userId: params.userId }
     });
 
@@ -63,7 +64,7 @@ export async function sendSMSWithPreferences(params: {
 }) {
   try {
     // 사용자 알림 설정 조회
-    const preferences = await prisma.userPreferences.findUnique({
+    const preferences = await (prisma as any).userPreferences?.findUnique?.({
       where: { userId: params.userId }
     });
 

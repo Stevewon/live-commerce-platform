@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 
-const prisma = new PrismaClient();
+
 
 // GET: 쿠폰 목록 조회 (관리자)
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 인증 확인
     const authResult = await verifyAuthToken(request);
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
 
 // POST: 쿠폰 생성 (관리자)
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 인증 확인
     const authResult = await verifyAuthToken(request);

@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'qrlive.io', 'www.qrlive.io', 'images.unsplash.com'],
     unoptimized: true,
   },
   typescript: {

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma';
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     // 쿠키에서 토큰 가져오기
     const cookieStore = await cookies()

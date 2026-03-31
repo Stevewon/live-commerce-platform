@@ -1,7 +1,7 @@
 // lib/notifications.ts
 // 알림 발송 헬퍼 함수
 
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 export type NotificationType = 
   | 'ORDER_STATUS' // 주문 상태 변경
@@ -23,6 +23,7 @@ interface SendNotificationParams {
  */
 export async function sendNotification(params: SendNotificationParams) {
   try {
+    const prisma = await getPrisma();
     const notification = await prisma.notification.create({
       data: {
         userId: params.userId,

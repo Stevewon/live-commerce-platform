@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import prisma from '@/lib/prisma';
+import { getPrisma } from '@/lib/prisma';
 
 // 리뷰 생성 (POST)
 export async function POST(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const authResult = await verifyAuthToken(request);
     if (authResult instanceof NextResponse) {
@@ -147,6 +148,7 @@ export async function POST(request: NextRequest) {
 
 // 리뷰 목록 조회 (GET)
 export async function GET(request: NextRequest) {
+  const prisma = await getPrisma();
   try {
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get('productId');
