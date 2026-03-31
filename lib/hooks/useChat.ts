@@ -1,7 +1,7 @@
 'use client';
 
 // lib/hooks/useChat.ts
-// API 폴링 기반 채팅 훅 (Vercel 서버리스 호환)
+// API 폴링 기반 채팅 훅 (Cloudflare Workers 호환)
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 
