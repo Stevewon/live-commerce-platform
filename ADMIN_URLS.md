@@ -40,13 +40,13 @@
 /admin/coupons
 ```
 
-## 🌐 프로덕션 URL (Vercel):
+## 🌐 프로덕션 URL (Cloudflare Workers):
 
 배포 완료 후 다음 형식으로 접근:
 ```
-https://your-domain.vercel.app/admin
-https://your-domain.vercel.app/admin/login
-https://your-domain.vercel.app/admin/dashboard
+https://qrlive.io/admin
+https://qrlive.io/admin/login
+https://qrlive.io/admin/dashboard
 등등...
 ```
 

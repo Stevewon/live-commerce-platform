@@ -218,7 +218,7 @@ npm run dev
 
 ⚠️ **절대 Git에 실제 키를 커밋하지 마세요!**
 - `.env` 파일은 `.gitignore`에 포함되어야 합니다
-- 프로덕션 키는 환경변수로 별도 관리 (Railway, Vercel 등)
+- 프로덕션 키는 환경변수로 별도 관리 (Cloudflare Workers wrangler.jsonc)
 
 ---
 
