@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:custom": "node server.js",
-    "build": "prisma generate && next build",
+    "build": "rm -rf .open-next .next && prisma generate && npx opennextjs-cloudflare build",
+    "build:local": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
