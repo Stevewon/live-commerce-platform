@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('관리자 상품 조회 실패:', error);
     return NextResponse.json(
-      { success: false, error: '상품 조회에 실패했습니다' },
+      { success: false, error: '상품 조회에 실패했습니다', detail: (error as any)?.message || String(error) },
       { status: 500 }
     );
   }
@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: '상품 등록에 실패했습니다' },
+      { success: false, error: '상품 등록에 실패했습니다', detail: error?.message || String(error) },
       { status: 500 }
     );
   }
