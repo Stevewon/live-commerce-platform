@@ -1,27 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPrisma } from '@/lib/prisma';
-import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/auth/jwt'
+import { verifyAuthToken } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   const prisma = await getPrisma();
   try {
-    // 쿠키에서 토큰 가져오기
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth-token')?.value
-
-    if (!token) {
-      return NextResponse.json(
-        { error: '인증이 필요합니다' },
-        { status: 401 }
-      )
-    }
-
-    const decoded = verifyToken(token)
-    if (!decoded || decoded.role !== 'ADMIN') {
+    const authResult = await verifyAuthToken(request);
+    if (authResult instanceof NextResponse) return authResult;
+    if (authResult.role !== 'ADMIN') {
       return NextResponse.json(
         { error: '관리자 권한이 필요합니다' },
-        { status: 401 }
+        { status: 403 }
       )
     }
 
