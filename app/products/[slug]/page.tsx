@@ -1,32 +1,28 @@
 import type { Metadata } from 'next';
+import { getPrisma } from '@/lib/prisma';
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
-// SSR metadata for SEO (OG + Twitter Cards)
+// SSR metadata for SEO (OG + Twitter Cards) - DB 직접 조회
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';
 
   try {
-    const res = await fetch(`${baseUrl}/api/products?slug=${slug}`, {
-      next: { revalidate: 300 }, // 5분 캐시
+    const prisma = await getPrisma();
+    const product = await prisma.product.findFirst({
+      where: { slug: decodedSlug, isActive: true },
+      include: {
+        category: { select: { name: true } },
+      },
     });
-
-    if (!res.ok) {
-      return {
-        title: '상품을 찾을 수 없습니다',
-        description: 'QRLIVE 쇼핑몰에서 다양한 상품을 만나보세요.',
-      };
-    }
-
-    const data = await res.json();
-    const product = data.data?.[0];
 
     if (!product) {
       return {
-        title: '상품을 찾을 수 없습니다',
+        title: '상품을 찾을 수 없습니다 | QRLIVE',
         description: 'QRLIVE 쇼핑몰에서 다양한 상품을 만나보세요.',
       };
     }
