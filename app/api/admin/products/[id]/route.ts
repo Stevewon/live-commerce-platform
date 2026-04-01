@@ -65,7 +65,7 @@ export async function GET(
   } catch (error) {
     console.error('상품 조회 실패:', error);
     return NextResponse.json(
-      { success: false, error: '상품 조회에 실패했습니다' },
+      { success: false, error: '상품 조회에 실패했습니다', detail: (error as any)?.message || String(error) },
       { status: 500 }
     );
   }
@@ -212,7 +212,7 @@ export async function PATCH(
   } catch (error) {
     console.error('상품 수정 실패:', error);
     return NextResponse.json(
-      { success: false, error: '상품 수정에 실패했습니다' },
+      { success: false, error: '상품 수정에 실패했습니다', detail: (error as any)?.message || String(error) },
       { status: 500 }
     );
   }
@@ -281,7 +281,7 @@ export async function DELETE(
   } catch (error) {
     console.error('상품 삭제 실패:', error);
     return NextResponse.json(
-      { success: false, error: '상품 삭제에 실패했습니다' },
+      { success: false, error: '상품 삭제에 실패했습니다', detail: (error as any)?.message || String(error) },
       { status: 500 }
     );
   }

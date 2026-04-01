@@ -80,7 +80,7 @@ function convertRow(row: any): any {
   for (const [key, value] of Object.entries(row)) {
     // SQLite stores booleans as 0/1
     if (key === 'isActive' || key === 'isFeatured' || key === 'isLive' || 
-        key === 'isRead' || key === 'isDeleted' || key === 'isReported') {
+        key === 'isRead' || key === 'isDeleted' || key === 'isReported' || key === 'hasOptions') {
       result[key] = value === 1 || value === true;
     } else {
       result[key] = value;
@@ -296,12 +296,49 @@ function createModelProxy(db: D1DB, tableName: string) {
         // Nothing to update, just return current
         const selectSql = `SELECT * FROM "${tableName}"${w.sql} LIMIT 1`;
         const row = await db.prepare(selectSql).bind(...w.params).first();
-        return convertRow(row);
+        let result = convertRow(row);
+        if (args?.include && result) {
+          const rows = await resolveIncludes(db, tableName, [result], args.include);
+          result = rows[0];
+        }
+        return result;
       }
       
       const sql = `UPDATE "${tableName}" SET ${setClauses.join(', ')}${w.sql} RETURNING *`;
       const result = await db.prepare(sql).bind(...setValues, ...w.params).first();
-      return convertRow(result);
+      let updatedRow = convertRow(result);
+      
+      // Handle includes
+      if (args?.include && updatedRow) {
+        const relations = RELATIONS[tableName] || {};
+        for (const [relName, relConfig] of Object.entries(args.include)) {
+          if (!relConfig) continue;
+          const rel = relations[relName];
+          if (!rel) continue;
+          if (rel.type === 'one') {
+            const fkValue = updatedRow[rel.foreignKey];
+            if (fkValue) {
+              const selectFields = typeof relConfig === 'object' && (relConfig as any).select
+                ? Object.keys((relConfig as any).select).map(f => `"${f}"`).join(', ')
+                : '*';
+              const related = await db.prepare(`SELECT ${selectFields} FROM "${rel.table}" WHERE "id" = ? LIMIT 1`).bind(fkValue).first();
+              updatedRow[relName] = related ? convertRow(related) : null;
+            } else {
+              updatedRow[relName] = null;
+            }
+          } else {
+            const related = await db.prepare(`SELECT * FROM "${rel.table}" WHERE "${rel.foreignKey}" = ?`).bind(updatedRow.id).all();
+            let relRows = (related.results || []).map(convertRow);
+            // Nested includes
+            if (typeof relConfig === 'object' && (relConfig as any).include) {
+              relRows = await resolveIncludes(db, rel.table, relRows, (relConfig as any).include);
+            }
+            updatedRow[relName] = relRows;
+          }
+        }
+      }
+      
+      return updatedRow;
     },
     
     async delete(args: any) {
@@ -437,6 +474,16 @@ function createModelProxy(db: D1DB, tableName: string) {
       return { count: result.meta.changes };
     },
 
+    async createMany(args: any) {
+      const items = args.data || [];
+      const results: any[] = [];
+      for (const item of items) {
+        const row = await createModelProxy(db, tableName).create({ data: item });
+        results.push(row);
+      }
+      return { count: results.length };
+    },
+
     async upsert(args: any) {
       const w = buildWhere(args.where);
       const sql = `SELECT * FROM "${tableName}"${w.sql} LIMIT 1`;
@@ -461,9 +508,15 @@ const RELATIONS: Record<string, Record<string, { table: string; foreignKey: stri
   },
   Product: {
     category: { table: 'Category', foreignKey: 'categoryId', type: 'one' },
+    variants: { table: 'ProductVariant', foreignKey: 'productId', type: 'many' },
     partnerProducts: { table: 'PartnerProduct', foreignKey: 'productId', type: 'many' },
     reviews: { table: 'Review', foreignKey: 'productId', type: 'many' },
     orderItems: { table: 'OrderItem', foreignKey: 'productId', type: 'many' },
+  },
+  ProductVariant: {
+    product: { table: 'Product', foreignKey: 'productId', type: 'one' },
+    orderItems: { table: 'OrderItem', foreignKey: 'variantId', type: 'many' },
+    cartItems: { table: 'CartItem', foreignKey: 'variantId', type: 'many' },
   },
   Partner: {
     user: { table: 'User', foreignKey: 'userId', type: 'one' },
@@ -605,6 +658,7 @@ function createDbProxy(db: D1DB) {
     coupon: 'Coupon',
     notification: 'Notification',
     liveChat: 'LiveChat',
+    productVariant: 'ProductVariant',
   };
   
   const proxy: any = {
