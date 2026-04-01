@@ -41,6 +41,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // 파트너 활성화 상태 확인
+    if (!partner.isActive) {
+      return NextResponse.json(
+        { error: '파트너 승인 대기 중입니다. 관리자 승인 후 이용 가능합니다.' },
+        { status: 403 }
+      )
+    }
+
     const partnerProducts = await prisma.partnerProduct.findMany({
       where: { partnerId: partner.id },
       include: {
@@ -83,6 +91,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: '파트너 정보를 찾을 수 없습니다' },
         { status: 404 }
+      )
+    }
+
+    // 파트너 활성화 상태 확인
+    if (!partner.isActive) {
+      return NextResponse.json(
+        { error: '파트너 승인 대기 중입니다. 관리자 승인 후 이용 가능합니다.' },
+        { status: 403 }
       )
     }
 

@@ -32,6 +32,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 파트너 활성화 상태 확인
+    if (!partner.isActive) {
+      return NextResponse.json(
+        { success: false, error: '파트너 승인 대기 중입니다. 관리자 승인 후 이용 가능합니다.' },
+        { status: 403 }
+      );
+    }
+
     const partnerId = partner.id;
 
     // 파트너의 총 주문 통계
@@ -59,9 +67,12 @@ export async function GET(request: NextRequest) {
       .filter(s => s.status === 'COMPLETED')
       .reduce((sum, settlement) => sum + settlement.amount, 0);
 
-    // 오늘 매출
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // 오늘 매출 (한국 시간 기준)
+    const now = new Date();
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstNow = new Date(now.getTime() + kstOffset);
+    const today = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate());
+    today.setTime(today.getTime() - kstOffset);
     const todaySales = orders
       .filter(order => new Date(order.createdAt) >= today)
       .reduce((sum, order) => sum + order.total, 0);

@@ -32,6 +32,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 파트너 활성화 상태 확인
+    if (!partner.isActive) {
+      return NextResponse.json(
+        { success: false, error: '파트너 승인 대기 중입니다. 관리자 승인 후 이용 가능합니다.' },
+        { status: 403 }
+      );
+    }
+
     // 파트너의 주문 목록 조회
     const orders = await prisma.order.findMany({
       where: {

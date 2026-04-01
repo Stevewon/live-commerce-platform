@@ -33,6 +33,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // 파트너 활성화 상태 확인
+    if (!partner.isActive) {
+      return NextResponse.json(
+        { success: false, error: '파트너 승인 대기 중입니다. 관리자 승인 후 이용 가능합니다.' },
+        { status: 403 }
+      );
+    }
+
     // 라이브 목록 조회
     const lives = await prisma.liveStream.findMany({
       where: { partnerId: partner.id },
@@ -85,6 +93,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { success: false, error: '파트너 정보를 찾을 수 없습니다' },
         { status: 404 }
+      );
+    }
+
+    // 파트너 활성화 상태 확인
+    if (!partner.isActive) {
+      return NextResponse.json(
+        { success: false, error: '파트너 승인 대기 중입니다. 관리자 승인 후 이용 가능합니다.' },
+        { status: 403 }
       );
     }
 

@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
         storeSlug: `store-${decoded.userId.substring(0, 8)}`,
         description: '테스트 파트너 스토어입니다.',
         commissionRate: 30.0,
-        isActive: true,
+        isActive: false, // 관리자 승인 전까지 비활성화
       },
     });
 

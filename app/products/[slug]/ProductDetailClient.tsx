@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { addToGuestCart } from '@/lib/utils/guestCart';
@@ -79,8 +79,13 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function ProductDetailClient() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const slug = params.slug as string;
+
+  // 파트너 스토어를 통한 접속인지 확인
+  const storeSlug = searchParams.get('store');
+  const partnerId = searchParams.get('partner');
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +106,12 @@ export default function ProductDetailClient() {
       const res = await fetch(`/api/products?slug=${slug}`);
       const data = await res.json();
       if (data.success && data.data?.length > 0) {
-        setProduct(data.data[0]);
+        const p = data.data[0];
+        // Ensure reviews and partnerProducts are always arrays
+        if (!Array.isArray(p.reviews)) p.reviews = [];
+        if (!Array.isArray(p.partnerProducts)) p.partnerProducts = [];
+        if (!Array.isArray(p.variants)) p.variants = [];
+        setProduct(p);
       } else {
         setError('상품을 찾을 수 없습니다.');
       }
@@ -180,9 +190,10 @@ export default function ProductDetailClient() {
     : 0;
   const shippingFree = currentPrice * quantity >= 50000;
 
-  // Average rating
-  const avgRating = product.reviews.length > 0
-    ? (product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length).toFixed(1)
+  // Average rating - safely handle reviews possibly being undefined or not an array
+  const safeReviews = Array.isArray(product.reviews) ? product.reviews : [];
+  const avgRating = safeReviews.length > 0
+    ? (safeReviews.reduce((s, r) => s + (r.rating || 0), 0) / safeReviews.length).toFixed(1)
     : null;
 
   const handleAddToCart = async () => {
@@ -203,6 +214,13 @@ export default function ProductDetailClient() {
           }),
         });
         if (res.ok) {
+          // 파트너 스토어 경유 시 partnerId를 sessionStorage에 저장
+          if (partnerId) {
+            sessionStorage.setItem('checkout_partnerId', partnerId);
+            if (storeSlug) {
+              sessionStorage.setItem('checkout_storeSlug', storeSlug);
+            }
+          }
           setCartMessage('장바구니에 추가되었습니다!');
         } else {
           setCartMessage('장바구니 추가에 실패했습니다.');
@@ -223,6 +241,13 @@ export default function ProductDetailClient() {
           },
           addedAt: new Date().toISOString(),
         });
+        // 파트너 스토어 경유 시 partnerId를 sessionStorage에 저장
+        if (partnerId) {
+          sessionStorage.setItem('checkout_partnerId', partnerId);
+          if (storeSlug) {
+            sessionStorage.setItem('checkout_storeSlug', storeSlug);
+          }
+        }
         setCartMessage('장바구니에 추가되었습니다!');
       }
     } catch {
@@ -241,8 +266,8 @@ export default function ProductDetailClient() {
   const tabs = [
     { id: 'detail' as const, label: '상세정보' },
     { id: 'specs' as const, label: '상품정보' },
-    { id: 'sellers' as const, label: `판매자 (${product.partnerProducts.length})` },
-    { id: 'reviews' as const, label: `리뷰 (${product.reviews.length})` },
+    { id: 'sellers' as const, label: `판매자 (${(product.partnerProducts || []).length})` },
+    { id: 'reviews' as const, label: `리뷰 (${safeReviews.length})` },
     { id: 'qna' as const, label: 'Q&A' },
   ];
 
@@ -251,6 +276,22 @@ export default function ProductDetailClient() {
       <ShopNavigation />
 
       <div className="max-w-6xl mx-auto px-4 py-4 sm:py-8">
+        {/* 파트너 스토어 경유 배너 */}
+        {storeSlug && (
+          <div className="mb-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-lg">🏪</span>
+              <span className="text-blue-700 font-medium">파트너 스토어를 통해 접속하셨습니다</span>
+            </div>
+            <Link
+              href={`/store/${storeSlug}`}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
+            >
+              스토어로 돌아가기 &rarr;
+            </Link>
+          </div>
+        )}
+
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-500 mb-4 flex items-center gap-2">
           <Link href="/" className="hover:text-gray-700">홈</Link>
@@ -325,7 +366,7 @@ export default function ProductDetailClient() {
                   {'★'.repeat(Math.round(Number(avgRating)))}
                   {'☆'.repeat(5 - Math.round(Number(avgRating)))}
                 </div>
-                <span className="text-sm text-gray-600">{avgRating} ({product.reviews.length}개 리뷰)</span>
+                <span className="text-sm text-gray-600">{avgRating} ({safeReviews.length}개 리뷰)</span>
               </div>
             )}
 
@@ -627,7 +668,7 @@ export default function ProductDetailClient() {
             {/* Sellers tab */}
             {activeTab === 'sellers' && (
               <div>
-                {product.partnerProducts.length === 0 ? (
+                {(!product.partnerProducts || product.partnerProducts.length === 0) ? (
                   <p className="text-gray-500 text-center py-8">등록된 판매자가 없습니다.</p>
                 ) : (
                   <div className="space-y-4">
@@ -654,15 +695,25 @@ export default function ProductDetailClient() {
 
             {/* Reviews tab */}
             {activeTab === 'reviews' && (
-              <ProductReviews productId={product.id} initialReviews={product.reviews} />
+              <ProductReviews productId={product.id} initialReviews={safeReviews} />
             )}
 
             {/* Q&A tab */}
             {activeTab === 'qna' && (
-              <div className="text-center py-12 text-gray-400">
-                <span className="text-5xl block mb-4">💬</span>
-                <p className="text-lg font-medium text-gray-500 mb-2">Q&A 서비스 준비 중</p>
-                <p className="text-sm">상품에 대한 궁금한 점은 고객센터로 문의해주세요.</p>
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-900">상품 Q&A</h2>
+                </div>
+                <div className="text-center py-12 text-gray-400">
+                  <span className="text-5xl block mb-4">💬</span>
+                  <p className="text-lg font-medium text-gray-500 mb-2">등록된 Q&A가 없습니다</p>
+                  <p className="text-sm mb-6">상품에 대한 궁금한 점은 고객센터로 문의해주세요.</p>
+                  <div className="bg-gray-50 rounded-lg p-4 max-w-sm mx-auto text-left">
+                    <p className="text-sm font-medium text-gray-700 mb-2">📞 고객센터</p>
+                    <p className="text-sm text-gray-600">전화: 02-1551-4220</p>
+                    <p className="text-xs text-gray-400 mt-1">평일 10:00 ~ 18:00 (점심 12:00 ~ 13:00)</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

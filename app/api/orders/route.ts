@@ -154,6 +154,9 @@ export async function POST(req: NextRequest) {
       price: number;
     }> = [];
 
+    // 파트너 스토어를 통한 주문인 경우 partnerId 확인
+    const { partnerId: requestPartnerId } = body;
+
     for (const item of items) {
       const product = products.find(p => p.id === item.productId);
       if (!product) {
@@ -178,6 +181,21 @@ export async function POST(req: NextRequest) {
         quantity: item.quantity,
         price: product.price
       });
+    }
+
+    // partnerId 결정: 요청에서 전달 or 상품의 파트너 제품에서 자동 매칭
+    let partnerId: string | null = requestPartnerId || null;
+    if (!partnerId && productIds.length > 0) {
+      // 상품이 파트너 제품에 등록되어 있으면 해당 파트너를 자동 매칭
+      const partnerProduct = await prisma.partnerProduct.findFirst({
+        where: { 
+          productId: { in: productIds },
+          isActive: true
+        }
+      });
+      if (partnerProduct) {
+        partnerId = partnerProduct.partnerId;
+      }
     }
 
     // 쿠폰 처리
@@ -255,6 +273,19 @@ export async function POST(req: NextRequest) {
       if (shippingZipCode) orderData.shippingZipCode = shippingZipCode;
       if (shippingMemo) orderData.shippingMemo = shippingMemo;
       if (couponId) orderData.couponId = couponId;
+      
+      // 파트너 연결 및 수익 계산
+      if (partnerId) {
+        const partner = await tx.partner.findUnique({
+          where: { id: partnerId }
+        });
+        if (partner && partner.isActive) {
+          orderData.partnerId = partnerId;
+          const commissionRate = partner.commissionRate || 30;
+          orderData.partnerRevenue = Math.round(total * (commissionRate / 100));
+          orderData.platformRevenue = total - orderData.partnerRevenue;
+        }
+      }
 
       const newOrder = await tx.order.create({
         data: orderData,
@@ -394,31 +425,75 @@ export async function GET(req: NextRequest) {
     }
     const { userId } = authResult;
 
-    const orders = await prisma.order.findMany({
-      where: { userId },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: { category: true }
+    // 페이지네이션 파라미터
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = (page - 1) * limit;
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          total: true,
+          subtotal: true,
+          shippingFee: true,
+          discount: true,
+          shippingName: true,
+          shippingPhone: true,
+          shippingAddress: true,
+          shippingZipCode: true,
+          shippingMemo: true,
+          paymentMethod: true,
+          paidAt: true,
+          createdAt: true,
+          updatedAt: true,
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              quantity: true,
+              price: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  thumbnail: true,
+                  category: {
+                    select: { name: true }
+                  }
+                }
+              }
+            }
+          },
+          review: {
+            select: {
+              id: true,
+              rating: true
             }
           }
         },
-        review: {
-          select: {
-            id: true,
-            rating: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip: offset,
+        take: limit
+      }),
+      prisma.order.count({ where: { userId } })
+    ]);
 
     return NextResponse.json({
       success: true,
-      data: orders
+      data: orders,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
     });
   } catch (error: any) {
     console.error('Get orders error:', error);

@@ -1,7 +1,7 @@
 'use client';
 import { useAuth } from '@/lib/contexts/AuthContext'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ReviewForm from '@/components/ReviewForm';
@@ -60,15 +60,40 @@ export default function OrdersPage() {
   // 인증 체크
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/partner/login');
+      router.push('/login');
     }
   }, [authLoading, user, router]);
 
+  const loadOrders = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/orders', {
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '주문 내역을 불러오는데 실패했습니다');
+      }
+
+      setOrders(data.data || []);
+      setFilteredOrders(data.data || []);
+    } catch (err: any) {
+      console.error('Load orders error:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (user && token) {
+    if (user) {
       loadOrders();
     }
-  }, [user, token]);
+  }, [user, loadOrders]);
 
   useEffect(() => {
     if (filterStatus === 'all') {
@@ -78,46 +103,16 @@ export default function OrdersPage() {
     }
   }, [filterStatus, orders]);
 
-  const loadOrders = async () => {
-    if (!token) return;
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/orders', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '주문 내역을 불러오는데 실패했습니다');
-      }
-
-      setOrders(data.orders || []);
-      setFilteredOrders(data.orders || []);
-    } catch (err: any) {
-      console.error('Load orders error:', err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const cancelOrder = async (orderId: string) => {
-    if (!token) return;
     if (!confirm('정말로 이 주문을 취소하시겠습니까?')) return;
 
     try {
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ status: 'CANCELLED' })
       });
 

@@ -28,18 +28,17 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
       setLoading(true);
       setError('');
 
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/reviews', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           orderId,
           productId,
           rating,
-          content
+          comment: content,
         })
       });
 

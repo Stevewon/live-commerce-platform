@@ -9,7 +9,7 @@ import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 
 interface RichEditorProps {
   content: string
@@ -155,6 +155,13 @@ export default function RichEditor({ content, onChange, placeholder }: RichEdito
       },
     },
   })
+
+  // 외부에서 content prop이 변경되면 에디터 내용 동기화 (edit 모드에서 초기 데이터 로드 시)
+  useEffect(() => {
+    if (editor && content && editor.getHTML() !== content) {
+      editor.commands.setContent(content)
+    }
+  }, [editor, content])
 
   const handleImageUpload = async () => {
     fileRef.current?.click()

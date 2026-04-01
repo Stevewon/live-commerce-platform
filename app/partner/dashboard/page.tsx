@@ -36,6 +36,7 @@ export default function PartnerDashboardPage() {
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [pendingApproval, setPendingApproval] = useState(false)
 
   useEffect(() => {
     if (user && user.role === 'PARTNER') {
@@ -52,6 +53,12 @@ export default function PartnerDashboardPage() {
       const data = await res.json()
 
       if (!res.ok) {
+        // 파트너 승인 대기 상태 체크
+        if (res.status === 403 && data.error?.includes('승인 대기')) {
+          setPendingApproval(true)
+          setLoading(false)
+          return
+        }
         throw new Error(data.error || '데이터 로드 실패')
       }
 
@@ -117,6 +124,52 @@ export default function PartnerDashboardPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 파트너 승인 대기 화면
+  if (pendingApproval) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center">
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="text-6xl mb-4">⏳</div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">관리자 승인 대기 중</h1>
+            <p className="text-gray-600 mb-6">
+              파트너 등록이 완료되었습니다.<br />
+              관리자 승인 후 대시보드와 스토어 기능을 이용하실 수 있습니다.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+              <h3 className="font-semibold text-blue-800 mb-2">승인 절차 안내</h3>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>1. 관리자가 파트너 신청 내용을 검토합니다</li>
+                <li>2. 승인 완료 시 스토어가 활성화됩니다</li>
+                <li>3. 제품 선택 및 판매를 시작할 수 있습니다</li>
+              </ul>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+              >
+                승인 상태 새로고침
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition"
+              >
+                로그아웃
+              </button>
+              <Link
+                href="/"
+                className="block w-full py-3 px-4 text-gray-500 text-sm hover:text-gray-700 transition"
+              >
+                홈으로 돌아가기
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     )

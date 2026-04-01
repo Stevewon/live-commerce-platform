@@ -190,6 +190,10 @@ export default function AdminDashboardPage() {
               <span className="text-2xl group-hover:scale-110 transition-transform">🛍️</span>
               <span>상품 관리</span>
             </Link>
+            <Link href="/admin/reports" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
+              <span className="text-2xl group-hover:scale-110 transition-transform">📈</span>
+              <span>매출 리포트</span>
+            </Link>
           </div>
         </div>
 
@@ -397,7 +401,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6 mt-8">
           <Link href="/admin/partners" className="group bg-gradient-to-br from-white to-emerald-50 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all text-center border-2 border-transparent hover:border-emerald-300 hover:scale-105 duration-300">
             <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">🤝</div>
             <h3 className="font-black text-xl text-gray-900">파트너 관리</h3>
@@ -420,6 +424,18 @@ export default function AdminDashboardPage() {
             <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">💰</div>
             <h3 className="font-black text-xl text-gray-900">정산 관리</h3>
             <p className="text-sm text-gray-500 mt-2">Settlement Management</p>
+          </Link>
+          
+          <Link href="/admin/reports" className="group bg-gradient-to-br from-white to-indigo-50 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all text-center border-2 border-transparent hover:border-indigo-300 hover:scale-105 duration-300">
+            <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">📈</div>
+            <h3 className="font-black text-xl text-gray-900">매출 리포트</h3>
+            <p className="text-sm text-gray-500 mt-2">Sales Reports</p>
+          </Link>
+          
+          <Link href="/admin/reports" className="group bg-gradient-to-br from-white to-indigo-50 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all text-center border-2 border-transparent hover:border-indigo-300 hover:scale-105 duration-300">
+            <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">📈</div>
+            <h3 className="font-black text-xl text-gray-900">매출 리포트</h3>
+            <p className="text-sm text-gray-500 mt-2">Sales & Cancellation Reports</p>
           </Link>
         </div>
       </div>
