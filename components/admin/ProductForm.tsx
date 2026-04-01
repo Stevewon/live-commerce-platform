@@ -198,14 +198,15 @@ export default function ProductForm({ mode, initialData }: Props) {
     }
   }
 
-  // Auto-generate slug from name
+  // Auto-generate slug from name (영문/숫자 only)
   const generateSlug = (name: string) => {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9가-힣\s-]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '')
+      || 'product'
   }
 
   const handleNameChange = (name: string) => {

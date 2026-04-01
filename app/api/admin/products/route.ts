@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     }
 
     // slug 자동 생성 (제공되지 않은 경우)
-    const productSlug = slug || name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '-' + Date.now();
+    const productSlug = slug || (name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'product') + '-' + Date.now();
 
     // 상품 생성
     const product = await prisma.product.create({
