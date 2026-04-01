@@ -26,6 +26,45 @@ function buildWhere(where: any): { sql: string; params: any[] } {
   
   for (const [key, value] of Object.entries(where)) {
     if (value === undefined) continue;
+    
+    // OR 조건 처리
+    if (key === 'OR' && Array.isArray(value)) {
+      const orParts: string[] = [];
+      for (const orItem of value) {
+        const sub = buildWhere(orItem);
+        if (sub.sql) {
+          orParts.push(sub.sql.replace(' WHERE ', ''));
+          params.push(...sub.params);
+        }
+      }
+      if (orParts.length > 0) {
+        conditions.push(`(${orParts.join(' OR ')})`);
+      }
+      continue;
+    }
+    
+    // AND 조건 처리
+    if (key === 'AND' && Array.isArray(value)) {
+      for (const andItem of value) {
+        const sub = buildWhere(andItem);
+        if (sub.sql) {
+          conditions.push(sub.sql.replace(' WHERE ', ''));
+          params.push(...sub.params);
+        }
+      }
+      continue;
+    }
+    
+    // NOT 조건 처리
+    if (key === 'NOT') {
+      const sub = buildWhere(value as any);
+      if (sub.sql) {
+        conditions.push(`NOT (${sub.sql.replace(' WHERE ', '')})`);
+        params.push(...sub.params);
+      }
+      continue;
+    }
+    
     if (value === null) {
       conditions.push(`"${key}" IS NULL`);
     } else if (typeof value === 'object' && value !== null) {
@@ -37,18 +76,34 @@ function buildWhere(where: any): { sql: string; params: any[] } {
         const placeholders = obj.in.map(() => '?').join(',');
         conditions.push(`"${key}" IN (${placeholders})`);
         params.push(...obj.in);
+      } else if ('gt' in obj) {
+        conditions.push(`"${key}" > ?`);
+        params.push(obj.gt);
       } else if ('gte' in obj) {
         conditions.push(`"${key}" >= ?`);
         params.push(obj.gte);
+      } else if ('lt' in obj) {
+        conditions.push(`"${key}" < ?`);
+        params.push(obj.lt);
       } else if ('lte' in obj) {
         conditions.push(`"${key}" <= ?`);
         params.push(obj.lte);
       } else if ('not' in obj) {
-        conditions.push(`"${key}" != ?`);
-        params.push(obj.not);
+        if (obj.not === null) {
+          conditions.push(`"${key}" IS NOT NULL`);
+        } else {
+          conditions.push(`"${key}" != ?`);
+          params.push(obj.not);
+        }
       } else if ('mode' in obj && 'contains' in obj) {
         conditions.push(`"${key}" LIKE ?`);
         params.push(`%${obj.contains}%`);
+      } else {
+        // 복합 조건 (예: price: { gte: 10, lte: 100 })
+        if ('gte' in obj) { conditions.push(`"${key}" >= ?`); params.push(obj.gte); }
+        if ('gt' in obj) { conditions.push(`"${key}" > ?`); params.push(obj.gt); }
+        if ('lte' in obj) { conditions.push(`"${key}" <= ?`); params.push(obj.lte); }
+        if ('lt' in obj) { conditions.push(`"${key}" < ?`); params.push(obj.lt); }
       }
     } else {
       conditions.push(`"${key}" = ?`);
@@ -117,6 +172,29 @@ function createModelProxy(db: D1DB, tableName: string) {
       
       const result = await db.prepare(sql).bind(...params).all();
       let rows = (result.results || []).map(convertRow);
+      
+      // distinct 처리
+      if (args?.distinct && Array.isArray(args.distinct)) {
+        const seen = new Set();
+        rows = rows.filter((row: any) => {
+          const key = args.distinct.map((f: string) => row[f]).join('|');
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+      
+      // select 처리
+      if (args?.select) {
+        const selectKeys = Object.keys(args.select).filter(k => args.select[k]);
+        rows = rows.map((row: any) => {
+          const picked: any = {};
+          for (const k of selectKeys) {
+            if (k in row) picked[k] = row[k];
+          }
+          return picked;
+        });
+      }
       
       // Handle includes (basic relations)
       if (args?.include) {
