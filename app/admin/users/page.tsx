@@ -33,7 +33,7 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     if (!authLoading && (!currentUser || currentUser.role !== 'ADMIN')) {
-      router.push('/partner/login');
+      router.push('/admin/login');
       return;
     }
 

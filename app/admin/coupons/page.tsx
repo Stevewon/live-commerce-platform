@@ -54,7 +54,7 @@ export default function AdminCouponsPage() {
   // 인증 확인
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'ADMIN')) {
-      router.push('/login');
+      router.push('/admin/login');
     }
   }, [user, authLoading, router]);
 

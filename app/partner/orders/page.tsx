@@ -1,5 +1,4 @@
 'use client';
-import { useAuth } from '@/lib/contexts/AuthContext'
 
 import { useEffect, useState } from 'react';
 import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth';
@@ -52,11 +51,6 @@ export default function PartnerOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'PARTNER')) {
-    }
-  }, [user, authLoading, router]);
 
   useEffect(() => {
     if (user && user.role === 'PARTNER') {
