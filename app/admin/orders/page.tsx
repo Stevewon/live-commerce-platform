@@ -66,7 +66,7 @@ const STATUS_ICONS: Record<string, string> = {
 };
 
 export default function AdminOrdersPage() {
-  const { user, loading: authLoading, logout } = useAdminAuth()
+  const { user, loading: authLoading } = useAdminAuth()
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
@@ -108,8 +108,8 @@ export default function AdminOrdersPage() {
       if (!res.ok) throw new Error('주문 목록 로드 실패');
 
       const data = await res.json();
-      setOrders(data.orders);
-      setPagination(data.pagination);
+      setOrders(data.orders || []);
+      if (data.pagination) setPagination(data.pagination);
     } catch (error) {
       console.error('Load orders error:', error);
       alert('주문 목록을 불러오는데 실패했습니다');
@@ -397,10 +397,10 @@ export default function AdminOrdersPage() {
                       <td className="px-8 py-6">
                         <div>
                           <div className="text-base font-black text-gray-900">
-                            {order.user.name}
+                            {order.user?.name || '미설정'}
                           </div>
                           <div className="text-sm text-gray-600 font-medium mt-1">
-                            📧 {order.user.email}
+                            📧 {order.user?.email || '-'}
                           </div>
                         </div>
                       </td>
@@ -530,11 +530,11 @@ export default function AdminOrdersPage() {
                 <div className="space-y-3 text-base">
                   <div className="flex justify-between items-center bg-white rounded-xl p-4">
                     <span className="text-gray-600 font-bold">이름:</span>
-                    <span className="font-black text-gray-900">{selectedOrder.user.name}</span>
+                    <span className="font-black text-gray-900">{selectedOrder.user?.name || '미설정'}</span>
                   </div>
                   <div className="flex justify-between items-center bg-white rounded-xl p-4">
                     <span className="text-gray-600 font-bold">이메일:</span>
-                    <span className="font-bold text-gray-700">{selectedOrder.user.email}</span>
+                    <span className="font-bold text-gray-700">{selectedOrder.user?.email || '-'}</span>
                   </div>
                 </div>
               </div>

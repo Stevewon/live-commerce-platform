@@ -259,8 +259,29 @@ export default function ProductDetailClient() {
   };
 
   const handleBuyNow = async () => {
-    await handleAddToCart();
-    router.push('/checkout');
+    // 바로구매: 장바구니에 넣지 않고 sessionStorage에 바로구매 상품만 저장 후 checkout으로 이동
+    const buyNowItem = {
+      productId: product.id,
+      quantity,
+      variantId: selectedVariant?.id || null,
+      product: {
+        id: product.id,
+        name: product.name,
+        price: currentPrice,
+        thumbnail: product.thumbnail,
+      },
+    };
+    try {
+      sessionStorage.setItem('buyNowItem', JSON.stringify(buyNowItem));
+      // 파트너 스토어 경유 시 partnerId를 sessionStorage에 저장
+      if (partnerId) {
+        sessionStorage.setItem('checkout_partnerId', partnerId);
+        if (storeSlug) {
+          sessionStorage.setItem('checkout_storeSlug', storeSlug);
+        }
+      }
+    } catch {}
+    router.push('/checkout?mode=buynow');
   };
 
   const tabs = [

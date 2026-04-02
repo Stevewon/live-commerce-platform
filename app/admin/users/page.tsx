@@ -8,8 +8,9 @@ import Link from 'next/link';
 
 interface User {
   id: string;
-  email: string;
-  name: string;
+  email: string | null;
+  nickname: string | null;
+  name: string | null;
   phone: string | null;
   role: 'CUSTOMER' | 'PARTNER' | 'ADMIN';
   emailVerified: boolean | null;
@@ -144,7 +145,7 @@ export default function AdminUsersPage() {
       
       switch (sortBy) {
         case 'name':
-          comparison = a.name.localeCompare(b.name);
+          comparison = (a.name || a.nickname || '').localeCompare(b.name || b.nickname || '');
           break;
         case 'date':
           comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -158,9 +159,13 @@ export default function AdminUsersPage() {
     });
   };
 
+  const getDisplayName = (u: User) => u.name || u.nickname || u.email || '미설정';
+
   const filteredUsers = getSortedUsers(users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const displayName = getDisplayName(user);
+    const email = user.email || '';
+    const matchesSearch = displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   }));
@@ -191,10 +196,10 @@ export default function AdminUsersPage() {
             <div className="flex items-center space-x-4">
               <div className="text-right">
                 <div className="text-sm text-gray-500">관리자</div>
-                <div className="text-lg font-semibold text-gray-900">{currentUser?.name}</div>
+                <div className="text-lg font-semibold text-gray-900">{currentUser?.name || currentUser?.nickname || ''}</div>
               </div>
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                {currentUser?.name?.charAt(0)}
+                {(currentUser?.name || currentUser?.nickname || 'A').charAt(0)}
               </div>
             </div>
           </div>
@@ -451,15 +456,15 @@ export default function AdminUsersPage() {
                           <div className="flex-shrink-0">
                             <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center shadow-lg">
                               <span className="text-white font-bold text-lg">
-                                {user.name.charAt(0)}
+                                {(getDisplayName(user)).charAt(0)}
                               </span>
                             </div>
                           </div>
                           <div>
-                            <div className="text-base font-bold text-gray-900">{user.name}</div>
+                            <div className="text-base font-bold text-gray-900">{getDisplayName(user)}</div>
                             <div className="text-sm text-gray-500 flex items-center">
                               <span className="mr-2">✉️</span>
-                              {user.email}
+                              {user.email || '-'}
                             </div>
                           </div>
                         </div>
