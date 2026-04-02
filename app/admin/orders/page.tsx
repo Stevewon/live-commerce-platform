@@ -80,6 +80,7 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [trackingCompany, setTrackingCompany] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (user && user.role === 'ADMIN') {
@@ -151,6 +152,46 @@ export default function AdminOrdersPage() {
     e.preventDefault();
     setPagination({ ...pagination, page: 1 });
     loadOrders();
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      setExporting(true);
+
+      const params = new URLSearchParams();
+      if (statusFilter !== 'ALL') params.append('status', statusFilter);
+      if (searchQuery) params.append('search', searchQuery);
+
+      const res = await fetch(`/api/admin/orders/export?${params}`, {
+        credentials: 'include',
+      });
+
+      if (!res.ok) throw new Error('다운로드 실패');
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Content-Disposition 헤더에서 파일명 추출
+      const disposition = res.headers.get('Content-Disposition');
+      let fileName = `orders_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`;
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) fileName = match[1];
+      }
+
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('주문 목록 다운로드에 실패했습니다.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const formatCurrency = (amount: number) => {
@@ -337,6 +378,24 @@ export default function AdminOrdersPage() {
             </div>
             <button type="submit" className="px-8 py-5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 font-black shadow-lg hover:scale-110 transition-all">
               검색
+            </button>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={exporting}
+              className="px-8 py-5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 font-black shadow-lg hover:scale-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {exporting ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                  <span>다운로드 중...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xl">📥</span>
+                  <span>엑셀 다운로드</span>
+                </>
+              )}
             </button>
           </form>
         </div>
