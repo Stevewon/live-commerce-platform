@@ -105,7 +105,7 @@ export default function StorePage() {
             <div className="text-6xl mb-4">🏪</div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">스토어를 찾을 수 없습니다</h1>
             <p className="text-gray-500 mb-6">{error || '존재하지 않는 스토어입니다'}</p>
-            <Link href="/shop" className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+            <Link href="/products" className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
               쇼핑몰로 이동
             </Link>
           </div>
@@ -255,7 +255,7 @@ export default function StorePage() {
           <div className="text-center text-sm text-gray-500">
             <p className="font-medium text-gray-700">{store.storeName}</p>
             <p className="mt-1">QRLIVE 플랫폼에서 운영되는 파트너 스토어입니다</p>
-            <Link href="/shop" className="mt-3 inline-block text-blue-600 hover:underline">
+            <Link href="/products" className="mt-3 inline-block text-blue-600 hover:underline">
               QRLIVE 메인 쇼핑몰 보기 &rarr;
             </Link>
           </div>

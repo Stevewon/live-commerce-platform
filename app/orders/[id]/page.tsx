@@ -98,7 +98,7 @@ export default function OrderDetailPage() {
         <div className="text-center">
           <p className="text-red-600 mb-4">{error || '주문을 찾을 수 없습니다.'}</p>
           <Link
-            href="/orders"
+            href="/my-orders"
             className="text-blue-600 hover:text-blue-800 underline"
           >
             주문 목록으로 돌아가기
@@ -117,7 +117,7 @@ export default function OrderDetailPage() {
         {/* Header */}
         <div className="mb-6">
           <Link
-            href="/orders"
+            href="/my-orders"
             className="text-blue-600 hover:text-blue-800 mb-4 inline-block"
           >
             ← 주문 목록
@@ -226,7 +226,7 @@ export default function OrderDetailPage() {
         {/* Action Buttons */}
         <div className="mt-6 flex gap-4">
           <Link
-            href="/orders"
+            href="/my-orders"
             className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-6 rounded-lg text-center transition"
           >
             주문 목록

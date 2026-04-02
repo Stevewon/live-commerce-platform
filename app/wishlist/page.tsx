@@ -63,14 +63,14 @@ export default function WishlistPage() {
       <header className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+            <Link href="/products" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
               QRLIVE
             </Link>
             <div className="flex items-center gap-3 sm:gap-6">
-              <Link href="/" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
+              <Link href="/products" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
                 홈
               </Link>
-              <Link href="/shop" className="text-gray-300 hover:text-white transition text-xs sm:text-sm">
+              <Link href="/products" className="text-gray-300 hover:text-white transition text-xs sm:text-sm">
                 🛍️ 쇼핑몰
               </Link>
               <Link href="/wishlist" className="text-pink-400 font-semibold text-xs sm:text-sm">
@@ -112,7 +112,7 @@ export default function WishlistPage() {
               마음에 드는 상품을 찜해보세요!
             </p>
             <Link
-              href="/shop"
+              href="/products"
               className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-bold text-base sm:text-lg transition-all transform hover:scale-105 shadow-lg"
             >
               쇼핑하러 가기 →
@@ -195,7 +195,7 @@ export default function WishlistPage() {
         {wishlistItems.length > 0 && (
           <div className="text-center mt-12">
             <Link
-              href="/shop"
+              href="/products"
               className="inline-block px-8 py-4 bg-gray-800/50 border-2 border-gray-700 hover:border-pink-500 text-white rounded-xl font-bold text-lg transition-all transform hover:scale-105"
             >
               쇼핑 계속하기 🛍️
