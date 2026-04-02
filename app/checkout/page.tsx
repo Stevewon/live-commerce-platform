@@ -59,6 +59,10 @@ export default function CheckoutPage() {
   // 쿠폰
   const [appliedCoupon, setAppliedCoupon] = useState<CouponData | null>(null);
 
+  // 파트너 스토어 경유 정보
+  const [storePartnerId, setStorePartnerId] = useState<string | null>(null);
+  const [storeSlug, setStoreSlug] = useState<string | null>(null);
+
   // 배송 메모 프리셋
   const MEMO_PRESETS = [
     '직접 입력',
@@ -78,6 +82,13 @@ export default function CheckoutPage() {
       setIsGuest(true);
       loadGuestCart();
     }
+    // 파트너 스토어 경유 정보 확인
+    try {
+      const savedPartnerId = sessionStorage.getItem('checkout_partnerId');
+      const savedStoreSlug = sessionStorage.getItem('checkout_storeSlug');
+      if (savedPartnerId) setStorePartnerId(savedPartnerId);
+      if (savedStoreSlug) setStoreSlug(savedStoreSlug);
+    } catch {}
   }, [user, authLoading]);
 
   const fetchCart = async () => {
@@ -200,6 +211,11 @@ export default function CheckoutPage() {
         orderData.discount = couponDiscount;
       }
 
+      // 파트너 스토어 경유 주문 시 partnerId 전달
+      if (storePartnerId) {
+        orderData.partnerId = storePartnerId;
+      }
+
       if (isGuest) {
         orderData.guestEmail = guestEmail || undefined;
         orderData.guestPhone = guestPhone || shippingPhone;
@@ -225,6 +241,12 @@ export default function CheckoutPage() {
         localStorage.setItem('guestOrderToken', guestOrderToken);
         localStorage.setItem('guestOrderNumber', order.orderNumber);
       }
+
+      // 파트너 스토어 경유 정보 정리
+      try {
+        sessionStorage.removeItem('checkout_partnerId');
+        sessionStorage.removeItem('checkout_storeSlug');
+      } catch {}
 
       const tossPayments = await loadTossPayments(
         process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq'
@@ -292,6 +314,21 @@ export default function CheckoutPage() {
             </span>
           )}
         </div>
+
+        {/* 파트너 스토어 경유 안내 */}
+        {storePartnerId && (
+          <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+            <span className="text-2xl">🏪</span>
+            <div>
+              <p className="text-sm font-medium text-blue-700">파트너 스토어를 통한 주문입니다</p>
+              {storeSlug && (
+                <Link href={`/store/${storeSlug}`} className="text-xs text-blue-500 hover:underline">
+                  스토어로 돌아가기
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

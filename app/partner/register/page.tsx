@@ -29,6 +29,7 @@ export default function PartnerRegisterPage() {
   const [agreeTerms, setAgreeTerms] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [registered, setRegistered] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -113,7 +114,7 @@ export default function PartnerRegisterPage() {
     }
 
     try {
-      // AuthContext의 register 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
+      // AuthContext의 register 사용 - 자동으로 상태 업데이트 + 쿠키 설정
       await authRegister({
         nickname: formData.nickname,
         password: formData.password,
@@ -126,12 +127,61 @@ export default function PartnerRegisterPage() {
         storeSlug: formData.storeSlug,
         description: formData.description || undefined,
       })
-      // authRegister 성공 시 자동으로 /partner/dashboard로 리다이렉트됨
+      // 등록 성공 - 승인 대기 안내 표시
+      setRegistered(true)
     } catch (err: any) {
       setError(err.message || '파트너 등록 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // 등록 성공 - 승인 대기 안내 화면
+  if (registered) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 py-8 sm:py-12 px-4">
+        <div className="max-w-lg mx-auto text-center">
+          <div className="bg-white rounded-xl shadow-lg p-8 sm:p-12">
+            <div className="text-6xl mb-6">🎉</div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
+              파트너 등록이 완료되었습니다!
+            </h1>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-xl">⏳</span>
+                <h2 className="text-lg font-semibold text-yellow-800">관리자 승인 대기 중</h2>
+              </div>
+              <p className="text-sm text-yellow-700">
+                파트너 스토어는 관리자 승인 후 활성화됩니다.<br />
+                승인 완료 시 파트너 대시보드 이용이 가능합니다.
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+              <h3 className="font-semibold text-gray-800 mb-2">등록 정보</h3>
+              <div className="space-y-1 text-sm text-gray-600">
+                <p><span className="font-medium">상점명:</span> {formData.storeName}</p>
+                <p><span className="font-medium">스토어 URL:</span> /store/{formData.storeSlug}</p>
+                <p><span className="font-medium">닉네임:</span> {formData.nickname}</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Link
+                href="/partner/dashboard"
+                className="block w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+              >
+                파트너 대시보드로 이동
+              </Link>
+              <Link
+                href="/"
+                className="block w-full py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition"
+              >
+                홈으로 돌아가기
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

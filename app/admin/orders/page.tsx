@@ -244,6 +244,10 @@ export default function AdminOrdersPage() {
               <span className="text-2xl group-hover:scale-110 transition-transform">🛍️</span>
               <span>상품 관리</span>
             </Link>
+            <Link href="/admin/reports" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
+              <span className="text-2xl group-hover:scale-110 transition-transform">📈</span>
+              <span>매출 리포트</span>
+            </Link>
           </div>
         </div>
 

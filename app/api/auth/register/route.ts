@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
             storeSlug,
             description: description || null,
             commissionRate: 30.0, // 기본 수수료율 30%
-            isActive: true
+            isActive: false // 관리자 승인 전까지 비활성화
           }
         });
       }

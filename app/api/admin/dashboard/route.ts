@@ -35,9 +35,12 @@ export async function GET(request: NextRequest) {
     const totalOrders = orders.length
     const pendingOrders = orders.filter(order => order.status === 'PENDING').length
 
-    // 오늘 통계
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    // 오늘 통계 (한국 시간 기준)
+    const now = new Date()
+    const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
+    const kstNow = new Date(now.getTime() + kstOffset)
+    const today = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate())
+    today.setTime(today.getTime() - kstOffset) // KST 자정을 UTC로 변환
     const todayOrders = orders.filter(order => new Date(order.createdAt) >= today)
     const todayRevenue = todayOrders.reduce((sum, order) => sum + order.total, 0)
 

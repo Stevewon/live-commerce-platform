@@ -943,28 +943,28 @@ export default function ProductForm({ mode, initialData }: Props) {
           )}
 
           {/* ===== 상세설명 탭 ===== */}
-          {activeTab === 'detail' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  상품 상세 설명 (WYSIWYG 에디터)
-                </label>
-                <p className="text-xs text-gray-500 mb-3">
-                  상세페이지에 표시될 내용입니다. 에디터를 사용하여 서식, 이미지, 링크 등을 자유롭게 편집하세요.
-                </p>
-                <Suspense fallback={
-                  <div className="border border-gray-300 rounded-lg p-8 text-center text-gray-400">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                    에디터 로딩 중...
-                  </div>
-                }>
-                  <RichEditor
-                    content={form.detailContent}
-                    onChange={(html) => setForm(prev => ({ ...prev, detailContent: html }))}
-                    placeholder="상품 상세 설명을 작성하세요..."
-                  />
-                </Suspense>
-              </div>
+          {/* RichEditor는 unmount 시 내용 손실 방지를 위해 CSS로 숨김 처리 */}
+          <div className={activeTab === 'detail' ? 'space-y-4' : 'hidden'}>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                상품 상세 설명 (WYSIWYG 에디터)
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                상세페이지에 표시될 내용입니다. 에디터를 사용하여 서식, 이미지, 링크 등을 자유롭게 편집하세요.
+              </p>
+              <Suspense fallback={
+                <div className="border border-gray-300 rounded-lg p-8 text-center text-gray-400">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  에디터 로딩 중...
+                </div>
+              }>
+                <RichEditor
+                  content={form.detailContent}
+                  onChange={(html) => setForm(prev => ({ ...prev, detailContent: html }))}
+                  placeholder="상품 상세 설명을 작성하세요..."
+                />
+              </Suspense>
+            </div>
 
               {/* 상세 이미지 */}
               <div>
@@ -1021,8 +1021,7 @@ export default function ProductForm({ mode, initialData }: Props) {
                   {uploadingDetail ? '업로드 중...' : '+ 상세 이미지 추가'}
                 </button>
               </div>
-            </div>
-          )}
+          </div>
 
           {/* ===== 이미지 탭 ===== */}
           {activeTab === 'images' && (

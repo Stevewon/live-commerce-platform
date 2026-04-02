@@ -660,6 +660,29 @@ async function resolveIncludes(db: D1DB, tableName: string, rows: any[], include
   
   for (const [relName, relConfig] of Object.entries(include)) {
     if (!relConfig) continue;
+    
+    // _count 관계 처리 (Prisma의 _count include 지원)
+    if (relName === '_count' && typeof relConfig === 'object' && (relConfig as any).select) {
+      const countSelect = (relConfig as any).select;
+      for (const row of rows) {
+        const countObj: any = {};
+        for (const [countRelName, doCount] of Object.entries(countSelect)) {
+          if (!doCount) continue;
+          const countRel = relations[countRelName];
+          if (countRel && countRel.type === 'many') {
+            const countResult = await db.prepare(
+              `SELECT COUNT(*) as count FROM "${countRel.table}" WHERE "${countRel.foreignKey}" = ?`
+            ).bind(row.id).first() as any;
+            countObj[countRelName] = countResult?.count || 0;
+          } else {
+            countObj[countRelName] = 0;
+          }
+        }
+        row._count = countObj;
+      }
+      continue;
+    }
+    
     const rel = relations[relName];
     if (!rel) continue;
     
