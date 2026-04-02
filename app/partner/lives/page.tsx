@@ -1,5 +1,4 @@
 'use client';
-import { useAuth } from '@/lib/contexts/AuthContext'
 
 // app/partner/lives/page.tsx
 // 파트너 라이브 관리 페이지
@@ -7,6 +6,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth';
 
 interface Live {
   id: string;
@@ -27,7 +27,7 @@ interface Live {
 
 export default function PartnerLivesPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = usePartnerAuth();
   
   const [lives, setLives] = useState<Live[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,28 +41,14 @@ export default function PartnerLivesPage() {
     scheduledAt: '',
   });
 
-  // 권한 확인
-  useEffect(() => {
-    if (!user) {
-      alert('로그인이 필요합니다');
-      router.push('/partner/login');
-      return;
-    }
-    if (user.role !== 'PARTNER') {
-      alert('파트너 권한이 필요합니다');
-      router.push('/');
-      return;
-    }
-  }, [user]);
-
   // 라이브 목록 로드
   const fetchLives = async () => {
-    if (!token) return;
+    if (!user) return;
     
     setIsLoading(true);
     try {
       const res = await fetch('/api/partner/lives', {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       const data = await res.json();
       if (data.success) {
@@ -77,7 +63,7 @@ export default function PartnerLivesPage() {
 
   // 라이브 생성
   const createLive = async () => {
-    if (!token) return;
+    if (!user) return;
     
     if (!formData.title || !formData.youtubeUrl) {
       alert('제목과 YouTube URL은 필수입니다');
@@ -87,9 +73,9 @@ export default function PartnerLivesPage() {
     try {
       const res = await fetch('/api/partner/lives', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(formData),
       });
@@ -111,16 +97,16 @@ export default function PartnerLivesPage() {
 
   // 상태 변경
   const changeStatus = async (liveId: string, newStatus: string) => {
-    if (!token) return;
+    if (!user) return;
     
     if (!confirm(`라이브를 "${newStatus}" 상태로 변경하시겠습니까?`)) return;
 
     try {
       const res = await fetch(`/api/partner/lives/${liveId}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ status: newStatus }),
       });
@@ -140,14 +126,14 @@ export default function PartnerLivesPage() {
 
   // 라이브 삭제
   const deleteLive = async (liveId: string) => {
-    if (!token) return;
+    if (!user) return;
     
     if (!confirm('정말 삭제하시겠습니까?')) return;
 
     try {
       const res = await fetch(`/api/partner/lives/${liveId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
 
       const data = await res.json();
@@ -164,10 +150,10 @@ export default function PartnerLivesPage() {
   };
 
   useEffect(() => {
-    if (user && token) {
+    if (user && user.role === 'PARTNER') {
       fetchLives();
     }
-  }, [user, token]);
+  }, [user]);
 
   if (!user) return null;
 
@@ -275,7 +261,7 @@ export default function PartnerLivesPage() {
         )}
 
         {/* 라이브 목록 */}
-        {loading ? (
+        {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin mx-auto mb-4 h-12 w-12 border-4 border-red-500 border-t-transparent rounded-full"></div>
             <p className="text-gray-600">로딩 중...</p>
