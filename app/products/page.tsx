@@ -181,10 +181,14 @@ function ProductsContent() {
                   🔍
                 </button>
               </form>
+              <Link href="/cart" className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">🛒 장바구니</Link>
               {user ? (
-                <Link href="/cart" className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">🛒 장바구니</Link>
+                <span className="hidden sm:inline text-sm text-gray-700 font-medium">{user.name}님</span>
               ) : (
-                <Link href="/login" className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium">로그인</Link>
+                <>
+                  <Link href="/login" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 font-medium">로그인</Link>
+                  <Link href="/register" className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">회원가입</Link>
+                </>
               )}
             </div>
           </div>
