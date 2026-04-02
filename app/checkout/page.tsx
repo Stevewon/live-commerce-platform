@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
 import ShopNavigation from '@/components/ShopNavigation';
-import { getGuestCart, clearGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
+import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
 import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
 
@@ -75,6 +75,41 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (authLoading) return;
+
+    // 바로구매 모드 확인
+    const params = new URLSearchParams(window.location.search);
+    const isBuyNow = params.get('mode') === 'buynow';
+
+    if (isBuyNow) {
+      try {
+        const buyNowRaw = sessionStorage.getItem('buyNowItem');
+        if (buyNowRaw) {
+          const buyNowItem = JSON.parse(buyNowRaw);
+          setCartItems([{
+            id: 'buynow-0',
+            productId: buyNowItem.productId,
+            quantity: buyNowItem.quantity,
+            product: buyNowItem.product,
+          }]);
+          sessionStorage.removeItem('buyNowItem');
+          setLoading(false);
+          if (!user) setIsGuest(true);
+          if (user) {
+            setShippingName(user.name || '');
+            setShippingPhone(user.phone || '');
+          }
+          // 파트너 스토어 경유 정보 확인
+          try {
+            const savedPartnerId = sessionStorage.getItem('checkout_partnerId');
+            const savedStoreSlug = sessionStorage.getItem('checkout_storeSlug');
+            if (savedPartnerId) setStorePartnerId(savedPartnerId);
+            if (savedStoreSlug) setStoreSlug(savedStoreSlug);
+          } catch {}
+          return;
+        }
+      } catch {}
+    }
+
     if (user) {
       setIsGuest(false);
       fetchCart();
@@ -448,7 +483,7 @@ export default function CheckoutPage() {
                 </h2>
                 <div className="space-y-4">
                   {cartItems.map(item => (
-                    <div key={item.id} className="flex gap-4">
+                    <div key={item.id} className="flex gap-4 items-start">
                       <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                         <img src={item.product.thumbnail} alt={item.product.name}
                           className="w-full h-full object-cover"
@@ -461,8 +496,29 @@ export default function CheckoutPage() {
                         <h3 className="font-semibold text-gray-900 line-clamp-2">{item.product.name}</h3>
                         <p className="text-sm text-gray-600">₩{item.product.price.toLocaleString()} x {item.quantity}개</p>
                       </div>
-                      <div className="text-right flex-shrink-0">
+                      <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                         <p className="font-bold text-gray-900">₩{(item.product.price * item.quantity).toLocaleString()}</p>
+                        {cartItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (user && !item.id.startsWith('guest-') && !item.id.startsWith('buynow-')) {
+                                try {
+                                  await fetch(`/api/cart?productId=${item.productId}`, {
+                                    method: 'DELETE',
+                                    credentials: 'include',
+                                  });
+                                } catch {}
+                              } else if (!user) {
+                                removeFromGuestCart(item.productId);
+                              }
+                              setCartItems(prev => prev.filter(ci => ci.id !== item.id));
+                            }}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium"
+                          >
+                            삭제
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

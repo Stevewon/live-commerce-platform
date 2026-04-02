@@ -18,14 +18,7 @@ export async function GET(request: NextRequest) {
     // 모든 회원 조회 (주문 수 포함)
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        role: true,
-        emailVerified: true,
-        createdAt: true,
+      include: {
         _count: {
           select: {
             orders: true

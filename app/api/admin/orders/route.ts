@@ -34,16 +34,39 @@ export async function GET(req: NextRequest) {
       where.status = status;
     }
 
-    if (search) {
-      where.OR = [
-        { orderNumber: { contains: search } },
-        { user: { name: { contains: search } } },
-        { user: { email: { contains: search } } },
-      ];
-    }
-
     if (partnerId) {
       where.partnerId = partnerId;
+    }
+
+    // 검색어가 있으면 주문번호로만 필터링 + 사용자 검색은 후처리
+    // (D1 래퍼가 nested relation 필터를 지원하지 않음)
+    let searchUserIds: string[] | null = null;
+    if (search) {
+      // 1) 주문번호 필터
+      const orderNumberFilter = { orderNumber: { contains: search } };
+
+      // 2) 사용자 이름/이메일로 검색하여 userId 목록 확보
+      try {
+        const matchingUsers = await prisma.user.findMany({
+          where: {
+            OR: [
+              { name: { contains: search } },
+              { nickname: { contains: search } },
+              { email: { contains: search } },
+            ],
+          },
+        });
+        searchUserIds = matchingUsers.map((u: any) => u.id);
+      } catch {
+        searchUserIds = [];
+      }
+
+      // OR 조건: 주문번호 또는 매칭된 userId
+      const orConditions: any[] = [orderNumberFilter];
+      if (searchUserIds && searchUserIds.length > 0) {
+        orConditions.push({ userId: { in: searchUserIds } });
+      }
+      where.OR = orConditions;
     }
 
     // 주문 목록 조회
@@ -55,6 +78,7 @@ export async function GET(req: NextRequest) {
             select: {
               name: true,
               email: true,
+              nickname: true,
             },
           },
           partner: {
@@ -81,6 +105,13 @@ export async function GET(req: NextRequest) {
       }),
       prisma.order.count({ where }),
     ]);
+
+    // user.name 이 null 일 수 있으므로 nickname 대체
+    for (const order of orders as any[]) {
+      if (order.user) {
+        order.user.name = order.user.name || order.user.nickname || '미설정';
+      }
+    }
 
     return NextResponse.json({
       orders,
