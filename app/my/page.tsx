@@ -80,14 +80,14 @@ export default function MyPage() {
       <header className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+            <Link href="/products" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
               QRLIVE
             </Link>
             <div className="flex items-center gap-3 sm:gap-6">
-              <Link href="/" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
+              <Link href="/products" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
                 홈
               </Link>
-              <Link href="/shop" className="text-gray-300 hover:text-white transition text-xs sm:text-sm font-semibold">
+              <Link href="/products" className="text-gray-300 hover:text-white transition text-xs sm:text-sm font-semibold">
                 🛍️ 쇼핑몰
               </Link>
               <Link href="/my" className="text-blue-400 font-semibold text-xs sm:text-sm">
@@ -155,7 +155,7 @@ export default function MyPage() {
               <div className="text-5xl sm:text-6xl mb-3 sm:mb-4">📦</div>
               <p className="text-gray-400 text-base sm:text-lg mb-3 sm:mb-4">주문 내역이 없습니다</p>
               <Link
-                href="/shop"
+                href="/products"
                 className="inline-block px-5 sm:px-6 py-2.5 sm:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition text-sm sm:text-base"
               >
                 쇼핑하러 가기
@@ -236,7 +236,7 @@ export default function MyPage() {
             <div className="text-xs sm:text-sm font-semibold group-hover:text-purple-400 transition">내 정보</div>
           </Link>
           <Link
-            href="/shop"
+            href="/products"
             className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 sm:p-6 text-center hover:border-green-500 transition group"
           >
             <div className="text-3xl sm:text-4xl mb-1 sm:mb-2">🛍️</div>

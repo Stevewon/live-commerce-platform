@@ -29,7 +29,7 @@ export default function ShopNavigation() {
         <div className="flex justify-between items-center h-14 sm:h-16">
           {/* 로고 */}
           <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/products" className="flex items-center space-x-2">
               <span className="text-xl sm:text-2xl font-bold text-blue-600">🛍️</span>
               <span className="text-base sm:text-xl font-bold text-gray-900">라이브커머스</span>
             </Link>
@@ -38,8 +38,8 @@ export default function ShopNavigation() {
           {/* 네비게이션 메뉴 - 데스크톱 */}
           <div className="hidden md:flex items-center space-x-1">
             <Link
-              href="/"
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/')}`}
+              href="/products"
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/products')}`}
             >
               홈
             </Link>
@@ -58,14 +58,14 @@ export default function ShopNavigation() {
             {user && (
               <>
                 <Link
-                  href="/products?view=cart"
+                  href="/cart"
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/cart')}`}
                 >
                   🛒 장바구니
                 </Link>
                 <Link
-                  href="/orders"
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/orders')}`}
+                  href="/my-orders"
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/my-orders')}`}
                 >
                   주문내역
                 </Link>
@@ -73,7 +73,7 @@ export default function ShopNavigation() {
             )}
             {!user && (
               <Link
-                href="/products?view=cart"
+                href="/cart"
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/cart')}`}
               >
                 🛒 장바구니
@@ -151,9 +151,9 @@ export default function ShopNavigation() {
         <div className="md:hidden border-t border-gray-200 bg-white">
           <div className="px-3 pt-2 pb-3 space-y-1">
             <Link
-              href="/"
+              href="/products"
               onClick={() => setMenuOpen(false)}
-              className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/')}`}
+              className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/products')}`}
             >
               홈
             </Link>
@@ -174,16 +174,16 @@ export default function ShopNavigation() {
             {user && (
               <>
                 <Link
-                  href="/products?view=cart"
+                  href="/cart"
                   onClick={() => setMenuOpen(false)}
                   className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/cart')}`}
                 >
                   🛒 장바구니
                 </Link>
                 <Link
-                  href="/orders"
+                  href="/my-orders"
                   onClick={() => setMenuOpen(false)}
-                  className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/orders')}`}
+                  className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/my-orders')}`}
                 >
                   주문내역
                 </Link>
@@ -201,7 +201,7 @@ export default function ShopNavigation() {
             )}
             {!user && (
               <Link
-                href="/products?view=cart"
+                href="/cart"
                 onClick={() => setMenuOpen(false)}
                 className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/cart')}`}
               >

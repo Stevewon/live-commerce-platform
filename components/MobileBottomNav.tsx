@@ -14,9 +14,9 @@ export default function MobileBottomNav() {
   }
 
   const navItems = [
-    { href: '/', icon: '🏠', label: '홈', activeCheck: (p: string) => p === '/' },
-    { href: '/products', icon: '🛍️', label: '쇼핑', activeCheck: (p: string) => p.startsWith('/products') || p === '/shop' },
-    { href: '/products?view=cart', icon: '🛒', label: '장바구니', activeCheck: (p: string) => p === '/cart' || p.includes('view=cart') },
+    { href: '/products', icon: '🏠', label: '홈', activeCheck: (p: string) => p === '/products' || p === '/' },
+    { href: '/lives', icon: '📺', label: '라이브', activeCheck: (p: string) => p.startsWith('/lives') },
+    { href: '/cart', icon: '🛒', label: '장바구니', activeCheck: (p: string) => p === '/cart' },
     { href: '/wishlist', icon: '💖', label: '찜', activeCheck: (p: string) => p === '/wishlist' },
     { href: '/my', icon: '👤', label: user ? '마이' : '로그인', activeCheck: (p: string) => p.startsWith('/my') || p === '/login' || p === '/register', dynamicHref: !user ? '/login' : '/my' },
   ];

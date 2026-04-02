@@ -132,7 +132,7 @@ function OrderSuccessContent() {
 
         <div className="space-y-3">
           <Link
-            href="/orders"
+            href="/my-orders"
             className="block w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
           >
             주문 내역 보기

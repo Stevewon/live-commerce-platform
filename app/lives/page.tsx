@@ -64,10 +64,10 @@ export default function LivesPage() {
               <p className="text-gray-600 mt-1">실시간 라이브 방송을 시청하세요</p>
             </div>
             <Link
-              href="/"
+              href="/products"
               className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
             >
-              홈으로
+              쇼핑몰로
             </Link>
           </div>
         </div>

@@ -167,7 +167,7 @@ function ProductsContent() {
       <div className="bg-white border-b shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold text-gray-900">QRLIVE Shop</Link>
+            <Link href="/products" className="text-xl font-bold text-gray-900">QRLIVE Shop</Link>
             <div className="flex items-center gap-3">
               <form onSubmit={handleSearch} className="relative hidden sm:block">
                 <input

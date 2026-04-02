@@ -101,6 +101,23 @@ export default function ProductDetailClient() {
     if (slug) fetchProduct();
   }, [slug]);
 
+  // 뒤로가기 시 쇼핑몰 메인(/products)에 머물도록 히스토리 관리
+  useEffect(() => {
+    // popstate 이벤트로 뒤로가기 감지
+    const handlePopState = () => {
+      // 뒤로가기 시 /products로 이동 (쇼핑몰 메인에 머물게)
+      router.replace('/products');
+    };
+
+    // 히스토리에 현재 상태를 push하여 뒤로가기 시 popstate 발생하도록 함
+    window.history.pushState({ fromProductDetail: true }, '', window.location.href);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [router]);
+
   const fetchProduct = async () => {
     try {
       const res = await fetch(`/api/products?slug=${slug}`);
@@ -315,7 +332,7 @@ export default function ProductDetailClient() {
 
         {/* Breadcrumb */}
         <nav className="text-sm text-gray-500 mb-4 flex items-center gap-2">
-          <Link href="/" className="hover:text-gray-700">홈</Link>
+          <Link href="/products" className="hover:text-gray-700">홈</Link>
           <span>/</span>
           <Link href="/products" className="hover:text-gray-700">전체상품</Link>
           <span>/</span>

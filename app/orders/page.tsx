@@ -7,7 +7,7 @@ export default function OrdersRedirect() {
   const router = useRouter();
   
   useEffect(() => {
-    router.replace('/products?view=orders');
+    router.replace('/my-orders');
   }, [router]);
   
   return (
