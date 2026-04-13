@@ -397,6 +397,13 @@ export default function AdminOrdersPage() {
                 </>
               )}
             </button>
+            <Link
+              href="/admin/orders/bulk"
+              className="px-8 py-5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl hover:from-orange-600 hover:to-amber-600 font-black shadow-lg hover:scale-110 transition-all flex items-center space-x-2"
+            >
+              <span className="text-xl">🚚</span>
+              <span>송장 대량등록</span>
+            </Link>
           </form>
         </div>
 
