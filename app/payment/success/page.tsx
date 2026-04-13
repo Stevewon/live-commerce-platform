@@ -22,9 +22,6 @@ function PaymentSuccessContent() {
   const payMethod = searchParams.get('payMethod');
   const appNo = searchParams.get('appNo');
 
-  // Toss 호환 (기존 파라미터)
-  const paymentKey = searchParams.get('paymentKey');
-
   useEffect(() => {
     if (!orderId) {
       alert('잘못된 접근입니다');
@@ -36,9 +33,6 @@ function PaymentSuccessContent() {
     // 별도 verify 없이 바로 주문 정보 표시
     if (tid || orderNumber) {
       handleKispgSuccess();
-    } else if (paymentKey && amount) {
-      // Toss Payments 결제 (레거시 호환)
-      verifyTossPayment();
     } else {
       // orderId만 있는 경우: DB에서 직접 조회
       fetchOrderInfo();
@@ -98,50 +92,6 @@ function PaymentSuccessContent() {
       console.error('Order fetch error:', err);
     }
     setIsLoading(false);
-  };
-
-  // Toss Payments 결제 검증 (기존 호환)
-  const verifyTossPayment = async () => {
-    try {
-      const response = await fetch('/api/payments/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ orderId, paymentKey, amount: parseInt(amount || '0') })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '결제 검증에 실패했습니다');
-      }
-
-      const guestToken = localStorage.getItem('guestOrderToken');
-      setIsGuest(!!guestToken && !data.order.userId);
-
-      setOrderInfo({
-        orderNumber: data.order.orderNumber,
-        amount: data.order.total,
-        paymentKey: data.payment.paymentKey,
-        method: data.payment.method,
-        approvedAt: data.payment.approvedAt
-      });
-
-      setIsLoading(false);
-
-      if (guestToken) {
-        clearGuestCart();
-      } else {
-        await fetch('/api/cart', {
-          method: 'DELETE',
-          credentials: 'include',
-        }).catch(() => {});
-      }
-    } catch (error: any) {
-      console.error('Payment verification error:', error);
-      alert(error.message || '결제 검증에 실패했습니다');
-      router.push('/products');
-    }
   };
 
   if (isLoading) {

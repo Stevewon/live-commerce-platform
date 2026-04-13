@@ -11,14 +11,14 @@
 ### 환경 설정 준비
 - [ ] `.env.example` 파일 확인
 - [ ] JWT 시크릿 키 생성 완료 (`openssl rand -hex 32`)
-- [ ] 토스페이먼츠 실제 API 키 발급 완료
-  - [ ] `NEXT_PUBLIC_TOSS_CLIENT_KEY` (live_ck_...)
-  - [ ] `TOSS_SECRET_KEY` (live_sk_...)
+- [ ] KISPG 실제 가맹점 정보 발급 완료
+  - [ ] `KISPG_MID` (실제 가맹점 MID)
+  - [ ] `KISPG_MERCHANT_KEY` (실제 가맹점 키)
 
 ### 계정 준비
 - [ ] Railway 계정 생성 (https://railway.app)
 - [ ] GitHub 계정 Railway에 연동
-- [ ] 토스페이먼츠 개발자 계정 (https://developers.tosspayments.com)
+- [ ] KISPG 가맹점 계정 (https://mms.kispg.co.kr)
 
 ---
 
@@ -36,8 +36,9 @@
 ### 환경변수 설정 (Settings → Variables)
 - [ ] `DATABASE_URL` - PostgreSQL 플러그인이 자동 생성 (확인만)
 - [ ] `JWT_SECRET` - 생성한 32자 시크릿 키 입력
-- [ ] `NEXT_PUBLIC_TOSS_CLIENT_KEY` - 토스 클라이언트 키 입력
-- [ ] `TOSS_SECRET_KEY` - 토스 시크릿 키 입력
+- [ ] `KISPG_MODE` - `production` 입력
+- [ ] `KISPG_MID` - KISPG 가맹점 MID 입력
+- [ ] `KISPG_MERCHANT_KEY` - KISPG 가맹점 키 입력
 - [ ] `NODE_ENV` - `production` 입력
 - [ ] `NEXT_PUBLIC_APP_URL` - Railway 도메인 입력 (예: https://your-app.railway.app)
 - [ ] `PORT` - `${{RAILWAY_PORT}}` 입력
@@ -135,8 +136,9 @@
 - [ ] 프로덕션에서 개발용 시크릿 키 사용하지 않는지 확인
 
 ### API 키
-- [ ] 토스페이먼츠 실제 키 (`live_ck_`, `live_sk_`) 사용 확인
-- [ ] 테스트 키 (`test_ck_`, `test_sk_`)가 프로덕션에 없는지 확인
+- [ ] KISPG 실제 가맹점 MID/MERCHANT_KEY 사용 확인
+- [ ] `KISPG_MODE=production` 설정 확인
+- [ ] 테스트 MID(kistest00m)가 프로덕션에 없는지 확인
 
 ### HTTPS 및 도메인
 - [ ] HTTPS가 적용되었는지 확인 (Railway 자동 적용)

@@ -107,7 +107,7 @@ live-commerce-platform/
 - **Nodemailer** - 이메일 발송
 
 ### External Services
-- **Toss Payments** - 결제 시스템
+- **KISPG** - 결제 시스템 (KIS정보통신)
 - **Cloudinary** - 이미지 호스팅
 - **Railway** - 배포 플랫폼
 
@@ -237,7 +237,7 @@ NEXT_PUBLIC_API_URL="https://qrlive.io"
 - [x] 파트너 관리 UI (승인, 수수료, 통계)
 - [x] 정산 관리 UI (승인, 상세 조회)
 - [x] 라이브 방송 및 실시간 채팅
-- [x] 결제 시스템 (Toss Payments)
+- [x] 결제 시스템 (KISPG)
 - [x] 알림 시스템 (실시간 + 이메일 템플릿)
 - [x] 이미지 업로드 및 관리
 - [x] 프로덕션 배포 준비 (Railway)
