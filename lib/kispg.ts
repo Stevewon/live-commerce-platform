@@ -175,6 +175,12 @@ export async function approveKispgPayment(params: KispgApproveParams) {
   const responseText = await response.text();
   console.log('[KISPG Approve] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
 
+  // 방화벽 차단 감지 (kisvan.co.kr/firewall.html 또는 '비정상적인 접근' HTML 응답)
+  if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr')) {
+    console.error('[KISPG Approve] 방화벽 차단 감지! 서버 IP가 KISPG 화이트리스트에 등록되지 않았습니다.');
+    throw new Error('KISPG 방화벽에 의해 결제 승인이 차단되었습니다. 관리자에게 문의해주세요. (카드 결제는 완료되었으며, 자동 환불 처리됩니다)');
+  }
+
   if (!response.ok) {
     throw new Error(`KISPG 결제 승인 HTTP 오류: ${response.status} - ${responseText.substring(0, 200)}`);
   }
@@ -183,8 +189,8 @@ export async function approveKispgPayment(params: KispgApproveParams) {
   try {
     data = JSON.parse(responseText);
   } catch (e) {
-    console.error('[KISPG Approve] JSON 파싱 실패:', responseText.substring(0, 500));
-    throw new Error(`KISPG 결제 승인 응답 파싱 실패: ${responseText.substring(0, 200)}`);
+    console.error('[KISPG Approve] JSON 파싱 실패 (HTML 응답 가능성):', responseText.substring(0, 500));
+    throw new Error('KISPG 결제 승인 서버 응답 오류. 관리자에게 문의해주세요.');
   }
 
   console.log('[KISPG Approve] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
@@ -241,6 +247,12 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
   const responseText = await response.text();
   console.log('[KISPG Cancel] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
 
+  // 방화벽 차단 감지
+  if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr')) {
+    console.error('[KISPG Cancel] 방화벽 차단 감지! 서버 IP가 KISPG 화이트리스트에 등록되지 않았습니다.');
+    throw new Error('KISPG 방화벽에 의해 취소 요청이 차단되었습니다. KISPG 고객센터(1599-3700)에 서버 IP 등록을 요청해주세요.');
+  }
+
   if (!response.ok) {
     throw new Error(`KISPG 결제 취소 HTTP 오류: ${response.status} - ${responseText.substring(0, 200)}`);
   }
@@ -249,8 +261,8 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
   try {
     data = JSON.parse(responseText);
   } catch (e) {
-    console.error('[KISPG Cancel] JSON 파싱 실패:', responseText.substring(0, 500));
-    throw new Error(`KISPG 결제 취소 응답 파싱 실패: ${responseText.substring(0, 200)}`);
+    console.error('[KISPG Cancel] JSON 파싱 실패 (HTML 응답 가능성):', responseText.substring(0, 500));
+    throw new Error('KISPG 결제 취소 서버 응답 오류. KISPG 고객센터(1599-3700)에 문의해주세요.');
   }
 
   console.log('[KISPG Cancel] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
