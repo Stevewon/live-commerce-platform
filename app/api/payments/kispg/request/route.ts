@@ -68,8 +68,12 @@ export async function POST(request: NextRequest) {
 
     // mbsReserved에 주문 ID를 넣어서 returnUrl에서 식별
     // goodsAmt는 반드시 정수 (원 단위)
+    // ordNo: KISPG는 영문+숫자만 허용 (하이픈 등 특수문자 불가 - 9998 에러 발생)
+    const safeOrdNo = order.orderNumber.replace(/[^a-zA-Z0-9]/g, '');
+    console.log('[KISPG Request] ordNo 변환:', order.orderNumber, '->', safeOrdNo);
+
     const formData = await buildAuthFormData({
-      ordNo: order.orderNumber,
+      ordNo: safeOrdNo,
       goodsNm,
       goodsAmt: Math.round(order.total),
       ordNm,
