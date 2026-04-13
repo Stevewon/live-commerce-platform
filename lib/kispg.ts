@@ -271,8 +271,9 @@ export async function verifyAuthResult(params: {
   ediDate: string;
   encData: string;
 }): Promise<boolean> {
-  // 성공 코드 확인
-  if (params.resultCd !== '0000') {
+  // 성공 코드 확인 (결제수단별로 다른 성공 코드: 0000, 3001, 4000, A000, 7001 등)
+  const authSuccessCodes = ['0000', '3001', '4000', 'A000', '7001', '8001', 'V000'];
+  if (!authSuccessCodes.includes(params.resultCd) && !(params.tid && params.tid.length > 0)) {
     return false;
   }
   // encData 검증: mid + ediDate + amt + merchantKey 의 SHA-256
