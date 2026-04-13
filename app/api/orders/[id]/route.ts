@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
-import { cancelTossPayment } from '@/lib/toss';
+import { cancelKispgPayment } from '@/lib/kispg';
 
 // 주문 상세 조회 (GET)
 export async function GET(
@@ -113,19 +113,26 @@ export async function PATCH(
     // 주문 상태 업데이트
     const updateData: any = { status }
 
-    // 취소 시 Toss 결제 취소 및 재고 복구
+    // 취소 시 KISPG 결제 취소 및 재고 복구
     if (status === 'CANCELLED') {
       updateData.cancelledAt = new Date()
       
-      // Toss Payments 실결제 취소
+      // KISPG 실결제 취소 (paymentKey에 KISPG tid 저장)
       if (order.paymentKey) {
         try {
-          const cancelResult = await cancelTossPayment(order.paymentKey, '고객 요청에 의한 주문 취소')
-          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total
+          await cancelKispgPayment({
+            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            tid: order.paymentKey,
+            canAmt: order.total,
+            canId: userId,
+            canNm: '고객',
+            canMsg: '고객 요청에 의한 주문 취소',
+          })
+          updateData.refundAmount = order.total
           updateData.refundedAt = new Date()
-        } catch (tossError: any) {
-          console.error('Toss payment cancel failed:', tossError.message)
-          // Toss 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
+        } catch (pgError: any) {
+          console.error('KISPG payment cancel failed:', pgError.message)
+          // PG 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
         }
       }
     }

@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { loadTossPayments } from '@tosspayments/payment-sdk';
+// KISPG 결제 연동 (키스정보통신)
 import ShopNavigation from '@/components/ShopNavigation';
 import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
 import AddressSearch from '@/components/AddressSearch';
@@ -283,27 +283,27 @@ export default function CheckoutPage() {
         sessionStorage.removeItem('checkout_storeSlug');
       } catch {}
 
-      const tossPayments = await loadTossPayments(
-        process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq'
-      );
-
-      const orderName = cartItems.length === 1
-        ? cartItems[0].product.name
-        : `${cartItems[0].product.name} 외 ${cartItems.length - 1}건`;
-
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-
-      await tossPayments.requestPayment('카드', {
-        amount: finalAmount,
-        orderId: order.orderNumber,
-        orderName,
-        customerName: shippingName,
-        successUrl: `${baseUrl}/payment/success?orderId=${order.id}`,
-        failUrl: `${baseUrl}/payment/fail?orderId=${order.id}`,
+      // KISPG 결제창 호출 (서버에서 form HTML 반환 → 새 페이지로 이동)
+      const kispgRes = await fetch('/api/payments/kispg/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ orderId: order.id }),
       });
+
+      if (!kispgRes.ok) {
+        const errData = await kispgRes.json().catch(() => ({}));
+        throw new Error(errData.error || '결제 요청에 실패했습니다.');
+      }
+
+      // 서버가 HTML을 반환 → 새 탭/페이지에 렌더링하여 KISPG 결제창으로 자동 이동
+      const html = await kispgRes.text();
+      const paymentWindow = document.open('text/html', 'replace');
+      paymentWindow?.write(html);
+      paymentWindow?.close();
     } catch (error: any) {
       console.error('주문 실패:', error);
-      if (error.message !== 'PAY_PROCESS_CANCELED') {
+      if (error.message !== 'PAY_PROCESS_CANCELED' && error.message !== 'KISPG_REDIRECT') {
         alert(error.message || '주문 처리 중 오류가 발생했습니다.');
       }
     } finally {
@@ -613,7 +613,7 @@ export default function CheckoutPage() {
                 </button>
 
                 <div className="pt-4 border-t text-xs text-gray-500 space-y-1">
-                  <p>결제는 Toss Payments로 안전하게 처리됩니다</p>
+                  <p>결제는 KISPG(키스정보통신)를 통해 안전하게 처리됩니다</p>
                   <p>주문 후 2-3일 이내 배송</p>
                   <p>교환/반품 가능 (7일 이내)</p>
                   {isGuest && (
