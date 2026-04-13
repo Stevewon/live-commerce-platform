@@ -43,8 +43,14 @@ export async function POST(request: NextRequest) {
 
     console.log('[KISPG Return] resultCd:', resultCd, 'resultMsg:', resultMsg, 'tid:', tid, 'ordNo:', ordNo, 'amt:', amt, 'orderId:', orderId);
 
-    // 1) 인증 실패 처리
-    if (resultCd !== '0000') {
+    // 1) 인증 결과 확인
+    // KISPG 성공 코드: 0000(일반), 3001(카드결제 성공), 4000(계좌이체 성공), 
+    // A000(가상계좌 성공), 7001(휴대폰결제 성공) 등 결제수단별로 다름
+    // tid가 존재하면 인증은 성공한 것이므로 승인 단계로 진행
+    const authSuccessCodes = ['0000', '3001', '4000', 'A000', '7001', '8001', 'V000'];
+    const isAuthSuccess = authSuccessCodes.includes(resultCd) || (tid && tid.length > 0);
+
+    if (!isAuthSuccess) {
       console.error('[KISPG Return] 인증 실패:', resultCd, resultMsg);
       
       // 사용자 취소(resultCd: "0060" 등)가 아닌 경우만 주문 취소
@@ -60,6 +66,8 @@ export async function POST(request: NextRequest) {
       if (orderId) failUrl.searchParams.set('orderId', orderId);
       return NextResponse.redirect(failUrl.toString(), 303);
     }
+
+    console.log('[KISPG Return] 인증 성공! resultCd:', resultCd, 'resultMsg:', resultMsg, 'tid:', tid);
 
     // 2) 주문 조회
     const order = await prisma.order.findUnique({
