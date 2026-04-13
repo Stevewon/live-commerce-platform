@@ -103,6 +103,7 @@ export interface KispgAuthParams {
   ordEmail?: string;      // 주문자 이메일
   returnUrl: string;      // 결제 결과 수신 URL
   payMethod?: string;     // 결제수단 (card, bank, vacnt, hp)
+  model?: string;         // 결제창 모드 (1: 기본)
   trxCd?: string;         // 0: 일반결제
   currencyType?: string;  // KRW
   mbsReserved?: string;   // 가맹점 예비 필드 (주문 ID 등 전달용)
@@ -119,12 +120,13 @@ export async function buildAuthFormData(params: KispgAuthParams) {
 
   return {
     mid,
+    model: params.model || '1',
     payMethod: params.payMethod || 'card',
     goodsNm: params.goodsNm,
     goodsAmt,
     ordNo: params.ordNo,
     ordNm: params.ordNm,
-    ordTel: params.ordTel || '',
+    ordTel: params.ordTel || '01000000000',
     ordEmail: params.ordEmail || '',
     returnUrl: params.returnUrl,
     trxCd: params.trxCd || '0',
