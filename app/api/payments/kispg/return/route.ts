@@ -10,6 +10,7 @@ import { getPrisma } from '@/lib/prisma';
  * 
  * KISPG 인증 결과 파라미터:
  *   resultCd, resultMsg, payMethod, tid, ordNo, amt, ediDate, encData, mbsReserved
+ *   + goodsAmt (일부 응답에 포함)
  */
 export async function POST(request: NextRequest) {
   const prisma = await getPrisma();
@@ -19,12 +20,20 @@ export async function POST(request: NextRequest) {
     // KISPG는 application/x-www-form-urlencoded로 POST
     const formData = await request.formData();
 
+    // 전체 파라미터 로깅 (디버그용)
+    const allParams: Record<string, string> = {};
+    formData.forEach((value, key) => {
+      allParams[key] = String(value);
+    });
+    console.log('[KISPG Return] All params:', JSON.stringify(allParams));
+
     const resultCd = formData.get('resultCd') as string || '';
     const resultMsg = formData.get('resultMsg') as string || '';
     const payMethod = formData.get('payMethod') as string || '';
     const tid = formData.get('tid') as string || '';
     const ordNo = formData.get('ordNo') as string || '';
-    const amt = formData.get('amt') as string || '';
+    // KISPG 응답에서 금액: amt 또는 goodsAmt 필드
+    const amt = formData.get('amt') as string || formData.get('goodsAmt') as string || '';
     const ediDate = formData.get('ediDate') as string || '';
     const encData = formData.get('encData') as string || '';
     const mbsReserved = formData.get('mbsReserved') as string || '';
@@ -32,14 +41,16 @@ export async function POST(request: NextRequest) {
     // mbsReserved에 orderId(DB 주문 ID)가 들어있음
     const orderId = mbsReserved;
 
-    console.log('[KISPG Return] resultCd:', resultCd, 'resultMsg:', resultMsg, 'tid:', tid, 'ordNo:', ordNo, 'amt:', amt);
+    console.log('[KISPG Return] resultCd:', resultCd, 'resultMsg:', resultMsg, 'tid:', tid, 'ordNo:', ordNo, 'amt:', amt, 'orderId:', orderId);
 
     // 1) 인증 실패 처리
     if (resultCd !== '0000') {
       console.error('[KISPG Return] 인증 실패:', resultCd, resultMsg);
       
-      // 주문 상태를 CANCELLED로 변경하고 재고 복구
-      if (orderId) {
+      // 사용자 취소(resultCd: "0060" 등)가 아닌 경우만 주문 취소
+      // 사용자가 취소한 경우 주문은 PENDING 상태로 유지하여 재시도 가능
+      const userCancelCodes = ['0060', '0061', 'CC01', 'CC02'];
+      if (orderId && !userCancelCodes.includes(resultCd)) {
         await cancelOrderAndRestoreStock(prisma, orderId);
       }
 
@@ -66,13 +77,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.redirect(failUrl.toString(), 303);
     }
 
-    // 금액 검증
-    if (order.total !== parseInt(amt)) {
-      console.error('[KISPG Return] 금액 불일치:', order.total, 'vs', amt);
+    // 금액 검증 (정수 비교 - Float 소수점 이슈 방지)
+    const orderTotal = Math.round(order.total);
+    const paidAmt = parseInt(amt) || 0;
+    console.log('[KISPG Return] 금액 검증: order.total=', order.total, 'rounded=', orderTotal, 'paidAmt=', paidAmt);
+    
+    if (paidAmt > 0 && orderTotal !== paidAmt) {
+      console.error('[KISPG Return] 금액 불일치:', orderTotal, 'vs', paidAmt);
       await cancelOrderAndRestoreStock(prisma, orderId);
       const failUrl = new URL('/payment/fail', baseUrl);
       failUrl.searchParams.set('code', 'AMOUNT_MISMATCH');
-      failUrl.searchParams.set('message', '결제 금액이 일치하지 않습니다');
+      failUrl.searchParams.set('message', `결제 금액이 일치하지 않습니다 (주문: ${orderTotal}원, 결제: ${paidAmt}원)`);
       return NextResponse.redirect(failUrl.toString(), 303);
     }
 
@@ -81,7 +96,7 @@ export async function POST(request: NextRequest) {
     try {
       approveResult = await approveKispgPayment({
         tid,
-        goodsAmt: order.total,
+        goodsAmt: orderTotal,
       });
     } catch (approveError: any) {
       console.error('[KISPG Return] 승인 실패:', approveError.message);
@@ -107,13 +122,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log('[KISPG Return] 결제 성공! orderId:', orderId, 'tid:', tid);
+    console.log('[KISPG Return] 결제 성공! orderId:', orderId, 'tid:', tid, 'appNo:', approveResult.appNo);
 
     // 5) 성공 페이지로 redirect
     const successUrl = new URL('/payment/success', baseUrl);
     successUrl.searchParams.set('orderId', orderId);
     successUrl.searchParams.set('orderNumber', order.orderNumber);
-    successUrl.searchParams.set('amount', amt);
+    successUrl.searchParams.set('amount', orderTotal.toString());
     successUrl.searchParams.set('tid', tid);
     successUrl.searchParams.set('payMethod', payMethod);
     if (approveResult.appNo) {

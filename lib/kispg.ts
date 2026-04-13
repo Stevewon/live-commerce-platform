@@ -7,14 +7,28 @@
 
 // ─── 환경변수 ───
 // 개발환경: testapi.kispg.co.kr / 운영환경: api.kispg.co.kr
-const IS_PRODUCTION = process.env.KISPG_MODE === 'production';
-const KISPG_API_HOST = IS_PRODUCTION
-  ? 'https://api.kispg.co.kr'
-  : 'https://testapi.kispg.co.kr';
+function getKispgHost(): string {
+  const mode = process.env.KISPG_MODE;
+  console.log('[KISPG] MODE:', mode, '| MID:', process.env.KISPG_MID || '(default)');
+  return mode === 'production'
+    ? 'https://api.kispg.co.kr'
+    : 'https://testapi.kispg.co.kr';
+}
 
-export const KISPG_AUTH_URL = `${KISPG_API_HOST}/v2/auth`;       // 결제 인증 (결제창)
-export const KISPG_PAYMENT_URL = `${KISPG_API_HOST}/v2/payment`; // 결제 승인
-export const KISPG_CANCEL_URL = `${KISPG_API_HOST}/v2/cancel`;   // 결제 취소
+export function getKispgAuthUrl(): string {
+  return `${getKispgHost()}/v2/auth`;
+}
+export function getKispgPaymentUrl(): string {
+  return `${getKispgHost()}/v2/payment`;
+}
+export function getKispgCancelUrl(): string {
+  return `${getKispgHost()}/v2/cancel`;
+}
+
+// 레거시 호환
+export const KISPG_AUTH_URL = process.env.KISPG_MODE === 'production'
+  ? 'https://api.kispg.co.kr/v2/auth'
+  : 'https://testapi.kispg.co.kr/v2/auth';
 
 // 가맹점 정보
 export const KISPG_MID = process.env.KISPG_MID || 'kistest00m';
@@ -97,8 +111,11 @@ export interface KispgAuthParams {
 export async function buildAuthFormData(params: KispgAuthParams) {
   const mid = KISPG_MID;
   const ediDate = generateEdiDate();
-  const goodsAmt = params.goodsAmt.toString();
+  // KISPG는 정수 금액만 허용 (원 단위, 소수점 불가)
+  const goodsAmt = Math.round(params.goodsAmt).toString();
   const encData = await generateEncData({ ediDate, goodsAmt });
+
+  console.log('[KISPG buildAuthFormData] mid:', mid, 'ediDate:', ediDate, 'goodsAmt:', goodsAmt, 'ordNo:', params.ordNo);
 
   return {
     mid,
@@ -129,8 +146,12 @@ export interface KispgApproveParams {
 export async function approveKispgPayment(params: KispgApproveParams) {
   const mid = params.mid || KISPG_MID;
   const ediDate = generateEdiDate();
-  const goodsAmt = params.goodsAmt.toString();
+  // KISPG는 정수 금액만 허용
+  const goodsAmt = Math.round(params.goodsAmt).toString();
   const encData = await generateEncData({ mid, ediDate, goodsAmt });
+
+  const paymentUrl = getKispgPaymentUrl();
+  console.log('[KISPG Approve] URL:', paymentUrl, 'mid:', mid, 'tid:', params.tid, 'goodsAmt:', goodsAmt);
 
   const body = new URLSearchParams({
     mid,
@@ -141,7 +162,7 @@ export async function approveKispgPayment(params: KispgApproveParams) {
     charset: 'utf-8',
   });
 
-  const response = await fetch(KISPG_PAYMENT_URL, {
+  const response = await fetch(paymentUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
@@ -149,11 +170,22 @@ export async function approveKispgPayment(params: KispgApproveParams) {
     body: body.toString(),
   });
 
+  const responseText = await response.text();
+  console.log('[KISPG Approve] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
+
   if (!response.ok) {
-    throw new Error(`KISPG 결제 승인 HTTP 오류: ${response.status}`);
+    throw new Error(`KISPG 결제 승인 HTTP 오류: ${response.status} - ${responseText.substring(0, 200)}`);
   }
 
-  const data = await response.json();
+  let data: any;
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    console.error('[KISPG Approve] JSON 파싱 실패:', responseText.substring(0, 500));
+    throw new Error(`KISPG 결제 승인 응답 파싱 실패: ${responseText.substring(0, 200)}`);
+  }
+
+  console.log('[KISPG Approve] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
 
   // resultCd "0000" → 성공
   if (data.resultCd !== '0000') {
@@ -176,8 +208,12 @@ export interface KispgCancelParams {
 export async function cancelKispgPayment(params: KispgCancelParams) {
   const mid = KISPG_MID;
   const ediDate = generateEdiDate();
-  const canAmt = params.canAmt.toString();
+  // KISPG는 정수 금액만 허용
+  const canAmt = Math.round(params.canAmt).toString();
   const encData = await generateCancelEncData({ mid, ediDate, canAmt });
+
+  const cancelUrl = getKispgCancelUrl();
+  console.log('[KISPG Cancel] URL:', cancelUrl, 'mid:', mid, 'tid:', params.tid, 'canAmt:', canAmt);
 
   const body = new URLSearchParams({
     payMethod: params.payMethod,
@@ -192,7 +228,7 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
     charset: 'utf-8',
   });
 
-  const response = await fetch(KISPG_CANCEL_URL, {
+  const response = await fetch(cancelUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
@@ -200,11 +236,22 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
     body: body.toString(),
   });
 
+  const responseText = await response.text();
+  console.log('[KISPG Cancel] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
+
   if (!response.ok) {
-    throw new Error(`KISPG 결제 취소 HTTP 오류: ${response.status}`);
+    throw new Error(`KISPG 결제 취소 HTTP 오류: ${response.status} - ${responseText.substring(0, 200)}`);
   }
 
-  const data = await response.json();
+  let data: any;
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    console.error('[KISPG Cancel] JSON 파싱 실패:', responseText.substring(0, 500));
+    throw new Error(`KISPG 결제 취소 응답 파싱 실패: ${responseText.substring(0, 200)}`);
+  }
+
+  console.log('[KISPG Cancel] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
 
   if (data.resultCd !== '0000') {
     throw new Error(data.resultMsg || `KISPG 결제 취소 실패 (${data.resultCd})`);

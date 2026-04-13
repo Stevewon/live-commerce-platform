@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { buildAuthFormData, KISPG_AUTH_URL } from '@/lib/kispg';
+import { buildAuthFormData, getKispgAuthUrl } from '@/lib/kispg';
 import { getPrisma } from '@/lib/prisma';
 
 /**
@@ -49,24 +49,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 상품명 생성
-    const goodsNm = order.items.length === 1
+    // 상품명 생성 (특수문자 제거 - KISPG에서 일부 특수문자 거부)
+    const rawGoodsNm = order.items.length === 1
       ? order.items[0].product.name
       : `${order.items[0].product.name} 외 ${order.items.length - 1}건`;
+    const goodsNm = rawGoodsNm.replace(/[<>\"\'&\\]/g, '').substring(0, 40);
 
     // 주문자 정보
-    const ordNm = order.user?.name || order.shippingName;
-    const ordTel = order.user?.phone || order.shippingPhone || order.guestPhone || '';
+    const ordNm = (order.user?.name || order.shippingName || '주문자').replace(/[<>\"\'&\\]/g, '');
+    const ordTel = (order.user?.phone || order.shippingPhone || order.guestPhone || '').replace(/[^0-9-]/g, '');
     const ordEmail = order.user?.email || order.guestEmail || '';
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';
     const returnUrl = `${baseUrl}/api/payments/kispg/return`;
 
+    console.log('[KISPG Request] orderId:', orderId, 'orderNumber:', order.orderNumber, 'total:', order.total, 'returnUrl:', returnUrl);
+
     // mbsReserved에 주문 ID를 넣어서 returnUrl에서 식별
+    // goodsAmt는 반드시 정수 (원 단위)
     const formData = await buildAuthFormData({
       ordNo: order.orderNumber,
       goodsNm,
-      goodsAmt: order.total,
+      goodsAmt: Math.round(order.total),
       ordNm,
       ordTel,
       ordEmail,
@@ -74,6 +78,9 @@ export async function POST(request: NextRequest) {
       payMethod: 'card',
       mbsReserved: orderId,
     });
+
+    const authUrl = getKispgAuthUrl();
+    console.log('[KISPG Request] Auth URL:', authUrl, 'formData.mid:', formData.mid, 'formData.goodsAmt:', formData.goodsAmt);
 
     // 자동 submit HTML 생성 (KISPG 권장 방식: full-page form POST)
     const formFields = Object.entries(formData)
@@ -114,18 +121,29 @@ export async function POST(request: NextRequest) {
       100% { transform: rotate(360deg); }
     }
     p { color: #64748b; font-size: 16px; }
+    .error { color: #ef4444; display: none; margin-top: 16px; }
   </style>
 </head>
 <body>
   <div class="loading">
     <div class="spinner"></div>
     <p>결제 페이지로 이동 중입니다...</p>
+    <p class="error" id="errorMsg">결제 페이지 로딩에 문제가 발생했습니다. 잠시 후 다시 시도해주세요.</p>
   </div>
-  <form id="kispgForm" method="POST" action="${escapeHtml(KISPG_AUTH_URL)}">
+  <form id="kispgForm" method="POST" action="${escapeHtml(authUrl)}" accept-charset="utf-8">
     ${formFields}
   </form>
   <script>
-    document.getElementById('kispgForm').submit();
+    try {
+      document.getElementById('kispgForm').submit();
+    } catch(e) {
+      document.getElementById('errorMsg').style.display = 'block';
+      console.error('KISPG form submit error:', e);
+    }
+    // 3초 후에도 페이지가 남아있으면 에러 표시
+    setTimeout(function() {
+      document.getElementById('errorMsg').style.display = 'block';
+    }, 5000);
   </script>
 </body>
 </html>`;
