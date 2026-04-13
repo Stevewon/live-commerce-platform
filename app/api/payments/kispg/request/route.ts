@@ -82,75 +82,12 @@ export async function POST(request: NextRequest) {
     const authUrl = getKispgAuthUrl();
     console.log('[KISPG Request] Auth URL:', authUrl, 'formData.mid:', formData.mid, 'formData.goodsAmt:', formData.goodsAmt);
 
-    // 자동 submit HTML 생성 (KISPG 권장 방식: full-page form POST)
-    const formFields = Object.entries(formData)
-      .map(([key, value]) => `<input type="hidden" name="${key}" value="${escapeHtml(String(value))}">`)
-      .join('\n    ');
-
-    const html = `
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>결제 진행 중 - QRLIVE</title>
-  <style>
-    body {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      background: #f8fafc;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    }
-    .loading {
-      text-align: center;
-    }
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid #e2e8f0;
-      border-top: 4px solid #3b82f6;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    p { color: #64748b; font-size: 16px; }
-    .error { color: #ef4444; display: none; margin-top: 16px; }
-  </style>
-</head>
-<body>
-  <div class="loading">
-    <div class="spinner"></div>
-    <p>결제 페이지로 이동 중입니다...</p>
-    <p class="error" id="errorMsg">결제 페이지 로딩에 문제가 발생했습니다. 잠시 후 다시 시도해주세요.</p>
-  </div>
-  <form id="kispgForm" method="POST" action="${escapeHtml(authUrl)}" accept-charset="utf-8">
-    ${formFields}
-  </form>
-  <script>
-    try {
-      document.getElementById('kispgForm').submit();
-    } catch(e) {
-      document.getElementById('errorMsg').style.display = 'block';
-      console.error('KISPG form submit error:', e);
-    }
-    // 3초 후에도 페이지가 남아있으면 에러 표시
-    setTimeout(function() {
-      document.getElementById('errorMsg').style.display = 'block';
-    }, 5000);
-  </script>
-</body>
-</html>`;
-
-    return new Response(html, {
-      status: 200,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    // JSON으로 form 데이터 반환 → 클라이언트에서 동적 form 생성 후 submit
+    // (document.write() 방식은 PC Chrome에서 차단될 수 있으므로 사용하지 않음)
+    return NextResponse.json({
+      success: true,
+      authUrl,
+      formData,
     });
   } catch (error: any) {
     console.error('KISPG payment request error:', error);
@@ -161,11 +98,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+

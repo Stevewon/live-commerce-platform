@@ -283,7 +283,7 @@ export default function CheckoutPage() {
         sessionStorage.removeItem('checkout_storeSlug');
       } catch {}
 
-      // KISPG 결제창 호출 (서버에서 form HTML 반환 → 현재 페이지에 렌더링하여 KISPG로 이동)
+      // KISPG 결제창 호출 (서버에서 JSON 반환 → 클라이언트에서 동적 form 생성 후 submit)
       const kispgRes = await fetch('/api/payments/kispg/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -291,31 +291,35 @@ export default function CheckoutPage() {
         body: JSON.stringify({ orderId: order.id }),
       });
 
-      // 응답이 JSON인지 HTML인지 확인
-      const contentType = kispgRes.headers.get('content-type') || '';
-      
       if (!kispgRes.ok) {
-        if (contentType.includes('application/json')) {
-          const errData = await kispgRes.json().catch(() => ({}));
-          throw new Error(errData.error || '결제 요청에 실패했습니다.');
-        }
-        throw new Error('결제 요청에 실패했습니다. 다시 시도해주세요.');
+        const errData = await kispgRes.json().catch(() => ({}));
+        throw new Error(errData.error || '결제 요청에 실패했습니다.');
       }
 
-      if (contentType.includes('text/html')) {
-        // 서버가 HTML을 반환 → 현재 페이지를 대체하여 KISPG 결제창으로 이동
-        const html = await kispgRes.text();
-        // document.write를 사용하여 현재 페이지를 KISPG form으로 교체
-        document.open();
-        document.write(html);
-        document.close();
-        return; // 결제 페이지로 이동 중이므로 여기서 종료
-      } else {
-        // 예상치 못한 응답
-        const text = await kispgRes.text();
-        console.error('Unexpected KISPG response:', text.substring(0, 200));
-        throw new Error('결제 요청 응답 형식이 올바르지 않습니다.');
+      const kispgData = await kispgRes.json();
+      if (!kispgData.success || !kispgData.authUrl || !kispgData.formData) {
+        throw new Error(kispgData.error || '결제 데이터를 가져오지 못했습니다.');
       }
+
+      // 동적 form 생성 후 KISPG 결제창으로 POST submit
+      // (document.write() 방식은 PC Chrome에서 차단될 수 있어 사용하지 않음)
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = kispgData.authUrl;
+      form.acceptCharset = 'utf-8';
+      form.style.display = 'none';
+
+      Object.entries(kispgData.formData).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      form.submit();
+      return; // 결제 페이지로 이동 중이므로 여기서 종료
     } catch (error: any) {
       console.error('주문 실패:', error);
       if (error.message !== 'PAY_PROCESS_CANCELED' && error.message !== 'KISPG_REDIRECT') {
