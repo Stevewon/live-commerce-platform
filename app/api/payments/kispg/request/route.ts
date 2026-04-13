@@ -55,9 +55,10 @@ export async function POST(request: NextRequest) {
       : `${order.items[0].product.name} 외 ${order.items.length - 1}건`;
     const goodsNm = rawGoodsNm.replace(/[<>\"\'&\\]/g, '').substring(0, 40);
 
-    // 주문자 정보
+    // 주문자 정보 (KISPG는 ordTel 필수 - 빈값이면 W008 에러 발생)
     const ordNm = (order.user?.name || order.shippingName || '주문자').replace(/[<>\"\'&\\]/g, '');
-    const ordTel = (order.user?.phone || order.shippingPhone || order.guestPhone || '').replace(/[^0-9-]/g, '');
+    const rawTel = (order.shippingPhone || order.user?.phone || order.guestPhone || '').replace(/[^0-9-]/g, '');
+    const ordTel = rawTel || '01000000000'; // KISPG 필수값 - 비어있으면 기본값
     const ordEmail = order.user?.email || order.guestEmail || '';
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';
