@@ -109,7 +109,7 @@ export default function TermsPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">제7조 (구매 및 결제)</h2>
             <ol className="list-decimal pl-5 space-y-2">
               <li>이용자는 서비스를 통해 상품을 주문하고 결제할 수 있습니다.</li>
-              <li>결제 수단은 토스페이먼츠(Toss Payments) 등 회사가 제공하는 결제 방식을 통해 이루어집니다.</li>
+              <li>결제 수단은 KISPG(KIS정보통신) 등 회사가 제공하는 결제 방식을 통해 이루어집니다.</li>
               <li>이용자는 주문 시 정확한 배송 정보를 제공해야 하며, 잘못된 정보로 인한 배송 문제에 대해 회사는 책임을 지지 않습니다.</li>
               <li>라이브 방송 중 특별 할인이 적용된 상품은 방송 종료 후 정상 가격으로 변경될 수 있습니다.</li>
             </ol>

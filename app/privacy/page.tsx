@@ -193,7 +193,7 @@ export default function PrivacyPage() {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-4 py-2">토스페이먼츠(Toss Payments)</td>
+                    <td className="border border-gray-300 px-4 py-2">KISPG(KIS정보통신)</td>
                     <td className="border border-gray-300 px-4 py-2">결제 처리 및 결제 정보 관리</td>
                   </tr>
                   <tr className="bg-gray-50">

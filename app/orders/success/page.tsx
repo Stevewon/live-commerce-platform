@@ -14,43 +14,10 @@ function OrderSuccessContent() {
   const [orderId, setOrderId] = useState('');
 
   useEffect(() => {
-    const paymentKey = searchParams.get('paymentKey');
     const orderIdParam = searchParams.get('orderId');
-    const amount = searchParams.get('amount');
-
-    // Toss Payments 승인 파라미터가 있으면 결제 승인 진행
-    if (paymentKey && orderIdParam && amount) {
-      confirmPayment(paymentKey, orderIdParam, Number(amount));
-    } else {
-      // 승인 파라미터가 없으면 일반 주문 완료
-      const directOrderId = searchParams.get('orderId');
-      setOrderId(directOrderId || '');
-      setConfirming(false);
-    }
+    setOrderId(orderIdParam || '');
+    setConfirming(false);
   }, [searchParams]);
-
-  const confirmPayment = async (paymentKey: string, orderNumber: string, amount: number) => {
-    try {
-      const response = await fetch('/api/payments/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentKey, orderId: orderNumber, amount }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || '결제 승인에 실패했습니다.');
-      }
-
-      const data = await response.json();
-      setOrderId(orderNumber);
-      setConfirming(false);
-    } catch (err) {
-      console.error('Payment confirmation error:', err);
-      setError(err instanceof Error ? err.message : '결제 승인 중 오류가 발생했습니다.');
-      setConfirming(false);
-    }
-  };
 
   if (confirming) {
     return (

@@ -65,9 +65,10 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 KAKAO_CLIENT_ID=your-kakao-rest-api-key
 KAKAO_CLIENT_SECRET=
 
-# Toss Payments (프로덕션 키로 변경)
-NEXT_PUBLIC_TOSS_CLIENT_KEY=your-toss-production-client-key
-TOSS_SECRET_KEY=your-toss-production-secret-key
+# KISPG 결제 (운영환경)
+KISPG_MODE=production
+KISPG_MID=your-actual-mid
+KISPG_MERCHANT_KEY=your-actual-merchant-key
 ```
 
 > **참고**: `${{ RAILWAY_PUBLIC_DOMAIN }}`은 Railway가 자동으로 생성한 도메인으로 대체됩니다.

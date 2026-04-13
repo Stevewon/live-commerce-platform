@@ -15,7 +15,7 @@
 
 ### 1. 필요한 계정 및 도구
 - ✅ [Railway](https://railway.app) 계정 (GitHub 연동 권장)
-- ✅ [토스페이먼츠](https://developers.tosspayments.com) 실제 API 키
+- ✅ [KISPG](https://www.kispg.co.kr) 결제 연동 (MID/MERCHANT_KEY)
 - ✅ Git 설치 및 GitHub 저장소 연결
 - ✅ Railway CLI (선택사항, 마이그레이션 시 필요)
 
@@ -79,11 +79,12 @@ DATABASE_URL=postgresql://...  # PostgreSQL 플러그인이 자동 생성
 JWT_SECRET=your-generated-32-character-secret-key-here
 ```
 
-#### 3️⃣ 토스페이먼츠 API (필수)
+#### 3️⃣ KISPG 결제 API (필수)
 ```bash
-# 개발 키에서 실제 키로 변경
-NEXT_PUBLIC_TOSS_CLIENT_KEY=live_ck_실제클라이언트키
-TOSS_SECRET_KEY=live_sk_실제시크릿키
+# KISPG 가맹점 정보 (운영환경)
+KISPG_MODE=production
+KISPG_MID=실제MID
+KISPG_MERCHANT_KEY=실제MERCHANT_KEY
 ```
 
 #### 4️⃣ Node 환경 (필수)
@@ -295,7 +296,7 @@ railway logs --tail 100
 ### 배포 전 확인사항
 - [ ] 로컬 빌드 성공 (`npm run build`)
 - [ ] 환경변수 `.env.example` 참고하여 준비
-- [ ] 토스페이먼츠 실제 API 키 발급
+- [ ] KISPG 실제 가맹점 MID/MERCHANT_KEY 발급
 - [ ] JWT 시크릿 키 생성 (`openssl rand -hex 32`)
 
 ### 배포 중 확인사항
@@ -316,7 +317,7 @@ railway logs --tail 100
 ### 보안 체크리스트
 - [ ] JWT_SECRET이 강력한 랜덤 문자열인지 확인
 - [ ] DATABASE_URL이 외부에 노출되지 않았는지 확인
-- [ ] 토스페이먼츠 실제 키 사용 확인
+- [ ] KISPG 실제 키(MID/MERCHANT_KEY) 사용 확인
 - [ ] HTTPS 적용 확인
 - [ ] 환경변수가 Git에 커밋되지 않았는지 확인
 

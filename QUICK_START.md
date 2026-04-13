@@ -26,8 +26,9 @@ cp .env.example .env
 ```env
 DATABASE_URL="file:./dev.db"
 JWT_SECRET="your-super-secret-jwt-key-min-32-characters-long"
-NEXT_PUBLIC_TOSS_CLIENT_KEY="test_ck_..."
-TOSS_SECRET_KEY="test_sk_..."
+KISPG_MODE="test"
+KISPG_MID="kistest00m"
+KISPG_MERCHANT_KEY="your-merchant-key"
 ```
 
 ### 4️⃣ 데이터베이스 초기화 (30초)
@@ -111,8 +112,9 @@ Railway 대시보드에서 "New" → "Database" → "PostgreSQL"
 ```bash
 railway variables set DATABASE_URL="postgresql://..."
 railway variables set JWT_SECRET="your-secret"
-railway variables set NEXT_PUBLIC_TOSS_CLIENT_KEY="test_ck_..."
-railway variables set TOSS_SECRET_KEY="test_sk_..."
+railway variables set KISPG_MODE="production"
+railway variables set KISPG_MID="your-actual-mid"
+railway variables set KISPG_MERCHANT_KEY="your-actual-key"
 railway variables set NODE_ENV="production"
 ```
 

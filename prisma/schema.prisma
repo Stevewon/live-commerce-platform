@@ -373,7 +373,7 @@ model Order {
   
   // 결제 정보
   paymentMethod     String?       // card, bank, kakaopay 등
-  paymentKey        String?       // 토스 결제키 (환불용)
+  paymentKey        String?       // KISPG 결제키/TID (환불용)
   paidAt            DateTime?
   
   // 배송 추적 정보
