@@ -10,32 +10,102 @@ import { clearGuestCart } from '@/lib/utils/guestCart';
 function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isVerifying, setIsVerifying] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [orderInfo, setOrderInfo] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(false);
 
+  // KISPG 결제 완료 후 파라미터
   const orderId = searchParams.get('orderId');
-  const paymentKey = searchParams.get('paymentKey');
+  const orderNumber = searchParams.get('orderNumber');
   const amount = searchParams.get('amount');
+  const tid = searchParams.get('tid');
+  const payMethod = searchParams.get('payMethod');
+  const appNo = searchParams.get('appNo');
+
+  // Toss 호환 (기존 파라미터)
+  const paymentKey = searchParams.get('paymentKey');
 
   useEffect(() => {
-    if (!orderId || !paymentKey || !amount) {
+    if (!orderId) {
       alert('잘못된 접근입니다');
       router.push('/');
       return;
     }
 
-    verifyPayment();
+    // KISPG 결제의 경우: 승인이 이미 return route에서 처리되었으므로
+    // 별도 verify 없이 바로 주문 정보 표시
+    if (tid || orderNumber) {
+      handleKispgSuccess();
+    } else if (paymentKey && amount) {
+      // Toss Payments 결제 (레거시 호환)
+      verifyTossPayment();
+    } else {
+      // orderId만 있는 경우: DB에서 직접 조회
+      fetchOrderInfo();
+    }
   }, []);
 
-  const verifyPayment = async () => {
+  // KISPG 결제 성공 처리
+  const handleKispgSuccess = async () => {
     try {
-      // 쿠키 기반 인증 시도 (회원/비회원 모두)
+      const guestToken = localStorage.getItem('guestOrderToken');
+      setIsGuest(!!guestToken);
+
+      setOrderInfo({
+        orderNumber: orderNumber || '',
+        amount: amount ? parseInt(amount) : 0,
+        paymentKey: tid || '',
+        method: payMethodToKorean(payMethod || 'card'),
+        appNo: appNo || '',
+      });
+
+      setIsLoading(false);
+
+      // 장바구니 비우기
+      if (guestToken) {
+        clearGuestCart();
+      } else {
+        await fetch('/api/cart', {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(() => {});
+      }
+    } catch (error: any) {
+      console.error('KISPG success handling error:', error);
+      setIsLoading(false);
+    }
+  };
+
+  // DB에서 주문 정보 직접 조회
+  const fetchOrderInfo = async () => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const order = data.data || data.order;
+        if (order) {
+          setOrderInfo({
+            orderNumber: order.orderNumber,
+            amount: order.total,
+            method: order.paymentMethod || '카드',
+          });
+          setIsGuest(!order.userId);
+        }
+      }
+    } catch (err) {
+      console.error('Order fetch error:', err);
+    }
+    setIsLoading(false);
+  };
+
+  // Toss Payments 결제 검증 (기존 호환)
+  const verifyTossPayment = async () => {
+    try {
       const response = await fetch('/api/payments/verify', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ orderId, paymentKey, amount: parseInt(amount || '0') })
       });
@@ -46,7 +116,6 @@ function PaymentSuccessContent() {
         throw new Error(data.error || '결제 검증에 실패했습니다');
       }
 
-      // 비회원 여부 확인
       const guestToken = localStorage.getItem('guestOrderToken');
       setIsGuest(!!guestToken && !data.order.userId);
 
@@ -57,19 +126,16 @@ function PaymentSuccessContent() {
         method: data.payment.method,
         approvedAt: data.payment.approvedAt
       });
-      
-      setIsVerifying(false);
 
-      // 장바구니 비우기
+      setIsLoading(false);
+
       if (guestToken) {
-        // 비회원: localStorage 장바구니 비우기
         clearGuestCart();
       } else {
-        // 회원: 서버 장바구니 비우기
         await fetch('/api/cart', {
           method: 'DELETE',
           credentials: 'include',
-        });
+        }).catch(() => {});
       }
     } catch (error: any) {
       console.error('Payment verification error:', error);
@@ -78,7 +144,7 @@ function PaymentSuccessContent() {
     }
   };
 
-  if (isVerifying) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -114,6 +180,12 @@ function PaymentSuccessContent() {
               <span className="text-gray-500">결제수단</span>
               <span className="text-gray-900">{orderInfo?.method || '카드'}</span>
             </div>
+            {orderInfo?.appNo && (
+              <div className="flex justify-between border-b pb-3">
+                <span className="text-gray-500">승인번호</span>
+                <span className="font-mono text-gray-900">{orderInfo.appNo}</span>
+              </div>
+            )}
             <div className="flex justify-between pt-2">
               <span className="text-gray-500 text-lg">결제 금액</span>
               <span className="text-2xl font-bold text-blue-600">
@@ -189,6 +261,16 @@ function PaymentSuccessContent() {
       </div>
     </div>
   );
+}
+
+function payMethodToKorean(method: string): string {
+  const map: Record<string, string> = {
+    card: '신용카드', CARD: '신용카드',
+    bank: '계좌이체', BANK: '계좌이체',
+    vacnt: '가상계좌', VACNT: '가상계좌',
+    hp: '휴대폰결제', HP: '휴대폰결제',
+  };
+  return map[method] || method;
 }
 
 export default function PaymentSuccessPage() {

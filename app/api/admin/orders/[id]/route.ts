@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import { cancelTossPayment } from '@/lib/toss';
+import { cancelKispgPayment } from '@/lib/kispg';
 
 
 
@@ -78,18 +78,22 @@ export async function PATCH(
     if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
       updateData.cancelledAt = new Date();
       
-      // Toss Payments 실결제 취소
+      // KISPG 실결제 취소 (paymentKey에 KISPG tid 저장)
       if (order.paymentKey) {
         try {
-          const cancelResult = await cancelTossPayment(
-            order.paymentKey,
-            body.cancelReason || '관리자에 의한 주문 취소'
-          );
-          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total;
+          await cancelKispgPayment({
+            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            tid: order.paymentKey,
+            canAmt: order.total,
+            canId: 'admin',
+            canNm: '관리자',
+            canMsg: body.cancelReason || '관리자에 의한 주문 취소',
+          });
+          updateData.refundAmount = order.total;
           updateData.refundedAt = new Date();
-        } catch (tossError: any) {
-          console.error('Toss payment cancel failed (admin):', tossError.message);
-          // Toss 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
+        } catch (pgError: any) {
+          console.error('KISPG payment cancel failed (admin):', pgError.message);
+          // PG 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
         }
       }
     }
@@ -98,16 +102,20 @@ export async function PATCH(
     if (status === 'REFUNDED' && order.status !== 'REFUNDED') {
       updateData.refundedAt = new Date();
       
-      // Toss Payments 실결제 취소 (환불)
+      // KISPG 실결제 취소 (환불)
       if (order.paymentKey) {
         try {
-          const cancelResult = await cancelTossPayment(
-            order.paymentKey,
-            body.cancelReason || '관리자에 의한 환불 처리'
-          );
-          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total;
-        } catch (tossError: any) {
-          console.error('Toss payment refund failed (admin):', tossError.message);
+          await cancelKispgPayment({
+            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            tid: order.paymentKey,
+            canAmt: order.total,
+            canId: 'admin',
+            canNm: '관리자',
+            canMsg: body.cancelReason || '관리자에 의한 환불 처리',
+          });
+          updateData.refundAmount = order.total;
+        } catch (pgError: any) {
+          console.error('KISPG payment refund failed (admin):', pgError.message);
         }
       }
     }

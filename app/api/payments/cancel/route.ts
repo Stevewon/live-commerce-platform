@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cancelTossPayment } from '@/lib/toss';
+import { cancelKispgPayment } from '@/lib/kispg';
 import { getPrisma } from '@/lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth/middleware';
 
@@ -42,15 +42,22 @@ export async function POST(request: NextRequest) {
         cancelledAt: new Date(),
       };
 
-      // Toss Payments 실결제 취소
+      // KISPG 실결제 취소 (paymentKey에 KISPG tid 저장됨)
       if (order.paymentKey) {
         try {
-          const cancelResult = await cancelTossPayment(order.paymentKey, cancelReason);
-          updateData.refundAmount = cancelResult.cancels?.[0]?.cancelAmount || order.total;
+          const cancelResult = await cancelKispgPayment({
+            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            tid: order.paymentKey,
+            canAmt: order.total,
+            canId: req.user?.userId || 'user',
+            canNm: '고객',
+            canMsg: cancelReason,
+          });
+          updateData.refundAmount = order.total;
           updateData.refundedAt = new Date();
-        } catch (tossError: any) {
-          console.error('Toss payment cancel failed:', tossError.message);
-          // Toss 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
+        } catch (pgError: any) {
+          console.error('KISPG payment cancel failed:', pgError.message);
+          // PG 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
         }
       }
 

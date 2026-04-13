@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getPrisma } from '@/lib/prisma';
-import { confirmTossPayment } from '@/lib/toss';
 
-const TOSS_SECRET_KEY = process.env.TOSS_SECRET_KEY || 'test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R';
-
+/**
+ * POST /api/payments/verify
+ * 
+ * KISPG 전환 후 레거시 호환용.
+ * KISPG 결제는 /api/payments/kispg/return에서 승인 처리하므로
+ * 이 엔드포인트는 DB 주문 상태만 확인하여 반환한다.
+ * 
+ * 기존 Toss Payments 연동 코드에서 호출하는 경우에도 동작하도록 유지.
+ */
 export async function POST(req: NextRequest) {
   const prisma = await getPrisma();
   try {
     const body = await req.json();
     const { orderId, paymentKey, amount } = body;
 
-    if (!orderId || !paymentKey || !amount) {
+    if (!orderId) {
       return NextResponse.json(
-        { success: false, error: '필수 파라미터가 누락되었습니다' },
+        { success: false, error: '주문 ID가 필요합니다' },
         { status: 400 }
       );
     }
@@ -48,96 +54,40 @@ export async function POST(req: NextRequest) {
           );
         }
       }
-      // 비회원 주문이면 인증 체크 생략
     }
 
-    // 금액 검증
-    if (order.total !== amount) {
-      return NextResponse.json(
-        { success: false, error: '결제 금액이 일치하지 않습니다' },
-        { status: 400 }
-      );
-    }
-
-    // Toss Payments API 결제 승인 요청 (Cloudflare Workers 호환)
-    let tossData: any;
-    let tossSuccess = false;
-    
-    try {
-      tossData = await confirmTossPayment({
-        paymentKey,
-        orderId: order.orderNumber,
-        amount: order.total
-      });
-      tossSuccess = true;
-    } catch (tossError: any) {
-      tossData = { message: tossError.message, code: 'PAYMENT_CONFIRM_FAILED' };
-    }
-
-    if (!tossSuccess) {
-      console.error('Toss Payments verification failed:', tossData);
-      
-      // 주문 상태를 CANCELLED로 변경하고 재고 복구
-      await prisma.$transaction(async (tx) => {
-        await tx.order.update({
-          where: { id: orderId },
-          data: { status: 'CANCELLED' }
-        });
-
-        for (const item of order.items) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: {
-                increment: item.quantity
-              }
-            }
-          });
-        }
-      });
-
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: tossData.message || '결제 검증에 실패했습니다',
-          code: tossData.code 
+    // KISPG 결제의 경우: return route에서 이미 승인 처리됨 (CONFIRMED 상태)
+    // 상태만 확인하여 반환
+    if (order.status === 'CONFIRMED' || order.status === 'SHIPPING' || order.status === 'DELIVERED') {
+      return NextResponse.json({
+        success: true,
+        order,
+        payment: {
+          paymentKey: order.paymentKey || paymentKey || '',
+          orderId: order.orderNumber,
+          orderName: order.items.map(i => i.product.name).join(', '),
+          method: order.paymentMethod || '신용카드',
+          totalAmount: order.total,
+          approvedAt: order.paidAt?.toISOString() || new Date().toISOString(),
         },
+        message: '결제가 완료되었습니다'
+      });
+    }
+
+    // PENDING 상태인 경우 (아직 결제 미완료)
+    if (order.status === 'PENDING') {
+      return NextResponse.json(
+        { success: false, error: '결제가 아직 완료되지 않았습니다', code: 'PAYMENT_PENDING' },
         { status: 400 }
       );
     }
 
-    // 결제 성공 - 주문 상태 업데이트
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: 'CONFIRMED',
-        paymentMethod: tossData.method,
-        paymentKey: tossData.paymentKey,
-        paidAt: new Date(tossData.approvedAt)
-      },
-      include: {
-        items: {
-          include: {
-            product: true
-          }
-        }
-      }
-    });
+    // CANCELLED 등 다른 상태
+    return NextResponse.json(
+      { success: false, error: '결제가 취소되었거나 유효하지 않은 주문입니다', code: order.status },
+      { status: 400 }
+    );
 
-    return NextResponse.json({
-      success: true,
-      order: updatedOrder,
-      payment: {
-        paymentKey: tossData.paymentKey,
-        orderId: tossData.orderId,
-        orderName: tossData.orderName,
-        method: tossData.method,
-        totalAmount: tossData.totalAmount,
-        approvedAt: tossData.approvedAt,
-        receipt: tossData.receipt
-      },
-      message: '결제가 완료되었습니다'
-    });
   } catch (error: any) {
     console.error('Payment verification error:', error);
     return NextResponse.json(

@@ -1,24 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { confirmTossPayment } from '@/lib/toss';
+import { approveKispgPayment } from '@/lib/kispg';
 import { getPrisma } from '@/lib/prisma';
 
+/**
+ * POST /api/payments/confirm
+ * 
+ * KISPG 결제 승인 API (수동 호출용).
+ * 일반적으로 /api/payments/kispg/return에서 자동 승인되지만,
+ * 필요 시 별도로 승인을 시도할 수 있는 엔드포인트.
+ * 
+ * Body: { tid, orderId, amount }
+ */
 export async function POST(request: NextRequest) {
   const prisma = await getPrisma();
   try {
-    const { paymentKey, orderId, amount } = await request.json();
+    const { tid, orderId, amount } = await request.json();
 
-    if (!paymentKey || !orderId || !amount) {
+    if (!tid || !orderId || !amount) {
       return NextResponse.json(
         { success: false, error: '필수 파라미터가 누락되었습니다.' },
         { status: 400 }
       );
     }
 
-    // Toss Payments API로 결제 승인 요청
-    const paymentData = await confirmTossPayment({
-      paymentKey,
-      orderId,
-      amount,
+    // KISPG 결제 승인 요청
+    const paymentData = await approveKispgPayment({
+      tid,
+      goodsAmt: amount,
     });
 
     // DB에서 주문 조회
@@ -38,9 +46,9 @@ export async function POST(request: NextRequest) {
       where: { id: order.id },
       data: {
         status: 'CONFIRMED',
-        paymentMethod: paymentData.method,
-        paymentKey: paymentData.paymentKey || paymentKey,
-        paidAt: paymentData.approvedAt ? new Date(paymentData.approvedAt) : new Date(),
+        paymentMethod: paymentData.payMethod || '신용카드',
+        paymentKey: tid,
+        paidAt: new Date(),
       },
     });
 
