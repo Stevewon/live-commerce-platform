@@ -31,8 +31,8 @@
     "JWT_SECRET": "temp-jwt-secret-change-in-production-32chars",
     "NEXTAUTH_SECRET": "temp-nextauth-secret-change-me-32chars",
     "NEXT_PUBLIC_API_URL": "https://qrlive.io",
-    "KISPG_MODE": "test",
-    "KISPG_MID": "kistest00m",
-    "KISPG_MERCHANT_KEY": "2d6ECGhR1pg/1QGE1lcRI4awsWEgshjEyI8UgYslLPJSuNeyPTkdrT8XWARezvDTUJClWQWhjxzBbu7AsuLZqg=="
+    "KISPG_MODE": "production",
+    "KISPG_MID": "quanta001m",
+    "KISPG_MERCHANT_KEY": "Vme+so0frfyol4Fx1qRVuegbtUezBuTEZuBWGQVFyCCgisZgU4UhepUiGQyypnP/NFv9uwaoCPymfu4KXx31jw=="
   }
 }
