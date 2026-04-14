@@ -12,6 +12,17 @@ interface Order {
   total: number;
   status: string;
   createdAt: string;
+  paymentMethod: string | null;
+  paymentKey: string | null;
+  paidAt: string | null;
+  refundAmount: number | null;
+  refundedAt: string | null;
+  cancelledAt: string | null;
+  shippingName: string | null;
+  shippingPhone: string | null;
+  shippingAddress: string | null;
+  trackingCompany: string | null;
+  trackingNumber: string | null;
   user: {
     name: string;
     email: string;
@@ -81,6 +92,8 @@ export default function AdminOrdersPage() {
   const [trackingCompany, setTrackingCompany] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [cancelProcessing, setCancelProcessing] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     if (user && user.role === 'ADMIN') {
@@ -638,6 +651,179 @@ export default function AdminOrdersPage() {
                   </span>
                 </div>
               </div>
+
+              {/* 결제 정보 */}
+              <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 border-2 border-amber-200">
+                <h4 className="font-black text-gray-900 mb-4 text-lg flex items-center">
+                  <span className="text-2xl mr-2">💳</span>
+                  결제 정보
+                </h4>
+                <div className="space-y-3 text-base">
+                  <div className="flex justify-between items-center bg-white rounded-xl p-4">
+                    <span className="text-gray-600 font-bold">결제수단:</span>
+                    <span className="font-black text-gray-900">{selectedOrder.paymentMethod || '미결제'}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white rounded-xl p-4">
+                    <span className="text-gray-600 font-bold">거래번호 (TID):</span>
+                    <span className="font-mono font-bold text-gray-700 text-sm">{selectedOrder.paymentKey || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white rounded-xl p-4">
+                    <span className="text-gray-600 font-bold">결제일시:</span>
+                    <span className="font-bold text-gray-900">{selectedOrder.paidAt ? formatDate(selectedOrder.paidAt) : '-'}</span>
+                  </div>
+                  {selectedOrder.refundAmount && (
+                    <div className="flex justify-between items-center bg-red-50 rounded-xl p-4 border border-red-200">
+                      <span className="text-red-600 font-bold">환불금액:</span>
+                      <span className="font-black text-red-600">{formatCurrency(selectedOrder.refundAmount)}</span>
+                    </div>
+                  )}
+                  {selectedOrder.refundedAt && (
+                    <div className="flex justify-between items-center bg-red-50 rounded-xl p-4 border border-red-200">
+                      <span className="text-red-600 font-bold">환불일시:</span>
+                      <span className="font-bold text-red-600">{formatDate(selectedOrder.refundedAt)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 카드 결제 취소/환불 버튼 */}
+              {selectedOrder.paymentKey && 
+               selectedOrder.status !== 'CANCELLED' && 
+               selectedOrder.status !== 'REFUNDED' && (
+                <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl p-6 border-2 border-red-200">
+                  <h4 className="font-black text-red-700 mb-4 text-lg flex items-center">
+                    <span className="text-2xl mr-2">🔴</span>
+                    카드 결제 취소
+                  </h4>
+                  <p className="text-sm text-red-600 mb-4 font-medium">
+                    카드 결제를 취소하면 고객의 카드로 환불됩니다. 이 작업은 되돌릴 수 없습니다.
+                  </p>
+                  <div className="mb-4">
+                    <label className="block text-sm font-bold text-red-700 mb-2">취소 사유</label>
+                    <input
+                      type="text"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder="취소 사유를 입력하세요 (선택)"
+                      className="w-full px-4 py-3 border-2 border-red-200 rounded-xl text-sm font-medium focus:ring-4 focus:ring-red-200 focus:border-red-400"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      disabled={cancelProcessing}
+                      onClick={async () => {
+                        if (!confirm('정말 카드 결제를 취소하시겠습니까?\n\n' +
+                          `주문번호: ${selectedOrder.orderNumber}\n` +
+                          `결제금액: ${formatCurrency(selectedOrder.total)}\n` +
+                          `거래번호: ${selectedOrder.paymentKey}\n\n` +
+                          '카드 결제 취소 후 고객에게 환불됩니다.')) {
+                          return;
+                        }
+                        try {
+                          setCancelProcessing(true);
+                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                              status: 'CANCELLED',
+                              cancelReason: cancelReason || '관리자에 의한 주문 취소',
+                            }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || '취소 실패');
+                          alert('카드 결제 취소가 처리되었습니다.');
+                          setSelectedOrder(null);
+                          setCancelReason('');
+                          loadOrders();
+                        } catch (error: any) {
+                          alert('취소 처리 실패: ' + (error.message || '알 수 없는 오류'));
+                        } finally {
+                          setCancelProcessing(false);
+                        }
+                      }}
+                      className="flex-1 px-6 py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-black hover:from-red-600 hover:to-red-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {cancelProcessing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                          <span>취소 처리 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl">❌</span>
+                          <span>주문 취소 + 카드 환불</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      disabled={cancelProcessing}
+                      onClick={async () => {
+                        if (!confirm('환불 처리하시겠습니까?\n\n' +
+                          `주문번호: ${selectedOrder.orderNumber}\n` +
+                          `결제금액: ${formatCurrency(selectedOrder.total)}\n\n` +
+                          '주문 상태를 환불됨으로 변경하고 카드 환불을 진행합니다.')) {
+                          return;
+                        }
+                        try {
+                          setCancelProcessing(true);
+                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                              status: 'REFUNDED',
+                              cancelReason: cancelReason || '관리자에 의한 환불 처리',
+                            }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || '환불 실패');
+                          alert('환불 처리가 완료되었습니다.');
+                          setSelectedOrder(null);
+                          setCancelReason('');
+                          loadOrders();
+                        } catch (error: any) {
+                          alert('환불 처리 실패: ' + (error.message || '알 수 없는 오류'));
+                        } finally {
+                          setCancelProcessing(false);
+                        }
+                      }}
+                      className="flex-1 px-6 py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl font-black hover:from-orange-600 hover:to-amber-600 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {cancelProcessing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                          <span>환불 처리 중...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl">💸</span>
+                          <span>환불 처리</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 이미 취소/환불된 경우 안내 */}
+              {(selectedOrder.status === 'CANCELLED' || selectedOrder.status === 'REFUNDED') && (
+                <div className="bg-gray-100 rounded-2xl p-6 border-2 border-gray-300">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{selectedOrder.status === 'CANCELLED' ? '❌' : '💸'}</span>
+                    <div>
+                      <p className="font-black text-gray-700">
+                        {selectedOrder.status === 'CANCELLED' ? '취소된 주문입니다' : '환불 처리된 주문입니다'}
+                      </p>
+                      {selectedOrder.cancelledAt && (
+                        <p className="text-sm text-gray-500 font-medium mt-1">
+                          처리일시: {formatDate(selectedOrder.cancelledAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 배송 추적 정보 입력 */}
               <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-6 border-2 border-indigo-200">
