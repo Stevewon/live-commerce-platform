@@ -97,6 +97,20 @@ export default function ProductDetailClient() {
   const [cartMessage, setCartMessage] = useState('');
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
+  // 동적 배송비 설정
+  const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
+
+  useEffect(() => {
+    fetch('/api/settings/shipping')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setShippingConfig(data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (slug) fetchProduct();
   }, [slug]);
@@ -205,7 +219,7 @@ export default function ProductDetailClient() {
   const discountPercent = currentComparePrice && currentComparePrice > currentPrice
     ? Math.round(((currentComparePrice - currentPrice) / currentComparePrice) * 100)
     : 0;
-  const shippingFree = currentPrice * quantity >= 50000;
+  const shippingFree = shippingConfig.shippingFee === 0 || (shippingConfig.freeShippingThreshold > 0 && currentPrice * quantity >= shippingConfig.freeShippingThreshold);
 
   // Average rating - safely handle reviews possibly being undefined or not an array
   const safeReviews = Array.isArray(product.reviews) ? product.reviews : [];
@@ -427,7 +441,13 @@ export default function ProductDetailClient() {
                 {shippingFree ? (
                   <span className="text-green-600 font-medium">무료배송</span>
                 ) : (
-                  <span className="text-gray-500">배송비 ₩3,000 (₩50,000 이상 무료)</span>
+                  <span className="text-gray-500">
+                    {shippingConfig.shippingFee === 0
+                      ? '전 상품 무료배송'
+                      : shippingConfig.freeShippingThreshold > 0
+                        ? `배송비 ₩${shippingConfig.shippingFee.toLocaleString()} (₩${shippingConfig.freeShippingThreshold.toLocaleString()} 이상 무료)`
+                        : `배송비 ₩${shippingConfig.shippingFee.toLocaleString()}`}
+                  </span>
                 )}
               </div>
             </div>

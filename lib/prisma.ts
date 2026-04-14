@@ -760,6 +760,7 @@ function createDbProxy(db: D1DB) {
     notification: 'Notification',
     liveChat: 'LiveChat',
     productVariant: 'ProductVariant',
+    siteSetting: 'SiteSetting',
   };
   
   const proxy: any = {

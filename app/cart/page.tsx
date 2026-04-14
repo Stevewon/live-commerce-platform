@@ -36,6 +36,20 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // 동적 배송비 설정
+  const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
+
+  useEffect(() => {
+    fetch('/api/settings/shipping')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setShippingConfig(data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const isGuest = !user;
 
   const loadCart = useCallback(async () => {
@@ -170,7 +184,9 @@ export default function CartPage() {
   };
 
   const totalAmount = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shippingFee = totalAmount >= 50000 ? 0 : totalAmount > 0 ? 3000 : 0;
+  const shippingFee = totalAmount > 0
+    ? (shippingConfig.freeShippingThreshold > 0 && totalAmount >= shippingConfig.freeShippingThreshold ? 0 : shippingConfig.shippingFee)
+    : 0;
   const finalAmount = totalAmount + shippingFee;
 
   if (authLoading || loading) {
@@ -332,9 +348,9 @@ export default function CartPage() {
                       )}
                     </span>
                   </div>
-                  {totalAmount > 0 && totalAmount < 50000 && (
+                  {totalAmount > 0 && shippingConfig.freeShippingThreshold > 0 && totalAmount < shippingConfig.freeShippingThreshold && (
                     <p className="text-xs text-blue-600">
-                      ₩{(50000 - totalAmount).toLocaleString()} 더 담으면 무료배송!
+                      ₩{(shippingConfig.freeShippingThreshold - totalAmount).toLocaleString()} 더 담으면 무료배송!
                     </p>
                   )}
                   <div className="border-t pt-3 flex justify-between text-lg font-bold text-gray-900">

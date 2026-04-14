@@ -141,6 +141,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 배송비 설정 조회 (DB에서 동적 배송비 가져오기)
+    let configShippingFee = 3000;
+    let configFreeThreshold = 50000;
+    try {
+      // SiteSetting 테이블 자동 생성 (D1)
+      try {
+        const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+        const ctx = await getCloudflareContext();
+        const db = (ctx.env as any).DB;
+        if (db) {
+          await db.prepare(`CREATE TABLE IF NOT EXISTS "SiteSetting" ("id" TEXT NOT NULL PRIMARY KEY, "key" TEXT NOT NULL, "value" TEXT NOT NULL, "description" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
+          await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS "SiteSetting_key_key" ON "SiteSetting"("key")`).run();
+        }
+      } catch {}
+      const shippingSettings = await prisma.siteSetting.findMany({
+        where: { key: { in: ['SHIPPING_FEE', 'FREE_SHIPPING_THRESHOLD'] } },
+      });
+      for (const s of shippingSettings) {
+        if (s.key === 'SHIPPING_FEE') configShippingFee = parseInt(s.value) || 3000;
+        if (s.key === 'FREE_SHIPPING_THRESHOLD') configFreeThreshold = parseInt(s.value) || 50000;
+      }
+    } catch (e) {
+      // DB 오류 시 기본값 사용
+      console.error('Failed to load shipping settings:', e);
+    }
+
     // 상품 가격 검증
     const productIds = items.map((item: any) => item.productId);
     const products = await prisma.product.findMany({
@@ -198,9 +224,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 서버사이드 배송비 계산 (클라이언트 값 대신 DB 설정 사용)
+    const serverShippingFee = configFreeThreshold > 0 && subtotal >= configFreeThreshold ? 0 : configShippingFee;
+
     // 쿠폰 처리
     let discount = 0;
-    let appliedShippingFee = shippingFee;
+    let appliedShippingFee = serverShippingFee;
     let couponId: string | null = null;
 
     if (couponCode) {

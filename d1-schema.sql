@@ -331,6 +331,17 @@ CREATE INDEX IF NOT EXISTS "Notification_userId_idx" ON "Notification"("userId")
 CREATE INDEX IF NOT EXISTS "Notification_isRead_idx" ON "Notification"("isRead");
 CREATE INDEX IF NOT EXISTS "Notification_createdAt_idx" ON "Notification"("createdAt");
 
+CREATE TABLE IF NOT EXISTS "SiteSetting" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "key" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "description" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "SiteSetting_key_key" ON "SiteSetting"("key");
+CREATE INDEX IF NOT EXISTS "SiteSetting_key_idx" ON "SiteSetting"("key");
+
 CREATE TABLE IF NOT EXISTS "LiveChat" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "liveStreamId" TEXT NOT NULL,
