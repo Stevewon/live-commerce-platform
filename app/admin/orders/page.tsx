@@ -686,18 +686,94 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* 카드 결제 취소/환불 버튼 */}
-              {selectedOrder.paymentKey && 
+              {/* 결제 정보 수동 등록 (paymentKey가 없는 경우) */}
+              {!selectedOrder.paymentKey && 
                selectedOrder.status !== 'CANCELLED' && 
+               selectedOrder.status !== 'REFUNDED' && (
+                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl p-6 border-2 border-yellow-300">
+                  <h4 className="font-black text-yellow-800 mb-3 text-lg flex items-center">
+                    <span className="text-2xl mr-2">⚠️</span>
+                    결제 정보 미등록
+                  </h4>
+                  <p className="text-sm text-yellow-700 mb-4 font-medium">
+                    이 주문의 거래번호(TID)가 등록되어 있지 않습니다. 실제 결제가 완료된 경우 KISPG 관리자 페이지에서 TID를 확인하여 아래에 입력해주세요.
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-bold text-yellow-800 mb-1">거래번호 (TID)</label>
+                      <input
+                        type="text"
+                        id="manualTidInput"
+                        placeholder="KISPG 거래번호 (TID)를 입력하세요"
+                        className="w-full px-4 py-3 border-2 border-yellow-300 rounded-xl text-sm font-mono font-medium focus:ring-4 focus:ring-yellow-200 focus:border-yellow-500 bg-white"
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const tidInput = (document.getElementById('manualTidInput') as HTMLInputElement)?.value?.trim();
+                        if (!tidInput) {
+                          alert('거래번호(TID)를 입력해주세요.');
+                          return;
+                        }
+                        if (!confirm(`거래번호(TID)를 등록하시겠습니까?\n\nTID: ${tidInput}`)) return;
+                        try {
+                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                              paymentKey: tidInput,
+                              paymentMethod: '신용카드',
+                            }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || '등록 실패');
+                          alert('결제 정보가 등록되었습니다. 이제 카드 취소가 가능합니다.');
+                          setSelectedOrder({ ...selectedOrder, paymentKey: tidInput, paymentMethod: '신용카드' });
+                          loadOrders();
+                        } catch (error: any) {
+                          alert('결제 정보 등록 실패: ' + (error.message || '알 수 없는 오류'));
+                        }
+                      }}
+                      className="w-full px-6 py-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-white rounded-xl font-black hover:from-yellow-600 hover:to-amber-600 transition-all shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <span className="text-xl">💾</span>
+                      <span>거래번호(TID) 등록</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 카드 결제 취소/환불 버튼 - paymentKey가 있거나 수동 TID 입력 가능 */}
+              {selectedOrder.status !== 'CANCELLED' && 
                selectedOrder.status !== 'REFUNDED' && (
                 <div className="bg-gradient-to-br from-red-50 to-pink-50 rounded-2xl p-6 border-2 border-red-200">
                   <h4 className="font-black text-red-700 mb-4 text-lg flex items-center">
                     <span className="text-2xl mr-2">🔴</span>
-                    카드 결제 취소
+                    주문 취소 / 카드 결제 취소
                   </h4>
-                  <p className="text-sm text-red-600 mb-4 font-medium">
-                    카드 결제를 취소하면 고객의 카드로 환불됩니다. 이 작업은 되돌릴 수 없습니다.
-                  </p>
+                  {selectedOrder.paymentKey ? (
+                    <p className="text-sm text-red-600 mb-4 font-medium">
+                      카드 결제를 취소하면 고객의 카드로 환불됩니다. 이 작업은 되돌릴 수 없습니다.
+                    </p>
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-3 mb-4">
+                      <p className="text-sm text-yellow-800 font-bold">
+                        ⚠️ 거래번호(TID)가 등록되어 있지 않습니다.
+                      </p>
+                      <p className="text-xs text-yellow-700 mt-1">
+                        실제 결제가 완료된 경우 위의 &quot;결제 정보 수동 등록&quot;에서 TID를 먼저 등록하거나, 아래에 TID를 직접 입력하여 취소할 수 있습니다.
+                      </p>
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          id="cancelManualTidInput"
+                          placeholder="수동 TID 입력 (선택사항)"
+                          className="w-full px-3 py-2 border border-yellow-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-yellow-300 bg-white"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="mb-4">
                     <label className="block text-sm font-bold text-red-700 mb-2">취소 사유</label>
                     <input
@@ -712,27 +788,42 @@ export default function AdminOrdersPage() {
                     <button
                       disabled={cancelProcessing}
                       onClick={async () => {
-                        if (!confirm('정말 카드 결제를 취소하시겠습니까?\n\n' +
-                          `주문번호: ${selectedOrder.orderNumber}\n` +
-                          `결제금액: ${formatCurrency(selectedOrder.total)}\n` +
-                          `거래번호: ${selectedOrder.paymentKey}\n\n` +
-                          '카드 결제 취소 후 고객에게 환불됩니다.')) {
-                          return;
-                        }
+                        const manualTid = !selectedOrder.paymentKey 
+                          ? (document.getElementById('cancelManualTidInput') as HTMLInputElement)?.value?.trim() 
+                          : undefined;
+                        const tidToUse = selectedOrder.paymentKey || manualTid;
+                        
+                        const confirmMsg = tidToUse
+                          ? `정말 카드 결제를 취소하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n거래번호: ${tidToUse}\n\n카드 결제 취소 후 고객에게 환불됩니다.`
+                          : `주문을 취소하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n\n⚠️ 거래번호(TID)가 없어 카드 자동환불은 진행되지 않습니다.\nKISPG 관리자 페이지에서 수동 취소가 필요합니다.`;
+                        
+                        if (!confirm(confirmMsg)) return;
+                        
                         try {
                           setCancelProcessing(true);
+                          const bodyData: any = {
+                            status: 'CANCELLED',
+                            cancelReason: cancelReason || '관리자에 의한 주문 취소',
+                          };
+                          if (manualTid) bodyData.manualTid = manualTid;
+                          
                           const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include',
-                            body: JSON.stringify({
-                              status: 'CANCELLED',
-                              cancelReason: cancelReason || '관리자에 의한 주문 취소',
-                            }),
+                            body: JSON.stringify(bodyData),
                           });
                           const data = await res.json();
                           if (!res.ok) throw new Error(data.error || '취소 실패');
-                          alert('카드 결제 취소가 처리되었습니다.');
+                          
+                          let alertMsg = '주문 취소가 처리되었습니다.';
+                          if (data.warning) {
+                            alertMsg += '\n\n⚠️ 주의: ' + data.warning;
+                          }
+                          if (tidToUse) {
+                            alertMsg += '\n\n카드 환불이 진행됩니다.';
+                          }
+                          alert(alertMsg);
                           setSelectedOrder(null);
                           setCancelReason('');
                           loadOrders();
@@ -752,33 +843,43 @@ export default function AdminOrdersPage() {
                       ) : (
                         <>
                           <span className="text-xl">❌</span>
-                          <span>주문 취소 + 카드 환불</span>
+                          <span>{selectedOrder.paymentKey ? '주문 취소 + 카드 환불' : '주문 취소'}</span>
                         </>
                       )}
                     </button>
                     <button
                       disabled={cancelProcessing}
                       onClick={async () => {
-                        if (!confirm('환불 처리하시겠습니까?\n\n' +
-                          `주문번호: ${selectedOrder.orderNumber}\n` +
-                          `결제금액: ${formatCurrency(selectedOrder.total)}\n\n` +
-                          '주문 상태를 환불됨으로 변경하고 카드 환불을 진행합니다.')) {
+                        const manualTid = !selectedOrder.paymentKey 
+                          ? (document.getElementById('cancelManualTidInput') as HTMLInputElement)?.value?.trim() 
+                          : undefined;
+                        const tidToUse = selectedOrder.paymentKey || manualTid;
+                        
+                        if (!confirm(`환불 처리하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n${tidToUse ? `거래번호: ${tidToUse}\n` : '⚠️ TID 없음 - KISPG 수동 환불 필요\n'}\n주문 상태를 환불됨으로 변경합니다.`)) {
                           return;
                         }
                         try {
                           setCancelProcessing(true);
+                          const bodyData: any = {
+                            status: 'REFUNDED',
+                            cancelReason: cancelReason || '관리자에 의한 환불 처리',
+                          };
+                          if (manualTid) bodyData.manualTid = manualTid;
+                          
                           const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include',
-                            body: JSON.stringify({
-                              status: 'REFUNDED',
-                              cancelReason: cancelReason || '관리자에 의한 환불 처리',
-                            }),
+                            body: JSON.stringify(bodyData),
                           });
                           const data = await res.json();
                           if (!res.ok) throw new Error(data.error || '환불 실패');
-                          alert('환불 처리가 완료되었습니다.');
+                          
+                          let alertMsg = '환불 처리가 완료되었습니다.';
+                          if (data.warning) {
+                            alertMsg += '\n\n⚠️ 주의: ' + data.warning;
+                          }
+                          alert(alertMsg);
                           setSelectedOrder(null);
                           setCancelReason('');
                           loadOrders();
