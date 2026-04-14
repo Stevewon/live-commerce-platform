@@ -155,30 +155,31 @@ export async function approveKispgPayment(params: KispgApproveParams) {
   const paymentUrl = getKispgPaymentUrl();
   console.log('[KISPG Approve] URL:', paymentUrl, 'mid:', mid, 'tid:', params.tid, 'goodsAmt:', goodsAmt);
 
-  const body = new URLSearchParams({
+  // KISPG v2 API는 application/json만 허용 (form-urlencoded 전송 시 415 에러 발생)
+  const bodyData = {
     mid,
     tid: params.tid,
     goodsAmt,
     ediDate,
     encData,
     charset: 'utf-8',
-  });
+  };
 
   const response = await fetch(paymentUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+      'Content-Type': 'application/json; charset=utf-8',
     },
-    body: body.toString(),
+    body: JSON.stringify(bodyData),
   });
 
   const responseText = await response.text();
   console.log('[KISPG Approve] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
 
-  // 방화벽 차단 감지 (kisvan.co.kr/firewall.html 또는 '비정상적인 접근' HTML 응답)
-  if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr')) {
-    console.error('[KISPG Approve] 방화벽 차단 감지! 서버 IP가 KISPG 화이트리스트에 등록되지 않았습니다.');
-    throw new Error('KISPG 방화벽에 의해 결제 승인이 차단되었습니다. 관리자에게 문의해주세요. (카드 결제는 완료되었으며, 자동 환불 처리됩니다)');
+  // HTML 응답 감지 (KISPG가 JSON 대신 HTML을 반환한 경우 - 415 에러 등)
+  if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr') || responseText.includes('<!DOCTYPE')) {
+    console.error('[KISPG Approve] HTML 응답 감지 (415 또는 비정상 응답). HTTP Status:', response.status);
+    throw new Error('KISPG 결제 승인 서버 응답 오류. 관리자에게 문의해주세요.');
   }
 
   if (!response.ok) {
@@ -223,7 +224,8 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
   const cancelUrl = getKispgCancelUrl();
   console.log('[KISPG Cancel] URL:', cancelUrl, 'mid:', mid, 'tid:', params.tid, 'canAmt:', canAmt);
 
-  const body = new URLSearchParams({
+  // KISPG v2 API는 application/json만 허용 (form-urlencoded 전송 시 415 에러 발생)
+  const bodyData = {
     payMethod: params.payMethod,
     mid,
     tid: params.tid,
@@ -234,23 +236,23 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
     ediDate,
     encData,
     charset: 'utf-8',
-  });
+  };
 
   const response = await fetch(cancelUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+      'Content-Type': 'application/json; charset=utf-8',
     },
-    body: body.toString(),
+    body: JSON.stringify(bodyData),
   });
 
   const responseText = await response.text();
   console.log('[KISPG Cancel] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
 
-  // 방화벽 차단 감지
-  if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr')) {
-    console.error('[KISPG Cancel] 방화벽 차단 감지! 서버 IP가 KISPG 화이트리스트에 등록되지 않았습니다.');
-    throw new Error('KISPG 방화벽에 의해 취소 요청이 차단되었습니다. KISPG 고객센터(1599-3700)에 서버 IP 등록을 요청해주세요.');
+  // HTML 응답 감지 (KISPG가 JSON 대신 HTML을 반환한 경우 - 415 에러 등)
+  if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr') || responseText.includes('<!DOCTYPE')) {
+    console.error('[KISPG Cancel] HTML 응답 감지 (415 또는 비정상 응답). HTTP Status:', response.status);
+    throw new Error('KISPG 결제 취소 서버 응답 오류. 관리자에게 문의해주세요.');
   }
 
   if (!response.ok) {
