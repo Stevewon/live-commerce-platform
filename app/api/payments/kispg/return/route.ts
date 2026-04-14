@@ -193,7 +193,12 @@ export async function POST(request: NextRequest) {
 
       const failUrl = new URL('/payment/fail', baseUrl);
       failUrl.searchParams.set('code', 'APPROVE_FAILED');
-      failUrl.searchParams.set('message', approveError.message || '결제 승인 처리 중 오류가 발생했습니다');
+      // 방화벽 차단 에러인 경우 사용자 친화적 메시지
+      const isFirewall = approveError.message?.includes('방화벽') || approveError.message?.includes('firewall') || approveError.message?.includes('redirect');
+      const userMessage = isFirewall
+        ? '결제 승인 서버 연결에 실패했습니다. 결제금액은 자동 환불됩니다. 잠시 후 다시 시도해주세요.'
+        : (approveError.message || '결제 승인 처리 중 오류가 발생했습니다');
+      failUrl.searchParams.set('message', userMessage);
       failUrl.searchParams.set('orderId', orderId);
       return NextResponse.redirect(failUrl.toString(), 303);
     }

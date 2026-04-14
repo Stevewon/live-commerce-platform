@@ -71,12 +71,33 @@ export async function GET(request: NextRequest) {
       kispgTest.isFirewallBlocked = e.message?.includes('redirect') || e.message?.includes('firewall');
     }
 
+    // Cloudflare Workers 실행 위치 확인
+    const cfData: Record<string, any> = {};
+    try {
+      // @ts-ignore - Cloudflare Workers에서만 존재하는 속성
+      const cf = (request as any).cf;
+      if (cf) {
+        cfData.colo = cf.colo; // 데이터센터 코드 (ICN=인천, NRT=도쿄, IAD=버지니아 등)
+        cfData.country = cf.country;
+        cfData.city = cf.city;
+        cfData.region = cf.region;
+        cfData.timezone = cf.timezone;
+      }
+    } catch (e: any) {
+      cfData.error = e.message;
+    }
+
+    // cf-placement 헤더 확인
+    const placementHeader = request.headers.get('cf-placement') || 'not set';
+
     return NextResponse.json({
       message: 'Server outbound IP addresses',
       ips: results,
+      workerLocation: cfData,
+      placementHeader,
       kispgApiTest: kispgTest,
       timestamp: new Date().toISOString(),
-      note: 'KISPG 방화벽에 등록해야 할 IP입니다',
+      note: 'KISPG 방화벽에 등록해야 할 IP입니다. Worker가 한국(ICN)에서 실행되어야 합니다.',
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
