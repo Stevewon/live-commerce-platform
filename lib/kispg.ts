@@ -165,21 +165,35 @@ export async function approveKispgPayment(params: KispgApproveParams) {
     charset: 'utf-8',
   };
 
+  // redirect: 'manual' - 방화벽 리다이렉트(firewall.html)를 자동으로 따라가지 않음
+  // Cloudflare Workers에서 KISPG 방화벽이 IP를 차단하면 302→firewall.html 무한 리다이렉트 발생
   const response = await fetch(paymentUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+      'User-Agent': 'QRLive-Payment/1.0',
+      'Accept': 'application/json',
     },
     body: JSON.stringify(bodyData),
+    redirect: 'manual',
   });
 
-  const responseText = await response.text();
-  console.log('[KISPG Approve] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
+  console.log('[KISPG Approve] HTTP Status:', response.status, 'Type:', response.type);
 
-  // HTML 응답 감지 (KISPG가 JSON 대신 HTML을 반환한 경우 - 415 에러 등)
+  // 3xx 리다이렉트 감지 = 방화벽 차단
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location') || '';
+    console.error('[KISPG Approve] 방화벽 리다이렉트 감지! Location:', location);
+    throw new Error(`KISPG 방화벽 차단: 서버 IP가 KISPG에 등록되지 않았습니다. KISPG 고객센터(1599-3700)에 Cloudflare Workers IP 등록을 요청하세요.`);
+  }
+
+  const responseText = await response.text();
+  console.log('[KISPG Approve] Response:', responseText.substring(0, 500));
+
+  // HTML 응답 감지 (KISPG가 JSON 대신 HTML을 반환한 경우)
   if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr') || responseText.includes('<!DOCTYPE')) {
-    console.error('[KISPG Approve] HTML 응답 감지 (415 또는 비정상 응답). HTTP Status:', response.status);
-    throw new Error('KISPG 결제 승인 서버 응답 오류. 관리자에게 문의해주세요.');
+    console.error('[KISPG Approve] HTML/방화벽 응답 감지. HTTP Status:', response.status);
+    throw new Error('KISPG 방화벽 차단: 서버 IP가 등록되지 않았습니다. KISPG 고객센터에 IP 등록을 요청하세요.');
   }
 
   if (!response.ok) {
@@ -190,8 +204,8 @@ export async function approveKispgPayment(params: KispgApproveParams) {
   try {
     data = JSON.parse(responseText);
   } catch (e) {
-    console.error('[KISPG Approve] JSON 파싱 실패 (HTML 응답 가능성):', responseText.substring(0, 500));
-    throw new Error('KISPG 결제 승인 서버 응답 오류. 관리자에게 문의해주세요.');
+    console.error('[KISPG Approve] JSON 파싱 실패:', responseText.substring(0, 500));
+    throw new Error('KISPG 결제 승인 서버 응답 형식 오류. 관리자에게 문의해주세요.');
   }
 
   console.log('[KISPG Approve] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
@@ -238,21 +252,34 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
     charset: 'utf-8',
   };
 
+  // redirect: 'manual' - 방화벽 리다이렉트 방지
   const response = await fetch(cancelUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+      'User-Agent': 'QRLive-Payment/1.0',
+      'Accept': 'application/json',
     },
     body: JSON.stringify(bodyData),
+    redirect: 'manual',
   });
 
-  const responseText = await response.text();
-  console.log('[KISPG Cancel] HTTP Status:', response.status, 'Response:', responseText.substring(0, 500));
+  console.log('[KISPG Cancel] HTTP Status:', response.status, 'Type:', response.type);
 
-  // HTML 응답 감지 (KISPG가 JSON 대신 HTML을 반환한 경우 - 415 에러 등)
+  // 3xx 리다이렉트 감지 = 방화벽 차단
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location') || '';
+    console.error('[KISPG Cancel] 방화벽 리다이렉트 감지! Location:', location);
+    throw new Error(`KISPG 방화벽 차단: 서버 IP가 KISPG에 등록되지 않았습니다. KISPG 고객센터(1599-3700)에 Cloudflare Workers IP 등록을 요청하세요.`);
+  }
+
+  const responseText = await response.text();
+  console.log('[KISPG Cancel] Response:', responseText.substring(0, 500));
+
+  // HTML 응답 감지
   if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr') || responseText.includes('<!DOCTYPE')) {
-    console.error('[KISPG Cancel] HTML 응답 감지 (415 또는 비정상 응답). HTTP Status:', response.status);
-    throw new Error('KISPG 결제 취소 서버 응답 오류. 관리자에게 문의해주세요.');
+    console.error('[KISPG Cancel] HTML/방화벽 응답 감지. HTTP Status:', response.status);
+    throw new Error('KISPG 방화벽 차단: 서버 IP가 등록되지 않았습니다. KISPG 고객센터에 IP 등록을 요청하세요.');
   }
 
   if (!response.ok) {
@@ -263,8 +290,8 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
   try {
     data = JSON.parse(responseText);
   } catch (e) {
-    console.error('[KISPG Cancel] JSON 파싱 실패 (HTML 응답 가능성):', responseText.substring(0, 500));
-    throw new Error('KISPG 결제 취소 서버 응답 오류. KISPG 고객센터(1599-3700)에 문의해주세요.');
+    console.error('[KISPG Cancel] JSON 파싱 실패:', responseText.substring(0, 500));
+    throw new Error('KISPG 결제 취소 서버 응답 형식 오류. KISPG 고객센터(1599-3700)에 문의해주세요.');
   }
 
   console.log('[KISPG Cancel] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
