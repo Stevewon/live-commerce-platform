@@ -8,6 +8,12 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Worker를 KISPG 서버(한국)에 가장 가까운 데이터센터에서 실행
+  // KISPG 방화벽이 해외(미국 등) IP를 차단하여 firewall.html로 리다이렉트하므로
+  // Worker가 한국 데이터센터에서 실행되어야 결제 승인 API가 정상 동작함
+  "placement": {
+    "hostname": "api.kispg.co.kr"
+  },
   "observability": {
     "enabled": true
   },
