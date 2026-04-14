@@ -23,7 +23,29 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { status, trackingCompany, trackingNumber } = body;
+    const { status, trackingCompany, trackingNumber, paymentKey: manualPaymentKey, paymentMethod: manualPaymentMethod } = body;
+
+    // 결제 정보 수동 등록 (status 없이 paymentKey만 보낼 수 있음)
+    if (!status && (manualPaymentKey || manualPaymentMethod)) {
+      const updatePaymentData: any = {};
+      if (manualPaymentKey) updatePaymentData.paymentKey = manualPaymentKey;
+      if (manualPaymentMethod) updatePaymentData.paymentMethod = manualPaymentMethod;
+      
+      const updatedOrder = await prisma.order.update({
+        where: { id },
+        data: updatePaymentData,
+        include: {
+          user: { select: { name: true, email: true } },
+          partner: { select: { storeName: true } },
+          items: { include: { product: { select: { name: true, price: true } } } },
+        },
+      });
+      return NextResponse.json({
+        success: true,
+        message: '결제 정보가 업데이트되었습니다',
+        order: updatedOrder,
+      });
+    }
 
     // 유효한 상태 확인
     const validStatuses = ['PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED', 'CANCELLED', 'REFUNDED'];
@@ -78,12 +100,17 @@ export async function PATCH(
     if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
       updateData.cancelledAt = new Date();
       
-      // KISPG 실결제 취소 (paymentKey에 KISPG tid 저장)
-      if (order.paymentKey) {
+      // KISPG 실결제 취소 - paymentKey 또는 수동 입력한 TID 사용
+      const tidForCancel = order.paymentKey || body.manualTid;
+      if (tidForCancel) {
+        // paymentKey가 없었던 주문에 수동 TID를 입력한 경우 저장
+        if (!order.paymentKey && body.manualTid) {
+          updateData.paymentKey = body.manualTid;
+        }
         try {
           await cancelKispgPayment({
             payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
-            tid: order.paymentKey,
+            tid: tidForCancel,
             canAmt: order.total,
             canId: 'admin',
             canNm: '관리자',
@@ -93,7 +120,8 @@ export async function PATCH(
           updateData.refundedAt = new Date();
         } catch (pgError: any) {
           console.error('KISPG payment cancel failed (admin):', pgError.message);
-          // PG 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
+          // PG 취소 실패 시 에러 메시지 포함하여 반환 (주문 취소는 진행)
+          updateData._pgCancelError = pgError.message;
         }
       }
     }
@@ -102,12 +130,16 @@ export async function PATCH(
     if (status === 'REFUNDED' && order.status !== 'REFUNDED') {
       updateData.refundedAt = new Date();
       
-      // KISPG 실결제 취소 (환불)
-      if (order.paymentKey) {
+      // KISPG 실결제 취소 (환불) - paymentKey 또는 수동 TID 사용
+      const tidForRefund = order.paymentKey || body.manualTid;
+      if (tidForRefund) {
+        if (!order.paymentKey && body.manualTid) {
+          updateData.paymentKey = body.manualTid;
+        }
         try {
           await cancelKispgPayment({
             payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
-            tid: order.paymentKey,
+            tid: tidForRefund,
             canAmt: order.total,
             canId: 'admin',
             canNm: '관리자',
@@ -116,9 +148,14 @@ export async function PATCH(
           updateData.refundAmount = order.total;
         } catch (pgError: any) {
           console.error('KISPG payment refund failed (admin):', pgError.message);
+          updateData._pgCancelError = pgError.message;
         }
       }
     }
+
+    // PG 에러 메시지 추출 후 updateData에서 제거
+    const pgCancelError = updateData._pgCancelError;
+    delete updateData._pgCancelError;
 
     // 주문 상태 업데이트
     const updatedOrder = await prisma.order.update({
@@ -149,11 +186,18 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({
+    const responseData: any = {
       success: true,
       message: '주문 상태가 변경되었습니다',
       order: updatedOrder,
-    });
+    };
+    
+    // PG 취소 실패 시 경고 메시지 포함
+    if (pgCancelError) {
+      responseData.warning = `주문 상태는 변경되었으나 카드 결제 취소가 실패했습니다: ${pgCancelError}. KISPG 관리자 페이지에서 수동 취소가 필요합니다.`;
+    }
+
+    return NextResponse.json(responseData);
   } catch (error: any) {
     console.error('Admin order update error:', error);
     return NextResponse.json({ error: '주문 상태 변경 실패' }, { status: 500 });
