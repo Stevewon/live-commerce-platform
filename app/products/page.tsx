@@ -73,6 +73,20 @@ function ProductsContent() {
   const currentMaxPrice = searchParams.get('maxPrice') || '';
   const currentInStock = searchParams.get('inStock') || '';
 
+  // 동적 배송비 설정
+  const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
+
+  useEffect(() => {
+    fetch('/api/settings/shipping')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setShippingConfig(data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Local filter state
   const [searchInput, setSearchInput] = useState(currentSearch);
   const [priceMin, setPriceMin] = useState(currentMinPrice);
@@ -412,7 +426,7 @@ function ProductsContent() {
                           <p className="text-xs text-gray-400 line-through">₩{product.comparePrice.toLocaleString()}</p>
                         )}
                         <div className="flex gap-1 mt-2">
-                          {product.stock > 0 && product.price >= 50000 && (
+                          {product.stock > 0 && (shippingConfig.shippingFee === 0 || (shippingConfig.freeShippingThreshold > 0 && product.price >= shippingConfig.freeShippingThreshold)) && (
                             <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">무료배송</span>
                           )}
                           {product.stock > 0 && product.stock <= 5 && (

@@ -63,6 +63,9 @@ export default function CheckoutPage() {
   const [storePartnerId, setStorePartnerId] = useState<string | null>(null);
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
 
+  // 동적 배송비 설정
+  const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
+
   // 배송 메모 프리셋
   const MEMO_PRESETS = [
     '직접 입력',
@@ -72,6 +75,18 @@ export default function CheckoutPage() {
     '부재 시 경비실에 맡겨주세요',
   ];
   const [memoPreset, setMemoPreset] = useState('직접 입력');
+
+  // 배송비 설정 로드
+  useEffect(() => {
+    fetch('/api/settings/shipping')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setShippingConfig(data.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -185,7 +200,7 @@ export default function CheckoutPage() {
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity, 0
   );
-  const shippingFee = totalAmount >= 50000 ? 0 : 3000;
+  const shippingFee = shippingConfig.freeShippingThreshold > 0 && totalAmount >= shippingConfig.freeShippingThreshold ? 0 : shippingConfig.shippingFee;
   const couponDiscount = appliedCoupon?.discountAmount || 0;
   const finalAmount = Math.max(0, totalAmount + shippingFee - couponDiscount);
 
@@ -607,7 +622,7 @@ export default function CheckoutPage() {
                       <span className="font-medium">-₩{couponDiscount.toLocaleString()}</span>
                     </div>
                   )}
-                  {totalAmount >= 50000 && (
+                  {shippingFee === 0 && totalAmount > 0 && (
                     <p className="text-xs text-green-600 font-semibold">무료배송 적용!</p>
                   )}
                   <div className="border-t pt-3 flex justify-between text-xl font-bold text-gray-900">

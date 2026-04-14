@@ -149,6 +149,9 @@ export default function AdminDashboard() {
           <Link href="/admin/products" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
             상품 관리
           </Link>
+          <Link href="/admin/settings" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+            &#9881;&#65039; 설정
+          </Link>
         </div>
 
         {/* 오늘의 통계 */}
