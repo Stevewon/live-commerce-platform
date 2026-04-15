@@ -188,13 +188,18 @@ export async function PATCH(
 
     const responseData: any = {
       success: true,
-      message: '주문 상태가 변경되었습니다',
       order: updatedOrder,
     };
     
-    // PG 취소 실패 시 경고 메시지 포함
+    // PG 취소 결과에 따른 메시지
     if (pgCancelError) {
-      responseData.warning = `주문 상태는 변경되었으나 카드 결제 취소가 실패했습니다: ${pgCancelError}. KISPG 관리자 페이지에서 수동 취소가 필요합니다.`;
+      responseData.message = '주문 상태가 변경되었습니다';
+      responseData.warning = `카드 결제 취소 API 응답 오류: ${pgCancelError}. 카드사에서 실제 취소가 되었는지 KISPG 관리자 페이지에서 확인해주세요.`;
+    } else if ((status === 'CANCELLED' || status === 'REFUNDED') && (order.paymentKey || body.manualTid)) {
+      responseData.message = '주문 취소 및 카드 결제 취소가 완료되었습니다';
+      responseData.pgCancelSuccess = true;
+    } else {
+      responseData.message = '주문 상태가 변경되었습니다';
     }
 
     return NextResponse.json(responseData);

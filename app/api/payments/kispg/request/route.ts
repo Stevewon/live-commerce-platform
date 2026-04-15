@@ -42,6 +42,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 이미 결제 완료된 주문은 결제 재시도 불가 (MOID 중복 방지)
+    if (order.status === 'CONFIRMED' || order.status === 'SHIPPING' || order.status === 'DELIVERED') {
+      return NextResponse.json(
+        { success: false, error: '이미 결제가 완료된 주문입니다. 주문내역을 확인해주세요.' },
+        { status: 400 }
+      );
+    }
+
+    if (order.status === 'CANCELLED' || order.status === 'REFUNDED') {
+      return NextResponse.json(
+        { success: false, error: '취소 또는 환불된 주문입니다. 새로 주문해주세요.' },
+        { status: 400 }
+      );
+    }
+
     if (order.status !== 'PENDING') {
       return NextResponse.json(
         { success: false, error: '결제 대기 상태가 아닌 주문입니다.' },
@@ -70,12 +85,14 @@ export async function POST(request: NextRequest) {
     // goodsAmt는 반드시 정수 (원 단위)
     // ordNo: KISPG는 영문+숫자만 허용 (하이픈 등 특수문자 불가 - 9998 에러 발생)
     // MOID 중복 방지: 같은 주문으로 결제 재시도 시 KISPG가 중복 MOID를 거부하므로
-    // ordNo에 짧은 타임스탬프 suffix를 추가하여 매 요청마다 유니크하게 만듦
+    // ordNo에 밀리초 타임스탬프 + 랜덤값을 추가하여 매 요청마다 유니크하게 만듦
     // (DB의 orderNumber는 변경하지 않고, KISPG에 보내는 ordNo만 유니크화)
     const baseOrdNo = order.orderNumber.replace(/[^a-zA-Z0-9]/g, '');
-    const retrySuffix = Date.now().toString(36).slice(-4); // 짧은 유니크 suffix
-    const safeOrdNo = `${baseOrdNo}R${retrySuffix}`;
-    console.log('[KISPG Request] ordNo 변환:', order.orderNumber, '->', safeOrdNo, '(retry suffix:', retrySuffix, ')');
+    // 밀리초 타임스탬프(base36) + 2자리 랜덤 = 매우 높은 유니크성 보장
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 4);
+    const safeOrdNo = `${baseOrdNo}T${timestamp}${random}`.substring(0, 40); // KISPG ordNo 최대 40자
+    console.log('[KISPG Request] ordNo 변환:', order.orderNumber, '->', safeOrdNo);
 
     const formData = await buildAuthFormData({
       ordNo: safeOrdNo,

@@ -816,11 +816,15 @@ export default function AdminOrdersPage() {
                           const data = await res.json();
                           if (!res.ok) throw new Error(data.error || '취소 실패');
                           
-                          let alertMsg = '주문 취소가 처리되었습니다.';
-                          if (data.warning) {
-                            alertMsg += '\n\n⚠️ 주의: ' + data.warning;
+                          let alertMsg = '';
+                          if (data.pgCancelSuccess) {
+                            alertMsg = '✅ 주문 취소 및 카드 결제 취소가 완료되었습니다.\n\n카드 환불이 진행됩니다.';
+                          } else if (data.warning) {
+                            alertMsg = '주문 상태는 변경되었습니다.\n\n⚠️ 주의: ' + data.warning;
                           } else if (tidToUse) {
-                            alertMsg += '\n\n카드 환불이 진행됩니다.';
+                            alertMsg = '주문 취소가 처리되었습니다.\n\n카드 환불이 진행됩니다.';
+                          } else {
+                            alertMsg = '주문 취소가 처리되었습니다.';
                           }
                           alert(alertMsg);
                           setSelectedOrder(null);
@@ -874,9 +878,13 @@ export default function AdminOrdersPage() {
                           const data = await res.json();
                           if (!res.ok) throw new Error(data.error || '환불 실패');
                           
-                          let alertMsg = '환불 처리가 완료되었습니다.';
-                          if (data.warning) {
-                            alertMsg += '\n\n⚠️ 주의: ' + data.warning;
+                          let alertMsg = '';
+                          if (data.pgCancelSuccess) {
+                            alertMsg = '✅ 환불 처리 및 카드 결제 취소가 완료되었습니다.';
+                          } else if (data.warning) {
+                            alertMsg = '환불 상태로 변경되었습니다.\n\n⚠️ 주의: ' + data.warning;
+                          } else {
+                            alertMsg = '환불 처리가 완료되었습니다.';
                           }
                           alert(alertMsg);
                           setSelectedOrder(null);
