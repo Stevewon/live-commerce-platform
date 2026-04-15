@@ -69,8 +69,13 @@ export async function POST(request: NextRequest) {
     // mbsReserved에 주문 ID를 넣어서 returnUrl에서 식별
     // goodsAmt는 반드시 정수 (원 단위)
     // ordNo: KISPG는 영문+숫자만 허용 (하이픈 등 특수문자 불가 - 9998 에러 발생)
-    const safeOrdNo = order.orderNumber.replace(/[^a-zA-Z0-9]/g, '');
-    console.log('[KISPG Request] ordNo 변환:', order.orderNumber, '->', safeOrdNo);
+    // MOID 중복 방지: 같은 주문으로 결제 재시도 시 KISPG가 중복 MOID를 거부하므로
+    // ordNo에 짧은 타임스탬프 suffix를 추가하여 매 요청마다 유니크하게 만듦
+    // (DB의 orderNumber는 변경하지 않고, KISPG에 보내는 ordNo만 유니크화)
+    const baseOrdNo = order.orderNumber.replace(/[^a-zA-Z0-9]/g, '');
+    const retrySuffix = Date.now().toString(36).slice(-4); // 짧은 유니크 suffix
+    const safeOrdNo = `${baseOrdNo}R${retrySuffix}`;
+    console.log('[KISPG Request] ordNo 변환:', order.orderNumber, '->', safeOrdNo, '(retry suffix:', retrySuffix, ')');
 
     const formData = await buildAuthFormData({
       ordNo: safeOrdNo,
