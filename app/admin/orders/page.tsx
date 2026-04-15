@@ -819,8 +819,7 @@ export default function AdminOrdersPage() {
                           let alertMsg = '주문 취소가 처리되었습니다.';
                           if (data.warning) {
                             alertMsg += '\n\n⚠️ 주의: ' + data.warning;
-                          }
-                          if (tidToUse) {
+                          } else if (tidToUse) {
                             alertMsg += '\n\n카드 환불이 진행됩니다.';
                           }
                           alert(alertMsg);

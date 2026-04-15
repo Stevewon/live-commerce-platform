@@ -226,6 +226,7 @@ export interface KispgCancelParams {
   canId?: string;         // 취소자 ID
   canNm?: string;         // 취소자 이름
   canMsg?: string;        // 취소 사유
+  partCanFlg?: '0' | '1'; // 부분취소 여부: 0=전체취소, 1=부분취소 (기본값: 0)
 }
 
 export async function cancelKispgPayment(params: KispgCancelParams) {
@@ -247,6 +248,7 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
     canId: params.canId || 'admin',
     canNm: params.canNm || '관리자',
     canMsg: params.canMsg || '고객 요청에 의한 취소',
+    partCanFlg: params.partCanFlg || '0', // 전체취소(0) / 부분취소(1) - KISPG 필수 파라미터
     ediDate,
     encData,
     charset: 'utf-8',
