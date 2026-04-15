@@ -131,6 +131,7 @@ export default function FindPasswordPage() {
                 id="newPassword"
                 name="newPassword"
                 type="password"
+                autoComplete="new-password"
                 required
                 placeholder="최소 6자 이상"
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -148,6 +149,7 @@ export default function FindPasswordPage() {
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
+                autoComplete="new-password"
                 required
                 placeholder="비밀번호를 다시 입력하세요"
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
