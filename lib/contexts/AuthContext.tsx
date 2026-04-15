@@ -46,31 +46,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  // 자동 로그인 - 페이지 로드 시 쿠키에서 사용자 정보 가져오기
+  // 자동 로그인 - localStorage 캐시 우선 로드 + 쿠키 검증
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // 쿠키에서 사용자 정보 가져오기 (서버 검증)
-        const res = await fetch('/api/auth/me', {
-          credentials: 'include', // 쿠키 포함
-        });
+        // 1단계: localStorage에서 캐시된 사용자 정보 즉시 로드 (빠른 UI 렌더링)
+        const cachedUser = localStorage.getItem('user');
+        const cachedToken = localStorage.getItem('auth-token');
+        
+        if (cachedUser && cachedToken) {
+          try {
+            const parsedUser = JSON.parse(cachedUser);
+            setUser(parsedUser);
+            setToken(cachedToken);
+          } catch {
+            localStorage.removeItem('user');
+            localStorage.removeItem('auth-token');
+          }
+        }
 
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.data.user) {
-            setUser(data.data.user);
-            // localStorage에도 저장 (빠른 접근용)
-            localStorage.setItem('user', JSON.stringify(data.data.user));
+        // 2단계: 토큰이 있을 때만 서버 검증 (불필요한 401 방지)
+        if (cachedToken) {
+          const res = await fetch('/api/auth/me', {
+            credentials: 'include',
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.data.user) {
+              setUser(data.data.user);
+              localStorage.setItem('user', JSON.stringify(data.data.user));
+            }
+          } else {
+            // 토큰이 만료되었거나 유효하지 않음
+            setUser(null);
+            setToken(null);
+            localStorage.removeItem('user');
+            localStorage.removeItem('auth-token');
           }
         } else {
-          // 쿠키가 없거나 유효하지 않음
+          // 토큰이 없으면 API 호출하지 않음 (401 에러 방지)
           setUser(null);
-          localStorage.removeItem('user');
+          setToken(null);
         }
       } catch (error) {
         console.error('Auto-login failed:', error);
         setUser(null);
+        setToken(null);
         localStorage.removeItem('user');
+        localStorage.removeItem('auth-token');
       } finally {
         setLoading(false);
       }

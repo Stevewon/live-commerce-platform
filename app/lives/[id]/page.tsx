@@ -166,13 +166,13 @@ export default function LiveViewPage() {
             ← 목록으로
           </Link>
           <div className="flex items-center gap-4">
-            {/* Socket 연결 상태 */}
+            {/* 채팅 연결 상태 */}
             <span
               className={`text-xs px-2 py-1 rounded ${
-                connected ? 'bg-green-500' : 'bg-red-500'
+                connected ? 'bg-green-500' : 'bg-yellow-500'
               }`}
             >
-              {connected ? '🟢 연결됨' : '🔴 연결 끊김'}
+              {connected ? '🟢 실시간 채팅' : '🟡 채팅 연결 중...'}
             </span>
             
             {live.isLive && (
