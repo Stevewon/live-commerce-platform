@@ -193,11 +193,27 @@ export async function POST(request: NextRequest) {
 
       const failUrl = new URL('/payment/fail', baseUrl);
       failUrl.searchParams.set('code', 'APPROVE_FAILED');
-      // 방화벽 차단 에러인 경우 사용자 친화적 메시지
+      // 에러 유형별 사용자 친화적 메시지
       const isFirewall = approveError.message?.includes('방화벽') || approveError.message?.includes('firewall') || approveError.message?.includes('redirect');
-      const userMessage = isFirewall
-        ? '결제 승인 서버 연결에 실패했습니다. 결제금액은 자동 환불됩니다. 잠시 후 다시 시도해주세요.'
-        : (approveError.message || '결제 승인 처리 중 오류가 발생했습니다');
+      const isMoidDuplicate = approveError.message?.includes('MOID') || approveError.message?.includes('중복') || approveError.message?.includes('이미 처리');
+      let userMessage: string;
+      if (isFirewall) {
+        userMessage = '결제 승인 서버 연결에 실패했습니다. 결제금액은 자동 환불됩니다. 잠시 후 다시 시도해주세요.';
+      } else if (isMoidDuplicate) {
+        userMessage = '주문번호(MOID)중복 또는 이미 처리된 주문입니다. 주문내역을 확인 후 새로 주문해주세요.';
+        // MOID 중복이면 주문을 CANCELLED로 변경하여 재주문 유도
+        try {
+          await prisma.order.update({
+            where: { id: orderId },
+            data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: '결제 승인 실패 (MOID 중복)' },
+          });
+          console.log('[KISPG Return] MOID 중복 → 주문 취소 처리:', orderId);
+        } catch (cancelErr: any) {
+          console.error('[KISPG Return] MOID 중복 주문 취소 실패:', cancelErr.message);
+        }
+      } else {
+        userMessage = approveError.message || '결제 처리 중 문제가 발생했습니다';
+      }
       failUrl.searchParams.set('message', userMessage);
       failUrl.searchParams.set('orderId', orderId);
       return NextResponse.redirect(failUrl.toString(), 303);

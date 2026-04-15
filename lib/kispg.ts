@@ -229,6 +229,11 @@ export interface KispgCancelParams {
   partCanFlg?: '0' | '1'; // 부분취소 여부: 0=전체취소, 1=부분취소 (기본값: 0)
 }
 
+// KISPG 취소 성공 코드 목록
+// 0000: 일반 성공, 2001: 카드 취소 성공, 2002: 부분취소 성공
+// 이미 취소된 건 메시지 포함 시에도 성공으로 간주
+const CANCEL_SUCCESS_CODES = ['0000', '2001', '2002'];
+
 export async function cancelKispgPayment(params: KispgCancelParams) {
   const mid = KISPG_MID;
   const ediDate = generateEdiDate();
@@ -254,6 +259,8 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
     charset: 'utf-8',
   };
 
+  console.log('[KISPG Cancel] Request body:', JSON.stringify(bodyData));
+
   // redirect: 'manual' - 방화벽 리다이렉트 방지
   const response = await fetch(cancelUrl, {
     method: 'POST',
@@ -276,7 +283,7 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
   }
 
   const responseText = await response.text();
-  console.log('[KISPG Cancel] Response:', responseText.substring(0, 500));
+  console.log('[KISPG Cancel] Full Response:', responseText);
 
   // HTML 응답 감지
   if (responseText.includes('firewall.html') || responseText.includes('비정상적인 접근') || responseText.includes('kisvan.co.kr') || responseText.includes('<!DOCTYPE')) {
@@ -296,13 +303,29 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
     throw new Error('KISPG 결제 취소 서버 응답 형식 오류. KISPG 고객센터(1599-3700)에 문의해주세요.');
   }
 
-  console.log('[KISPG Cancel] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
+  console.log('[KISPG Cancel] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg, 'canTid:', data.canTid || data.tid);
 
-  if (data.resultCd !== '0000') {
-    throw new Error(data.resultMsg || `KISPG 결제 취소 실패 (${data.resultCd})`);
+  // 취소 성공 코드 확인 (확장된 성공 코드 목록)
+  if (CANCEL_SUCCESS_CODES.includes(data.resultCd)) {
+    console.log('[KISPG Cancel] 취소 성공! resultCd:', data.resultCd);
+    return data;
   }
 
-  return data;
+  // "이미 취소된 거래" 메시지인 경우도 성공으로 간주
+  const alreadyCancelledKeywords = ['이미 취소', '취소된 거래', '취소 완료', 'already cancel', '중복 취소'];
+  const msgLower = (data.resultMsg || '').toLowerCase();
+  if (alreadyCancelledKeywords.some(kw => msgLower.includes(kw.toLowerCase()))) {
+    console.log('[KISPG Cancel] 이미 취소된 거래 - 성공으로 간주. resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
+    return data;
+  }
+
+  // 카드사에서 실제 취소 처리된 경우 (canTid가 있으면 취소가 실행된 것)
+  if (data.canTid || data.cancelTid) {
+    console.log('[KISPG Cancel] canTid 존재 - 카드사 취소 성공으로 간주. canTid:', data.canTid || data.cancelTid);
+    return data;
+  }
+
+  throw new Error(data.resultMsg || `KISPG 결제 취소 실패 (${data.resultCd})`);
 }
 
 // ─── 인증 결과 검증 ───
