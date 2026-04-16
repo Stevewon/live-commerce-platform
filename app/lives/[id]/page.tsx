@@ -58,7 +58,7 @@ export default function LiveViewPage() {
     stopTyping,
   } = useChat({
     liveId,
-    userId: user?.userId,
+    userId: user?.id,
     userName: user?.name,
     userRole: user?.role,
   });
