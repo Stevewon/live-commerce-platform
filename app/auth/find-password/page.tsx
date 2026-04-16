@@ -111,6 +111,7 @@ export default function FindPasswordPage() {
                 id="securetQrUrl"
                 name="securetQrUrl"
                 type="text"
+                autoComplete="off"
                 required
                 placeholder="https://securet.kr/securet.php?key=idcard&nick=..."
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

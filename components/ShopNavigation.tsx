@@ -59,12 +59,14 @@ export default function ShopNavigation() {
               <>
                 <Link
                   href="/cart"
+                  prefetch={false}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/cart')}`}
                 >
                   🛒 장바구니
                 </Link>
                 <Link
                   href="/my-orders"
+                  prefetch={false}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/my-orders')}`}
                 >
                   주문내역
@@ -74,6 +76,7 @@ export default function ShopNavigation() {
             {!user && (
               <Link
                 href="/cart"
+                prefetch={false}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/cart')}`}
               >
                 🛒 장바구니
@@ -175,6 +178,7 @@ export default function ShopNavigation() {
               <>
                 <Link
                   href="/cart"
+                  prefetch={false}
                   onClick={() => setMenuOpen(false)}
                   className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/cart')}`}
                 >
@@ -182,6 +186,7 @@ export default function ShopNavigation() {
                 </Link>
                 <Link
                   href="/my-orders"
+                  prefetch={false}
                   onClick={() => setMenuOpen(false)}
                   className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/my-orders')}`}
                 >
@@ -202,6 +207,7 @@ export default function ShopNavigation() {
             {!user && (
               <Link
                 href="/cart"
+                prefetch={false}
                 onClick={() => setMenuOpen(false)}
                 className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/cart')}`}
               >

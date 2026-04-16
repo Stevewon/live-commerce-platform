@@ -65,9 +65,9 @@ export default function AdminSettlementsPage() {
   const [rejectionReason, setRejectionReason] = useState('')
 
   useEffect(() => {
-    // 인증 확인
+    if (authLoading || !user) return
     fetchSettlements()
-  }, [statusFilter])
+  }, [statusFilter, authLoading, user])
 
   const fetchSettlements = async () => {
     try {
