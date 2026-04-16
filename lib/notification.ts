@@ -64,6 +64,7 @@ export async function sendSMSWithPreferences(params: {
 }) {
   try {
     // 사용자 알림 설정 조회
+    const prisma = await getPrisma();
     const preferences = await (prisma as any).userPreferences?.findUnique?.({
       where: { userId: params.userId }
     });

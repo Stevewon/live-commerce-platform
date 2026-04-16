@@ -180,7 +180,7 @@ export default function PartnerCharts() {
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
-                  label={(entry) => `${entry.label}: ${entry.count}`}
+                  label={(entry: any) => `${entry.label}: ${entry.count}`}
                 >
                   {data.orderStatus.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.status] || '#6B7280'} />

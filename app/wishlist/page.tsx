@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getWishlist, removeFromWishlist, clearWishlist, type WishlistItem } from '@/lib/utils/wishlist';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 export default function WishlistPage() {
+  const { t } = useLanguage();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -71,7 +73,7 @@ export default function WishlistPage() {
                 {t.nav.home}
               </Link>
               <Link href="/products" className="text-gray-300 hover:text-white transition text-xs sm:text-sm">
-                🛍️ {t.nav.shop}
+                🛍️ {t.nav.products}
               </Link>
               <Link href="/wishlist" className="text-pink-400 font-semibold text-xs sm:text-sm">
                 💖 {t.wishlist.title}
@@ -182,7 +184,7 @@ export default function WishlistPage() {
                     <button
                       className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
                     >
-                      {t.products.description} →
+                      {t.products.buyNow} →
                     </button>
                   </div>
                 </Link>

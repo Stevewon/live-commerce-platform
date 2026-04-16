@@ -179,7 +179,7 @@ export default function AdminCharts() {
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
-                  label={(entry) => `${entry.category}: ${(entry.revenue / 1000).toFixed(0)}K`}
+                  label={(entry: any) => `${entry.category}: ${(entry.revenue / 1000).toFixed(0)}K`}
                 >
                   {data.categoryData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
