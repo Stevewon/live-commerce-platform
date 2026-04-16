@@ -30,6 +30,13 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
         ],
       },
+      // HTML 페이지는 CDN 캐시 짧게 설정 (배포 시 이전 빌드 캐시 문제 방지)
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'CDN-Cache-Control', value: 'max-age=60' },
+        ],
+      },
     ];
   },
 }
