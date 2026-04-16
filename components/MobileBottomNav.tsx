@@ -32,6 +32,7 @@ export default function MobileBottomNav() {
             <Link
               key={item.label}
               href={href}
+              prefetch={false}
               className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
                 isActive 
                   ? 'text-blue-600' 

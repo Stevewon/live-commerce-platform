@@ -27,9 +27,10 @@ export default function PartnerSettlements() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (authLoading || !user) return
     fetchSettlements()
     fetchAvailableAmount()
-  }, [])
+  }, [authLoading, user])
 
   const fetchSettlements = async () => {
     try {

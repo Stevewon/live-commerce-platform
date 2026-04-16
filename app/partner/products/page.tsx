@@ -34,8 +34,9 @@ export default function PartnerProducts() {
   const [categoryFilter, setCategoryFilter] = useState('ALL')
 
   useEffect(() => {
+    if (authLoading || !user) return
     fetchData()
-  }, [])
+  }, [authLoading, user])
 
   const fetchData = async () => {
     try {
