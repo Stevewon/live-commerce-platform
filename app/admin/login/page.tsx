@@ -4,10 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/contexts/AuthContext'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import LanguageSelector from '@/components/LanguageSelector'
 
 export default function AdminLoginPage() {
   const router = useRouter()
   const { login } = useAuth()
+  const { t } = useLanguage()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,11 +22,9 @@ export default function AdminLoginPage() {
     setError('')
 
     try {
-      // AuthContext의 login 함수 사용 (닉네임 또는 이메일)
       await login(identifier, password)
-      // login 함수에서 자동으로 /admin/dashboard로 리다이렉션됨
     } catch (err: any) {
-      setError(err.message || '로그인에 실패했습니다')
+      setError(err.message || t.login.errorFailed)
     } finally {
       setLoading(false)
     }
@@ -33,6 +34,9 @@ export default function AdminLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
           <div className="flex justify-center mb-4">
             <img 
               src="/logos/qrlive-logo.png" 
@@ -41,10 +45,10 @@ export default function AdminLoginPage() {
             />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            QRLIVE 관리자
+            QRLIVE {t.nav.admin}
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
-            플랫폼 관리자 전용 페이지입니다
+            {t.admin.login}
           </p>
         </div>
 
@@ -57,7 +61,7 @@ export default function AdminLoginPage() {
             )}
 
             <div>
-              <label className="label">닉네임 또는 이메일</label>
+              <label className="label">{t.login.nickname}</label>
               <input
                 type="text"
                 name="admin-id"
@@ -73,7 +77,7 @@ export default function AdminLoginPage() {
             </div>
 
             <div>
-              <label className="label">비밀번호</label>
+              <label className="label">{t.login.password}</label>
               <input
                 type="password"
                 name="admin-pw"
@@ -93,23 +97,23 @@ export default function AdminLoginPage() {
               className="btn btn-primary w-full"
               disabled={loading}
             >
-              {loading ? '로그인 중...' : '로그인'}
+              {loading ? t.login.loggingIn : t.login.loginButton}
             </button>
           </form>
         </div>
 
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
-            ← 홈으로 돌아가기
+            ← {t.nav.home}
           </Link>
         </div>
 
-        {/* 테스트 계정 안내 */}
+        {/* Test account info */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800 font-medium mb-2">📋 관리자 계정</p>
+          <p className="text-sm text-blue-800 font-medium mb-2">📋 Admin Account</p>
           <p className="text-xs text-blue-700">
-            닉네임: admin<br />
-            비밀번호: admin123
+            Nickname: admin<br />
+            Password: admin123
           </p>
         </div>
       </div>

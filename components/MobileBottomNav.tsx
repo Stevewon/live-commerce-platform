@@ -3,22 +3,24 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { t } = useLanguage();
 
-  // 관리자/파트너 대시보드에서는 숨김
+  // Hide on admin/partner dashboards
   if (pathname.startsWith('/admin') || pathname.startsWith('/partner')) {
     return null;
   }
 
   const navItems = [
-    { href: '/products', icon: '🏠', label: '홈', activeCheck: (p: string) => p === '/products' || p === '/' },
-    { href: '/lives', icon: '📺', label: '라이브', activeCheck: (p: string) => p.startsWith('/lives') },
-    { href: '/cart', icon: '🛒', label: '장바구니', activeCheck: (p: string) => p === '/cart' },
-    { href: '/wishlist', icon: '💖', label: '찜', activeCheck: (p: string) => p === '/wishlist' },
-    { href: '/my', icon: '👤', label: user ? '마이' : '로그인', activeCheck: (p: string) => p.startsWith('/my') || p === '/login' || p === '/register', dynamicHref: !user ? '/login' : '/my' },
+    { href: '/products', icon: '🏠', label: t.nav.home, activeCheck: (p: string) => p === '/products' || p === '/' },
+    { href: '/lives', icon: '📺', label: t.nav.liveBroadcast, activeCheck: (p: string) => p.startsWith('/lives') },
+    { href: '/cart', icon: '🛒', label: t.nav.cart, activeCheck: (p: string) => p === '/cart' },
+    { href: '/wishlist', icon: '💖', label: t.nav.wishlist, activeCheck: (p: string) => p === '/wishlist' },
+    { href: '/my', icon: '👤', label: user ? t.nav.myPage : t.nav.login, activeCheck: (p: string) => p.startsWith('/my') || p === '/login' || p === '/register', dynamicHref: !user ? '/login' : '/my' },
   ];
 
   return (
@@ -30,7 +32,7 @@ export default function MobileBottomNav() {
           
           return (
             <Link
-              key={item.label}
+              key={item.href}
               href={href}
               prefetch={false}
               className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${

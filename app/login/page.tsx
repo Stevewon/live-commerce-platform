@@ -4,10 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login: authLogin } = useAuth();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     nickname: '',
     password: '',
@@ -20,18 +23,16 @@ export default function LoginPage() {
     setError('');
 
     if (!formData.nickname || !formData.password) {
-      setError('닉네임과 비밀번호를 입력해주세요.');
+      setError(t.login.errorRequired);
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // AuthContext의 login 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
       await authLogin(formData.nickname, formData.password);
-      // authLogin 성공 시 자동으로 역할 기반 리다이렉트됨
     } catch (err: any) {
-      setError(err.message || '로그인에 실패했습니다.');
+      setError(err.message || t.login.errorFailed);
     } finally {
       setIsLoading(false);
     }
@@ -41,16 +42,19 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-8 sm:py-12 px-4">
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
           <Link href="/" className="inline-block">
             <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               QRLIVE
             </div>
           </Link>
           <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900">
-            로그인
+            {t.login.title}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            닉네임과 비밀번호로 간편하게 로그인하세요
+            {t.login.subtitle}
           </p>
         </div>
 
@@ -65,7 +69,7 @@ export default function LoginPage() {
             {/* Nickname */}
             <div>
               <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
-                닉네임
+                {t.login.nickname}
               </label>
               <input
                 id="nickname"
@@ -85,7 +89,7 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호
+                {t.login.password}
               </label>
               <input
                 id="password"
@@ -109,23 +113,23 @@ export default function LoginPage() {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {isLoading ? '로그인 중...' : '로그인'}
+              {isLoading ? t.login.loggingIn : t.login.loginButton}
             </button>
           </div>
 
           <div className="flex items-center justify-between text-sm">
             <Link href="/auth/find-nickname" className="text-blue-600 hover:text-blue-500">
-              닉네임 찾기
+              {t.login.findNickname}
             </Link>
             <Link href="/auth/find-password" className="text-blue-600 hover:text-blue-500">
-              비밀번호 찾기
+              {t.login.findPassword}
             </Link>
           </div>
 
           <div className="text-center text-sm pt-4 border-t border-gray-200">
-            <span className="text-gray-600">아직 계정이 없으신가요? </span>
+            <span className="text-gray-600">{t.login.noAccount} </span>
             <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
-              회원가입
+              {t.login.goRegister}
             </Link>
           </div>
         </form>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import ShopNavigation from '@/components/ShopNavigation';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 import {
   getGuestCart,
   updateGuestCartQuantity,
@@ -35,6 +36,7 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   // 동적 배송비 설정
   const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
@@ -170,7 +172,7 @@ export default function CartPage() {
   };
 
   const handleClearCart = async () => {
-    if (!confirm('장바구니를 비우시겠습니까?')) return;
+    if (!confirm(t.cart.clearCart + '?')) return;
     try {
       if (user) {
         await fetch('/api/cart', { method: 'DELETE', credentials: 'include' });
@@ -195,7 +197,7 @@ export default function CartPage() {
         <ShopNavigation />
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-          <p className="text-gray-500">장바구니를 불러오는 중...</p>
+          <p className="text-gray-500">{t.cart.loading}</p>
         </div>
       </div>
     );
@@ -208,14 +210,14 @@ export default function CartPage() {
       <div className="max-w-4xl mx-auto px-4 py-4 sm:py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-            장바구니 ({cartItems.length})
+            {t.cart.title} ({cartItems.length})
           </h1>
           {cartItems.length > 0 && (
             <button
               onClick={handleClearCart}
               className="text-sm text-red-500 hover:text-red-700 font-medium"
             >
-              전체 삭제
+              {t.cart.clearCart}
             </button>
           )}
         </div>
@@ -223,13 +225,13 @@ export default function CartPage() {
         {cartItems.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm text-center py-20">
             <span className="text-6xl block mb-4">🛒</span>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">장바구니가 비어있습니다</h2>
-            <p className="text-gray-500 mb-6">상품을 담아보세요!</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">{t.cart.empty}</h2>
+            <p className="text-gray-500 mb-6">{t.cart.goShopping}</p>
             <Link
               href="/products"
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition"
             >
-              쇼핑하러 가기
+              {t.cart.goShopping}
             </Link>
           </div>
         ) : (
@@ -279,7 +281,7 @@ export default function CartPage() {
                         onClick={() => handleRemoveItem(item)}
                         disabled={updatingId === item.id}
                         className="flex-shrink-0 text-gray-400 hover:text-red-500 transition p-1"
-                        title="삭제"
+                        title={t.cart.remove}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -332,17 +334,17 @@ export default function CartPage() {
             {/* 결제 요약 */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-xl shadow-sm p-5 sticky top-20 space-y-4">
-                <h2 className="text-lg font-bold text-gray-900">주문 요약</h2>
+                <h2 className="text-lg font-bold text-gray-900">{t.cart.orderSummary}</h2>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between text-gray-600">
-                    <span>상품 금액</span>
+                    <span>{t.cart.productTotal}</span>
                     <span>₩{totalAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
-                    <span>배송비</span>
+                    <span>{t.cart.shippingFee}</span>
                     <span>
                       {shippingFee === 0 ? (
-                        <span className="text-green-600 font-medium">무료</span>
+                        <span className="text-green-600 font-medium">{t.common.free}</span>
                       ) : (
                         `₩${shippingFee.toLocaleString()}`
                       )}
@@ -350,11 +352,11 @@ export default function CartPage() {
                   </div>
                   {totalAmount > 0 && shippingConfig.freeShippingThreshold > 0 && totalAmount < shippingConfig.freeShippingThreshold && (
                     <p className="text-xs text-blue-600">
-                      ₩{(shippingConfig.freeShippingThreshold - totalAmount).toLocaleString()} 더 담으면 무료배송!
+                      ₩{(shippingConfig.freeShippingThreshold - totalAmount).toLocaleString()} {t.cart.remainForFree}
                     </p>
                   )}
                   <div className="border-t pt-3 flex justify-between text-lg font-bold text-gray-900">
-                    <span>총 결제 예상 금액</span>
+                    <span>{t.cart.finalAmount}</span>
                     <span className="text-blue-600">₩{finalAmount.toLocaleString()}</span>
                   </div>
                 </div>
@@ -363,14 +365,14 @@ export default function CartPage() {
                   onClick={() => router.push('/checkout')}
                   className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition"
                 >
-                  주문하기 ({cartItems.length}개)
+                  {t.cart.checkout} ({cartItems.length}{t.common.items})
                 </button>
 
                 <Link
                   href="/products"
                   className="block text-center text-sm text-gray-500 hover:text-gray-700 font-medium mt-2"
                 >
-                  쇼핑 계속하기
+                  {t.cart.continueShopping}
                 </Link>
               </div>
             </div>

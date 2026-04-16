@@ -1,6 +1,7 @@
 'use client'
 
 import { AuthProvider } from '@/lib/contexts/AuthContext'
+import { LanguageProvider } from '@/lib/i18n/LanguageContext'
 import MobileBottomNav from '@/components/MobileBottomNav'
 import Footer from '@/components/Footer'
 
@@ -10,10 +11,12 @@ export default function ClientLayout({
   children: React.ReactNode
 }) {
   return (
-    <AuthProvider>
-      {children}
-      <Footer />
-      <MobileBottomNav />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        {children}
+        <Footer />
+        <MobileBottomNav />
+      </AuthProvider>
+    </LanguageProvider>
   )
 }

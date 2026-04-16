@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 export default function FindPasswordPage() {
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     securetQrUrl: '',
     newPassword: '',
@@ -19,17 +22,17 @@ export default function FindPasswordPage() {
     setSuccess(false);
 
     if (!formData.securetQrUrl || !formData.newPassword || !formData.confirmPassword) {
-      setError('모든 필드를 입력해주세요.');
+      setError(t.findPassword.errorAllFields);
       return;
     }
 
     if (formData.newPassword.length < 6) {
-      setError('비밀번호는 최소 6자 이상이어야 합니다.');
+      setError(t.findPassword.errorPasswordLength);
       return;
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      setError('비밀번호가 일치하지 않습니다.');
+      setError(t.findPassword.errorPasswordMatch);
       return;
     }
 
@@ -50,7 +53,7 @@ export default function FindPasswordPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || '비밀번호 재설정에 실패했습니다.');
+        throw new Error(data.error || t.findPassword.errorFailed);
       }
 
       if (data.success) {
@@ -62,7 +65,7 @@ export default function FindPasswordPage() {
         });
       }
     } catch (err: any) {
-      setError(err.message || '비밀번호 재설정에 실패했습니다.');
+      setError(err.message || t.findPassword.errorFailed);
     } finally {
       setIsLoading(false);
     }
@@ -72,16 +75,19 @@ export default function FindPasswordPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
           <Link href="/" className="inline-block">
             <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               QRLIVE
             </div>
           </Link>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            비밀번호 찾기
+            {t.findPassword.title}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            시큐릿 QR 주소를 확인하여 새 비밀번호를 설정합니다
+            {t.findPassword.subtitle}
           </p>
         </div>
 
@@ -94,9 +100,9 @@ export default function FindPasswordPage() {
 
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-              <p className="font-semibold mb-2">비밀번호가 성공적으로 변경되었습니다!</p>
+              <p className="font-semibold mb-2">{t.findPassword.success}</p>
               <Link href="/login" className="text-blue-600 hover:text-blue-500 underline">
-                로그인 페이지로 이동
+                {t.findPassword.goLogin}
               </Link>
             </div>
           )}
@@ -105,7 +111,7 @@ export default function FindPasswordPage() {
             {/* Securet QR URL */}
             <div>
               <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                시큐릿 QR 주소
+                {t.findPassword.securetQrUrl}
               </label>
               <input
                 id="securetQrUrl"
@@ -119,14 +125,14 @@ export default function FindPasswordPage() {
                 onChange={(e) => setFormData({ ...formData, securetQrUrl: e.target.value })}
               />
               <p className="mt-1 text-xs text-gray-500">
-                회원가입 시 입력한 시큐릿 QR 주소를 입력해주세요
+                {t.findPassword.securetQrUrlHelp}
               </p>
             </div>
 
             {/* New Password */}
             <div>
               <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                새 비밀번호
+                {t.findPassword.newPassword}
               </label>
               <input
                 id="newPassword"
@@ -134,7 +140,7 @@ export default function FindPasswordPage() {
                 type="password"
                 autoComplete="new-password"
                 required
-                placeholder="최소 6자 이상"
+                placeholder={t.findPassword.newPasswordPlaceholder}
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.newPassword}
                 onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
@@ -144,7 +150,7 @@ export default function FindPasswordPage() {
             {/* Confirm Password */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호 확인
+                {t.findPassword.confirmPassword}
               </label>
               <input
                 id="confirmPassword"
@@ -152,7 +158,7 @@ export default function FindPasswordPage() {
                 type="password"
                 autoComplete="new-password"
                 required
-                placeholder="비밀번호를 다시 입력하세요"
+                placeholder={t.findPassword.confirmPasswordPlaceholder}
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
@@ -166,16 +172,16 @@ export default function FindPasswordPage() {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {isLoading ? '처리 중...' : '비밀번호 재설정'}
+              {isLoading ? t.findPassword.processing : t.findPassword.resetButton}
             </button>
           </div>
 
           <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-200">
             <Link href="/auth/find-nickname" className="text-blue-600 hover:text-blue-500">
-              닉네임 찾기
+              {t.findPassword.findNickname}
             </Link>
             <Link href="/login" className="text-blue-600 hover:text-blue-500">
-              로그인
+              {t.findPassword.login}
             </Link>
           </div>
         </form>

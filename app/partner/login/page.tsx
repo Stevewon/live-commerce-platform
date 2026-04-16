@@ -1,5 +1,7 @@
 'use client'
 import { useAuth } from '@/lib/contexts/AuthContext'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+import LanguageSelector from '@/components/LanguageSelector'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -8,6 +10,7 @@ import Link from 'next/link'
 export default function PartnerLoginPage() {
   const router = useRouter()
   const { login: authLogin } = useAuth()
+  const { t } = useLanguage()
   const [nickname, setNickname] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -19,11 +22,9 @@ export default function PartnerLoginPage() {
     setError('')
 
     try {
-      // AuthContext의 login 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
       await authLogin(nickname, password)
-      // authLogin 성공 시 자동으로 역할 기반 리다이렉트됨
     } catch (err: any) {
-      setError(err.message || '로그인 중 오류가 발생했습니다.')
+      setError(err.message || t.login.errorFailed)
     } finally {
       setIsLoading(false)
     }
@@ -33,6 +34,9 @@ export default function PartnerLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
           <div className="flex justify-center mb-4">
             <img 
               src="/logos/qrlive-logo.png" 
@@ -41,10 +45,10 @@ export default function PartnerLoginPage() {
             />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            QRLIVE 파트너
+            QRLIVE {t.nav.partner}
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
-            큐라이브 플랫폼에 오신 것을 환영합니다
+            {t.partner.login}
           </p>
         </div>
 
@@ -57,7 +61,7 @@ export default function PartnerLoginPage() {
             )}
 
             <div>
-              <label className="label">닉네임</label>
+              <label className="label">{t.login.nickname}</label>
               <input
                 type="text"
                 name="partner-login-nickname"
@@ -73,7 +77,7 @@ export default function PartnerLoginPage() {
             </div>
 
             <div>
-              <label className="label">비밀번호</label>
+              <label className="label">{t.login.password}</label>
               <input
                 type="password"
                 name="partner-login-pw"
@@ -93,21 +97,21 @@ export default function PartnerLoginPage() {
               className="btn btn-primary w-full"
               disabled={isLoading}
             >
-              {isLoading ? '로그인 중...' : '로그인'}
+              {isLoading ? t.login.loggingIn : t.login.loginButton}
             </button>
           </form>
 
           <div className="mt-6 text-center text-sm text-gray-600">
-            아직 파트너가 아니신가요?{' '}
+            {t.login.noAccount}{' '}
             <Link href="/partner/register" className="text-blue-600 hover:underline font-medium">
-              파트너 등록하기
+              {t.partner.register}
             </Link>
           </div>
         </div>
 
         <div className="mt-6 text-center">
           <Link href="/" className="text-sm text-gray-600 hover:text-gray-900">
-            ← 홈으로 돌아가기
+            ← {t.nav.home}
           </Link>
         </div>
       </div>

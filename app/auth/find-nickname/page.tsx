@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 export default function FindNicknamePage() {
+  const { t } = useLanguage();
   const [securetQrUrl, setSecuretQrUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,7 +18,7 @@ export default function FindNicknamePage() {
     setFoundNickname('');
 
     if (!securetQrUrl) {
-      setError('시큐릿 QR 주소를 입력해주세요.');
+      setError(t.findNickname.errorRequired);
       return;
     }
 
@@ -33,14 +36,14 @@ export default function FindNicknamePage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || '닉네임을 찾을 수 없습니다.');
+        throw new Error(data.error || t.findNickname.errorNotFound);
       }
 
       if (data.success) {
         setFoundNickname(data.data.nickname);
       }
     } catch (err: any) {
-      setError(err.message || '닉네임 찾기에 실패했습니다.');
+      setError(err.message || t.findNickname.errorFailed);
     } finally {
       setIsLoading(false);
     }
@@ -50,16 +53,19 @@ export default function FindNicknamePage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
           <Link href="/" className="inline-block">
             <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               QRLIVE
             </div>
           </Link>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            닉네임 찾기
+            {t.findNickname.title}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            회원가입 시 입력한 시큐릿 QR 주소로 닉네임을 찾습니다
+            {t.findNickname.subtitle}
           </p>
         </div>
 
@@ -72,14 +78,14 @@ export default function FindNicknamePage() {
 
           {foundNickname && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-              <p className="font-semibold mb-2">닉네임을 찾았습니다!</p>
+              <p className="font-semibold mb-2">{t.findNickname.found}</p>
               <p className="text-lg font-bold">{foundNickname}</p>
             </div>
           )}
 
           <div>
             <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1">
-              시큐릿 QR 주소
+              {t.findNickname.securetQrUrl}
             </label>
             <input
               id="securetQrUrl"
@@ -92,7 +98,7 @@ export default function FindNicknamePage() {
               onChange={(e) => setSecuretQrUrl(e.target.value)}
             />
             <p className="mt-1 text-xs text-gray-500">
-              회원가입 시 입력한 시큐릿 QR 주소를 입력해주세요
+              {t.findNickname.securetQrUrlHelp}
             </p>
           </div>
 
@@ -102,16 +108,16 @@ export default function FindNicknamePage() {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {isLoading ? '검색 중...' : '닉네임 찾기'}
+              {isLoading ? t.findNickname.searching : t.findNickname.searchButton}
             </button>
           </div>
 
           <div className="flex items-center justify-between text-sm pt-4 border-t border-gray-200">
             <Link href="/auth/find-password" className="text-blue-600 hover:text-blue-500">
-              비밀번호 찾기
+              {t.findNickname.findPassword}
             </Link>
             <Link href="/login" className="text-blue-600 hover:text-blue-500">
-              로그인
+              {t.findNickname.login}
             </Link>
           </div>
         </form>

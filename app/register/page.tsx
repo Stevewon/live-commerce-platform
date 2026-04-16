@@ -4,10 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register: authRegister } = useAuth();
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     securetQrUrl: '',
     nickname: '',
@@ -30,34 +33,33 @@ export default function RegisterPage() {
 
     // Validation
     if (!formData.securetQrUrl || !formData.nickname || !formData.password || !formData.confirmPassword) {
-      setError('모든 필드를 입력해주세요.');
+      setError(t.register.errorAllFields);
       return;
     }
 
     if (!validateSecuretUrl(formData.securetQrUrl)) {
-      setError('올바른 시큐릿 QR 주소 형식이 아닙니다.\n형식: https://securet.kr/securet.php?key=idcard&nick=...&token=...&voip=...&os=...');
+      setError(t.register.errorInvalidQr);
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('비밀번호는 최소 6자 이상이어야 합니다.');
+      setError(t.register.errorPasswordLength);
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('비밀번호가 일치하지 않습니다.');
+      setError(t.register.errorPasswordMatch);
       return;
     }
 
     if (!agreeTerms) {
-      setError('이용약관 및 개인정보처리방침에 동의해주세요.');
+      setError(t.register.errorAgreeTerms);
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // AuthContext의 register 사용 - 자동으로 상태 업데이트 + 쿠키 설정 + 리다이렉트
       await authRegister({
         nickname: formData.nickname,
         password: formData.password,
@@ -65,9 +67,8 @@ export default function RegisterPage() {
         name: formData.nickname,
         role: 'CUSTOMER',
       });
-      // authRegister 성공 시 자동으로 리다이렉트됨
     } catch (err: any) {
-      setError(err.message || '회원가입에 실패했습니다.');
+      setError(err.message || t.register.errorFailed);
     } finally {
       setIsLoading(false);
     }
@@ -77,16 +78,19 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-8 sm:py-12 px-4">
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
         <div className="text-center">
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
           <Link href="/" className="inline-block">
             <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               QRLIVE
             </div>
           </Link>
           <h2 className="mt-4 sm:mt-6 text-2xl sm:text-3xl font-extrabold text-gray-900">
-            간편 회원가입
+            {t.register.title}
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            시큐릿 QR 주소와 닉네임, 비밀번호만 입력하세요
+            {t.register.subtitle}
           </p>
         </div>
 
@@ -101,7 +105,7 @@ export default function RegisterPage() {
             {/* Securet QR URL */}
             <div>
               <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                시큐릿 QR 주소 *
+                {t.register.securetQrUrl} *
               </label>
               <input
                 id="securetQrUrl"
@@ -117,14 +121,14 @@ export default function RegisterPage() {
                 onChange={(e) => setFormData({ ...formData, securetQrUrl: e.target.value })}
               />
               <p className="mt-1 text-xs text-gray-500">
-                시큐릿 메신저의 QR 주소를 입력해주세요
+                {t.register.securetQrUrlHelp}
               </p>
             </div>
 
             {/* Nickname */}
             <div>
               <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
-                닉네임 *
+                {t.register.nickname} *
               </label>
               <input
                 id="nickname"
@@ -144,7 +148,7 @@ export default function RegisterPage() {
             {/* Password */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호 *
+                {t.register.password} *
               </label>
               <input
                 id="password"
@@ -164,7 +168,7 @@ export default function RegisterPage() {
             {/* Confirm Password */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호 확인 *
+                {t.register.confirmPassword} *
               </label>
               <input
                 id="confirmPassword"
@@ -182,7 +186,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* 이용약관 동의 */}
+          {/* Terms Agreement */}
           <div className="bg-gray-50 p-4 rounded-lg">
             <label className="flex items-start space-x-2 cursor-pointer">
               <input
@@ -192,8 +196,8 @@ export default function RegisterPage() {
                 className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">
-                <Link href="/terms" target="_blank" className="text-blue-600 hover:underline font-medium">이용약관</Link> 및{' '}
-                <Link href="/privacy" target="_blank" className="text-blue-600 hover:underline font-medium">개인정보처리방침</Link>에 동의합니다 *
+                <Link href="/terms" target="_blank" className="text-blue-600 hover:underline font-medium">{t.register.termsLink}</Link> {t.register.and}{' '}
+                <Link href="/privacy" target="_blank" className="text-blue-600 hover:underline font-medium">{t.register.privacyLink}</Link>{t.register.agreeTerms} *
               </span>
             </label>
           </div>
@@ -204,14 +208,14 @@ export default function RegisterPage() {
               disabled={isLoading}
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {isLoading ? '회원가입 중...' : '회원가입'}
+              {isLoading ? t.register.registering : t.register.registerButton}
             </button>
           </div>
 
           <div className="text-center text-sm">
-            <span className="text-gray-600">이미 계정이 있으신가요? </span>
+            <span className="text-gray-600">{t.register.haveAccount} </span>
             <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
-              로그인
+              {t.register.goLogin}
             </Link>
           </div>
         </form>

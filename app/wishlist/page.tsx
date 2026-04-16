@@ -36,7 +36,7 @@ export default function WishlistPage() {
   };
 
   const handleClearAll = () => {
-    if (confirm('찜한 모든 상품을 삭제하시겠습니까?')) {
+    if (confirm(t.common.delete + '?')) {
       clearWishlist();
     }
   };
@@ -68,13 +68,13 @@ export default function WishlistPage() {
             </Link>
             <div className="flex items-center gap-3 sm:gap-6">
               <Link href="/products" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
-                홈
+                {t.nav.home}
               </Link>
               <Link href="/products" className="text-gray-300 hover:text-white transition text-xs sm:text-sm">
-                🛍️ 쇼핑몰
+                🛍️ {t.nav.shop}
               </Link>
               <Link href="/wishlist" className="text-pink-400 font-semibold text-xs sm:text-sm">
-                💖 찜목록
+                💖 {t.wishlist.title}
               </Link>
               <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
                 <span className="text-xl sm:text-2xl">🛒</span>
@@ -88,7 +88,7 @@ export default function WishlistPage() {
         {/* 페이지 제목 - 모바일 최적화 */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">💖 찜한 상품</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">💖 {t.wishlist.title}</h1>
             <p className="text-gray-400 text-base sm:text-lg">
               총 <span className="text-pink-400 font-bold">{wishlistItems.length}</span>개의 상품
             </p>
@@ -98,7 +98,7 @@ export default function WishlistPage() {
               onClick={handleClearAll}
               className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600/20 border border-red-500 text-red-400 rounded-xl hover:bg-red-600/30 transition font-semibold text-sm sm:text-base self-end sm:self-auto"
             >
-              전체 삭제
+              {t.common.delete}
             </button>
           )}
         </div>
@@ -107,15 +107,15 @@ export default function WishlistPage() {
         {wishlistItems.length === 0 && (
           <div className="text-center py-16 sm:py-24">
             <div className="text-6xl sm:text-8xl mb-4 sm:mb-6">💔</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">찜한 상품이 없습니다</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">{t.wishlist.empty}</h2>
             <p className="text-gray-400 text-base sm:text-lg mb-6 sm:mb-8">
-              마음에 드는 상품을 찜해보세요!
+              {t.wishlist.goShopping}
             </p>
             <Link
               href="/products"
               className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-bold text-base sm:text-lg transition-all transform hover:scale-105 shadow-lg"
             >
-              쇼핑하러 가기 →
+              {t.wishlist.goShopping} →
             </Link>
           </div>
         )}
@@ -182,7 +182,7 @@ export default function WishlistPage() {
                     <button
                       className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
                     >
-                      상세보기 →
+                      {t.products.description} →
                     </button>
                   </div>
                 </Link>
@@ -198,7 +198,7 @@ export default function WishlistPage() {
               href="/products"
               className="inline-block px-8 py-4 bg-gray-800/50 border-2 border-gray-700 hover:border-pink-500 text-white rounded-xl font-bold text-lg transition-all transform hover:scale-105"
             >
-              쇼핑 계속하기 🛍️
+              {t.cart.continueShopping} 🛍️
             </Link>
           </div>
         )}
