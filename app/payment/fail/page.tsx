@@ -9,6 +9,62 @@ function PaymentFailContent() {
 
   const code = searchParams.get('code');
   const message = searchParams.get('message');
+  const orderId = searchParams.get('orderId');
+
+  // 결제 재시도: PENDING 상태의 주문이 있으면 KISPG 결제 재요청
+  const handleRetryPayment = async () => {
+    if (!orderId) {
+      // orderId가 없으면 장바구니로 이동
+      window.location.href = '/cart';
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/payments/kispg/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ orderId }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.error || '결제 재시도에 실패했습니다. 장바구니에서 다시 주문해주세요.');
+        window.location.href = '/cart';
+        return;
+      }
+
+      const kispgData = await res.json();
+      if (!kispgData.success || !kispgData.authUrl || !kispgData.formData) {
+        alert('결제 데이터를 가져오지 못했습니다. 장바구니에서 다시 주문해주세요.');
+        window.location.href = '/cart';
+        return;
+      }
+
+      // 동적 form 생성 후 KISPG 결제창으로 POST submit
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = kispgData.authUrl;
+      form.acceptCharset = 'utf-8';
+      form.style.display = 'none';
+      form.target = '_self';
+
+      Object.entries(kispgData.formData).forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+
+      document.body.appendChild(form);
+      setTimeout(() => form.submit(), 100);
+    } catch (error) {
+      console.error('결제 재시도 실패:', error);
+      alert('결제 재시도 중 오류가 발생했습니다.');
+      window.location.href = '/cart';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -55,12 +111,12 @@ function PaymentFailContent() {
 
         {/* 액션 버튼 */}
         <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            href="/checkout"
+          <button
+            onClick={handleRetryPayment}
             className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-center transition shadow-sm"
           >
             다시 결제하기
-          </Link>
+          </button>
           <Link
             href="/products"
             className="flex-1 py-4 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-center transition border border-gray-300"

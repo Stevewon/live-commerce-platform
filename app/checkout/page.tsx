@@ -323,6 +323,8 @@ export default function CheckoutPage() {
       form.action = kispgData.authUrl;
       form.acceptCharset = 'utf-8';
       form.style.display = 'none';
+      // 모바일 호환성: target을 명시적으로 설정
+      form.target = '_self';
 
       Object.entries(kispgData.formData).forEach(([key, value]) => {
         const input = document.createElement('input');
@@ -333,7 +335,10 @@ export default function CheckoutPage() {
       });
 
       document.body.appendChild(form);
-      form.submit();
+      // 모바일에서 form submit 지연 방지를 위해 약간의 딜레이
+      setTimeout(() => {
+        form.submit();
+      }, 100);
       return; // 결제 페이지로 이동 중이므로 여기서 종료
     } catch (error: any) {
       console.error('주문 실패:', error);

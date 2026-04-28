@@ -77,7 +77,9 @@ export async function POST(request: NextRequest) {
     const ordEmail = order.user?.email || order.guestEmail || '';
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';
-    const returnUrl = `${baseUrl}/api/payments/kispg/return`;
+    // returnUrl에 orderId를 query parameter로 포함 → KISPG가 mbsReserved를 안 보내도 orderId 복구 가능
+    // (KISPG 모바일 에러 페이지에서 mbsReserved가 주석 처리되어 전달 안 됨)
+    const returnUrl = `${baseUrl}/api/payments/kispg/return?orderId=${encodeURIComponent(orderId)}`;
 
     console.log('[KISPG Request] orderId:', orderId, 'orderNumber:', order.orderNumber, 'total:', order.total, 'returnUrl:', returnUrl);
 
