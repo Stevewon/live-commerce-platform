@@ -11,6 +11,13 @@ import { getPrisma } from '@/lib/prisma';
  * KISPG 인증 결과 파라미터:
  *   resultCd, resultMsg, payMethod, tid, ordNo, amt, ediDate, encData, mbsReserved
  *   + goodsAmt (일부 응답에 포함)
+ * 
+ * [BUG FIX 2026-04-30]
+ * - 승인 API가 "MOID 중복/이미 처리" 응답을 반환해도 실제 결제는 성공한 경우가 많음
+ *   → 이전: 무조건 실패 처리 + 주문 CANCELLED → 사용자에게 "실패" 표시
+ *   → 수정: DB에서 실제 주문 상태를 재확인 후, 결제가 이미 승인됐으면 성공 처리
+ * - approveKispgPayment()가 이제 "이미 처리된 거래"를 성공으로 반환 (_alreadyApproved 플래그)
+ * - 승인 실패 시에도 PENDING 주문을 무조건 취소하지 않고, DB 재확인 후 판단
  */
 export async function POST(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';
@@ -146,13 +153,7 @@ export async function POST(request: NextRequest) {
     // 이미 결제 완료된 주문인 경우 바로 성공 페이지로 이동 (중복 처리 방지)
     if (order.status === 'CONFIRMED' || order.status === 'SHIPPING' || order.status === 'DELIVERED') {
       console.log('[KISPG Return] 이미 결제 완료된 주문:', orderId, 'status:', order.status);
-      const successUrl = new URL('/payment/success', baseUrl);
-      successUrl.searchParams.set('orderId', orderId);
-      successUrl.searchParams.set('orderNumber', order.orderNumber);
-      successUrl.searchParams.set('amount', Math.round(order.total).toString());
-      successUrl.searchParams.set('tid', tid || order.paymentKey || '');
-      successUrl.searchParams.set('payMethod', payMethod || 'card');
-      return NextResponse.redirect(successUrl.toString(), 303);
+      return redirectToSuccess(baseUrl, orderId, order.orderNumber, Math.round(order.total), tid || order.paymentKey || '', payMethod);
     }
 
     // 금액 검증 (정수 비교 - Float 소수점 이슈 방지)
@@ -180,11 +181,30 @@ export async function POST(request: NextRequest) {
         goodsAmt: orderTotal,
       });
       console.log('[KISPG Return] 승인 API 결과:', JSON.stringify(approveResult));
+
+      // approveKispgPayment()가 성공을 반환 (_alreadyApproved 포함)
+      // → 정상 승인이든, 이미 처리된 거래든 모두 성공으로 처리
+      if (approveResult._alreadyApproved) {
+        console.log('[KISPG Return] 이미 승인된 거래 → 성공 처리 (주문 취소하지 않음)');
+      }
+
     } catch (approveError: any) {
-      console.error('[KISPG Return] 승인 실패:', approveError.message);
+      console.error('[KISPG Return] 승인 API 예외:', approveError.message);
       
-      // 중요: 카드 결제는 이미 완료되었을 수 있음!
-      // 승인 실패해도 무조건 주문 취소하지 않음
+      // ★★★ 핵심 수정: 승인 실패 시 DB에서 주문 상태를 재확인 ★★★
+      // KISPG 승인 API가 에러를 반환해도, 실제로는 카드 승인이 이미 완료된 경우가 있음
+      // (네트워크 타임아웃, 중복 요청, 테스트 환경 특성 등)
+      // → DB를 다시 조회하여 이미 CONFIRMED 상태이면 성공 처리
+      try {
+        const recheckedOrder = await prisma.order.findUnique({ where: { id: orderId } });
+        if (recheckedOrder && (recheckedOrder.status === 'CONFIRMED' || recheckedOrder.status === 'SHIPPING' || recheckedOrder.status === 'DELIVERED')) {
+          console.log('[KISPG Return] 승인 실패했지만 DB 재확인 결과 이미 결제 완료:', recheckedOrder.status);
+          return redirectToSuccess(baseUrl, orderId, recheckedOrder.orderNumber, Math.round(recheckedOrder.total), tid || recheckedOrder.paymentKey || '', payMethod);
+        }
+      } catch (recheckErr: any) {
+        console.error('[KISPG Return] DB 재확인 실패:', recheckErr.message);
+      }
+
       // DB에 tid를 저장하여 나중에 관리자가 확인할 수 있도록 함
       try {
         await prisma.order.update({
@@ -202,25 +222,14 @@ export async function POST(request: NextRequest) {
       failUrl.searchParams.set('code', 'APPROVE_FAILED');
       // 에러 유형별 사용자 친화적 메시지
       const isFirewall = approveError.message?.includes('방화벽') || approveError.message?.includes('firewall') || approveError.message?.includes('redirect');
-      const isMoidDuplicate = approveError.message?.includes('MOID') || approveError.message?.includes('중복') || approveError.message?.includes('이미 처리');
       let userMessage: string;
       if (isFirewall) {
         userMessage = '결제 승인 서버 연결에 실패했습니다. 결제금액은 자동 환불됩니다. 잠시 후 다시 시도해주세요.';
-      } else if (isMoidDuplicate) {
-        userMessage = '주문번호(MOID)중복 또는 이미 처리된 주문입니다. 주문내역을 확인 후 새로 주문해주세요.';
-        // MOID 중복이면 주문을 CANCELLED로 변경하여 재주문 유도
-        try {
-          await prisma.order.update({
-            where: { id: orderId },
-            data: { status: 'CANCELLED', cancelledAt: new Date(), cancelReason: '결제 승인 실패 (MOID 중복)' },
-          });
-          console.log('[KISPG Return] MOID 중복 → 주문 취소 처리:', orderId);
-        } catch (cancelErr: any) {
-          console.error('[KISPG Return] MOID 중복 주문 취소 실패:', cancelErr.message);
-        }
       } else {
-        userMessage = approveError.message || '결제 처리 중 문제가 발생했습니다';
+        userMessage = '결제 처리 중 일시적 오류가 발생했습니다. 잠시 후 주문내역을 확인해주세요.';
       }
+      // ★ MOID 중복이어도 주문을 CANCELLED로 변경하지 않음!
+      // 결제가 실제로 완료되었을 수 있으므로 PENDING 상태 유지 → 관리자가 확인
       failUrl.searchParams.set('message', userMessage);
       failUrl.searchParams.set('orderId', orderId);
       return NextResponse.redirect(failUrl.toString(), 303);
@@ -249,25 +258,44 @@ export async function POST(request: NextRequest) {
     console.log('[KISPG Return] 결제 성공! orderId:', orderId, 'tid:', tid, 'appNo:', approveResult.appNo);
 
     // 5) 성공 페이지로 redirect
-    const successUrl = new URL('/payment/success', baseUrl);
-    successUrl.searchParams.set('orderId', orderId);
-    successUrl.searchParams.set('orderNumber', order.orderNumber);
-    successUrl.searchParams.set('amount', orderTotal.toString());
-    successUrl.searchParams.set('tid', tid);
-    successUrl.searchParams.set('payMethod', payMethod);
-    if (approveResult.appNo) {
-      successUrl.searchParams.set('appNo', approveResult.appNo);
-    }
-    return NextResponse.redirect(successUrl.toString(), 303);
+    return redirectToSuccess(baseUrl, orderId, order.orderNumber, orderTotal, tid, payMethod, approveResult.appNo);
 
   } catch (error: any) {
     console.error('[KISPG Return] 처리 오류:', error?.message || error, 'stack:', error?.stack);
+    
+    // ★ 시스템 에러 시에도 DB 재확인: 이미 결제 완료되었을 수 있음
+    if (orderId) {
+      try {
+        const recheckedOrder = await prisma.order.findUnique({ where: { id: orderId } });
+        if (recheckedOrder && (recheckedOrder.status === 'CONFIRMED' || recheckedOrder.status === 'SHIPPING' || recheckedOrder.status === 'DELIVERED')) {
+          console.log('[KISPG Return] 시스템 에러지만 DB 재확인 결과 이미 결제 완료:', recheckedOrder.status);
+          return redirectToSuccess(baseUrl, orderId, recheckedOrder.orderNumber, Math.round(recheckedOrder.total), recheckedOrder.paymentKey || tid || '', payMethod);
+        }
+      } catch (recheckErr) {
+        console.error('[KISPG Return] 시스템 에러 후 DB 재확인도 실패:', recheckErr);
+      }
+    }
+
     const failUrl = new URL('/payment/fail', baseUrl);
     failUrl.searchParams.set('code', 'SYSTEM_ERROR');
     failUrl.searchParams.set('message', '결제 처리 중 시스템 오류가 발생했습니다. 결제가 완료된 경우 관리자에게 문의해주세요.');
     if (orderId) failUrl.searchParams.set('orderId', orderId);
     return NextResponse.redirect(failUrl.toString(), 303);
   }
+}
+
+// ─── 성공 페이지 redirect 헬퍼 ───
+function redirectToSuccess(baseUrl: string, orderId: string, orderNumber: string, amount: number, tid: string, payMethod: string, appNo?: string) {
+  const successUrl = new URL('/payment/success', baseUrl);
+  successUrl.searchParams.set('orderId', orderId);
+  successUrl.searchParams.set('orderNumber', orderNumber);
+  successUrl.searchParams.set('amount', amount.toString());
+  successUrl.searchParams.set('tid', tid);
+  successUrl.searchParams.set('payMethod', payMethod || 'card');
+  if (appNo) {
+    successUrl.searchParams.set('appNo', appNo);
+  }
+  return NextResponse.redirect(successUrl.toString(), 303);
 }
 
 // ─── 주문 취소 + 재고 복구 헬퍼 ───
@@ -279,6 +307,12 @@ async function cancelOrderAndRestoreStock(prisma: any, orderId: string) {
     });
 
     if (!order || order.status === 'CANCELLED') return;
+
+    // ★ 이미 결제 완료된 주문은 취소하지 않음 (결제가 실제로 성공한 상태일 수 있음)
+    if (order.status === 'CONFIRMED' || order.status === 'SHIPPING' || order.status === 'DELIVERED') {
+      console.log('[KISPG] 이미 결제 완료된 주문 → 취소 건너뜀:', orderId, order.status);
+      return;
+    }
 
     await prisma.$transaction(async (tx: any) => {
       await tx.order.update({
@@ -326,6 +360,11 @@ function parseKispgDateTime(dt: string): Date {
 }
 
 // ─── GET 핸들러 (모바일 일부 환경에서 GET redirect 대비) ───
+/**
+ * [BUG FIX 2026-04-30]
+ * - resultCd 체크 시 인증 성공 코드 목록을 사용하도록 수정 (이전: '0000'만 성공)
+ * - 승인 실패 시에도 DB 재확인하여 이미 결제 완료된 경우 성공 처리
+ */
 export async function GET(request: NextRequest) {
   console.log('[KISPG Return] GET 요청 수신 - URL:', request.url);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';
@@ -336,25 +375,35 @@ export async function GET(request: NextRequest) {
   const resultCd = url.searchParams.get('resultCd') || '';
   const resultMsg = url.searchParams.get('resultMsg') || '';
   const tid = url.searchParams.get('tid') || '';
+  const payMethod = url.searchParams.get('payMethod') || '';
   
   console.log('[KISPG Return GET] orderId:', orderId, 'resultCd:', resultCd, 'tid:', tid);
+
+  // 인증 성공 코드 목록 (결제수단별로 다름)
+  const authSuccessCodes = ['0000', '3001', '4000', 'A000', '7001', '8001', 'V000'];
 
   if (orderId) {
     // orderId가 있으면 주문 상태 확인 후 적절한 페이지로 이동
     try {
       const prisma = await getPrisma();
       const order = await prisma.order.findUnique({ where: { id: orderId } });
-      if (order && (order.status === 'CONFIRMED' || order.status === 'SHIPPING' || order.status === 'DELIVERED')) {
-        const successUrl = new URL('/payment/success', baseUrl);
-        successUrl.searchParams.set('orderId', orderId);
-        successUrl.searchParams.set('orderNumber', order.orderNumber);
-        successUrl.searchParams.set('amount', Math.round(order.total).toString());
-        successUrl.searchParams.set('tid', order.paymentKey || tid || '');
-        return NextResponse.redirect(successUrl.toString(), 303);
+
+      if (!order) {
+        console.error('[KISPG Return GET] 주문을 찾을 수 없음:', orderId);
+        const failUrl = new URL('/payment/fail', baseUrl);
+        failUrl.searchParams.set('code', 'ORDER_NOT_FOUND');
+        failUrl.searchParams.set('message', '주문을 찾을 수 없습니다');
+        return NextResponse.redirect(failUrl.toString(), 303);
+      }
+
+      // ★ 이미 결제 완료된 주문은 바로 성공 페이지로
+      if (order.status === 'CONFIRMED' || order.status === 'SHIPPING' || order.status === 'DELIVERED') {
+        console.log('[KISPG Return GET] 이미 결제 완료된 주문:', orderId, order.status);
+        return redirectToSuccess(baseUrl, orderId, order.orderNumber, Math.round(order.total), order.paymentKey || tid || '', payMethod || 'card');
       }
 
       // PENDING 상태이고 tid가 있으면 승인 시도 (모바일 GET redirect 특수 케이스)
-      if (order && order.status === 'PENDING' && tid && tid.length > 10) {
+      if (order.status === 'PENDING' && tid && tid.length > 10) {
         console.log('[KISPG Return GET] PENDING 주문 + tid 존재 → 승인 시도');
         try {
           const approveResult = await approveKispgPayment({
@@ -362,32 +411,55 @@ export async function GET(request: NextRequest) {
             goodsAmt: Math.round(order.total),
           });
           
+          // approveKispgPayment가 성공을 반환 (정상 승인 또는 _alreadyApproved)
           await prisma.order.update({
             where: { id: orderId },
             data: {
               status: 'CONFIRMED',
-              paymentMethod: '신용카드',
+              paymentMethod: payMethodToKorean(payMethod || 'card'),
               paymentKey: tid,
-              paidAt: new Date(),
+              paidAt: approveResult.appDtm
+                ? parseKispgDateTime(approveResult.appDtm)
+                : new Date(),
             },
           });
 
-          const successUrl = new URL('/payment/success', baseUrl);
-          successUrl.searchParams.set('orderId', orderId);
-          successUrl.searchParams.set('orderNumber', order.orderNumber);
-          successUrl.searchParams.set('amount', Math.round(order.total).toString());
-          successUrl.searchParams.set('tid', tid);
-          return NextResponse.redirect(successUrl.toString(), 303);
+          console.log('[KISPG Return GET] 승인 성공! alreadyApproved:', !!approveResult._alreadyApproved);
+          return redirectToSuccess(baseUrl, orderId, order.orderNumber, Math.round(order.total), tid, payMethod || 'card', approveResult.appNo);
         } catch (approveErr: any) {
           console.error('[KISPG Return GET] 승인 실패:', approveErr.message);
+          
+          // ★ 승인 실패 시에도 DB 재확인
+          try {
+            const recheckedOrder = await prisma.order.findUnique({ where: { id: orderId } });
+            if (recheckedOrder && (recheckedOrder.status === 'CONFIRMED' || recheckedOrder.status === 'SHIPPING' || recheckedOrder.status === 'DELIVERED')) {
+              console.log('[KISPG Return GET] 승인 실패했지만 DB 재확인 결과 이미 결제 완료');
+              return redirectToSuccess(baseUrl, orderId, recheckedOrder.orderNumber, Math.round(recheckedOrder.total), recheckedOrder.paymentKey || tid || '', payMethod || 'card');
+            }
+          } catch (recheckErr) {
+            console.error('[KISPG Return GET] DB 재확인 실패:', recheckErr);
+          }
+
+          // tid 저장 (추적용)
+          try {
+            await prisma.order.update({
+              where: { id: orderId },
+              data: { paymentKey: tid, paymentMethod: payMethodToKorean(payMethod || 'card') },
+            });
+          } catch {}
         }
       }
 
-      // 에러 결과가 있으면 에러 메시지 표시
-      if (resultCd && resultCd !== '0000') {
+      // 에러 결과가 있고, 인증 성공 코드가 아닌 경우만 에러 표시
+      // ★ 수정: 이전에는 '0000'이 아닌 모든 코드를 에러로 처리 → 성공 코드 목록으로 비교
+      if (resultCd && !authSuccessCodes.includes(resultCd)) {
+        // 사용자 취소가 아닌 경우만 실패 페이지 표시
+        const userCancelCodes = ['0060', '0061', 'CC01', 'CC02'];
         const failUrl = new URL('/payment/fail', baseUrl);
         failUrl.searchParams.set('code', resultCd);
-        failUrl.searchParams.set('message', resultMsg || '결제 인증에 실패했습니다');
+        failUrl.searchParams.set('message', userCancelCodes.includes(resultCd) 
+          ? '결제가 취소되었습니다'
+          : (resultMsg || '결제 인증에 실패했습니다'));
         failUrl.searchParams.set('orderId', orderId);
         return NextResponse.redirect(failUrl.toString(), 303);
       }

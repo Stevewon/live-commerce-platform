@@ -210,12 +210,36 @@ export async function approveKispgPayment(params: KispgApproveParams) {
 
   console.log('[KISPG Approve] resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
 
-  // resultCd "0000" → 성공
-  if (data.resultCd !== '0000') {
-    throw new Error(data.resultMsg || `KISPG 결제 승인 실패 (${data.resultCd})`);
+  // 승인 성공 코드 확장: 0000(일반성공), 2001(카드승인성공), 2002(부분승인)
+  // KISPG는 결제수단/상황에 따라 다양한 성공 코드를 반환할 수 있음
+  const APPROVE_SUCCESS_CODES = ['0000', '2001', '2002'];
+  
+  if (APPROVE_SUCCESS_CODES.includes(data.resultCd)) {
+    console.log('[KISPG Approve] 승인 성공! resultCd:', data.resultCd);
+    return data;
   }
 
-  return data;
+  // "이미 승인된 거래" / "MOID 중복" 감지 → 실제로는 결제가 완료된 상태
+  // 이 경우 에러가 아닌 성공으로 간주하되, 특별 플래그를 추가하여 호출자가 구분 가능하게 함
+  const resultMsg = (data.resultMsg || '').toLowerCase();
+  const alreadyApprovedKeywords = ['이미 처리', '이미 승인', 'moid', '중복', '기처리', 'already', 'duplicate', '처리된 주문', '처리완료'];
+  const isAlreadyApproved = alreadyApprovedKeywords.some(kw => resultMsg.includes(kw.toLowerCase()));
+  
+  if (isAlreadyApproved) {
+    console.log('[KISPG Approve] 이미 처리된 거래 감지 → 성공으로 간주. resultCd:', data.resultCd, 'resultMsg:', data.resultMsg);
+    // 이미 처리된 거래는 성공으로 반환 (alreadyApproved 플래그 추가)
+    data._alreadyApproved = true;
+    return data;
+  }
+
+  // appNo(승인번호)가 존재하면 실제 승인이 완료된 것으로 간주
+  if (data.appNo || data.appDtm) {
+    console.log('[KISPG Approve] appNo/appDtm 존재 → 승인 완료로 간주. appNo:', data.appNo, 'appDtm:', data.appDtm);
+    data._alreadyApproved = true;
+    return data;
+  }
+
+  throw new Error(data.resultMsg || `KISPG 결제 승인 실패 (${data.resultCd})`);
 }
 
 // ─── 결제 취소 API 호출 ───
