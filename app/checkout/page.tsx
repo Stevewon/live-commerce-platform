@@ -316,66 +316,15 @@ export default function CheckoutPage() {
         throw new Error(kispgData.error || '결제 데이터를 가져오지 못했습니다.');
       }
 
-      // [2026-05-11 BUG FIX] PC 결제 팝업 콜백 수신을 위한 postMessage 리스너 등록
-      // KISPG PC 결제는 팝업 윈도우에서 진행되며, 결제 완료 후 returnUrl의 HTML+JS가
-      // window.opener.postMessage()로 결과 URL을 부모 창(여기)에 전달함
-      const handlePaymentResult = (event: MessageEvent) => {
-        // origin 검증 (자사 도메인만 허용)
-        if (event.origin !== window.location.origin) return;
-        if (event.data?.type === 'KISPG_PAYMENT_RESULT' && event.data?.url) {
-          window.removeEventListener('message', handlePaymentResult);
-          window.location.href = event.data.url;
-        }
-      };
-      window.addEventListener('message', handlePaymentResult);
-
-      // [2026-05-11 BUG FIX] 결제 상태 폴링 시작 (팝업이 닫히거나 postMessage 실패 대비)
-      // 주문 상태를 주기적으로 확인하여 CONFIRMED되면 성공 페이지로 이동
-      const pollOrderId = order.id;
-      const pollOrderNumber = order.orderNumber;
-      const pollAmount = finalAmount;
-      let pollCount = 0;
-      const maxPollCount = 60; // 최대 5분 (5초 * 60회)
-      const pollInterval = setInterval(async () => {
-        pollCount++;
-        if (pollCount > maxPollCount) {
-          clearInterval(pollInterval);
-          window.removeEventListener('message', handlePaymentResult);
-          return;
-        }
-        try {
-          const statusRes = await fetch(`/api/orders/status?orderId=${pollOrderId}`);
-          if (statusRes.ok) {
-            const statusData = await statusRes.json();
-            if (statusData.status === 'CONFIRMED' || statusData.status === 'SHIPPING' || statusData.status === 'DELIVERED') {
-              clearInterval(pollInterval);
-              window.removeEventListener('message', handlePaymentResult);
-              // 결제 완료 → 성공 페이지로 이동
-              const successUrl = new URL('/payment/success', window.location.origin);
-              successUrl.searchParams.set('orderId', pollOrderId);
-              successUrl.searchParams.set('orderNumber', pollOrderNumber);
-              successUrl.searchParams.set('amount', pollAmount.toString());
-              successUrl.searchParams.set('payMethod', 'card');
-              window.location.href = successUrl.toString();
-            } else if (statusData.status === 'CANCELLED') {
-              clearInterval(pollInterval);
-              window.removeEventListener('message', handlePaymentResult);
-            }
-          }
-        } catch {
-          // 폴링 실패는 무시 (네트워크 오류 등)
-        }
-      }, 5000); // 5초마다 확인
-
-      // 동적 form 생성 후 KISPG 결제창으로 POST submit
-      // (document.write() 방식은 PC Chrome에서 차단될 수 있어 사용하지 않음)
+      // [2026-05-11 v2] 동적 form 생성 후 KISPG 결제창으로 POST submit
+      // form.target='_self'로 같은 창에서 KISPG 결제창이 열림
+      // 결제 완료 후 KISPG가 returnUrl로 POST → 서버에서 승인 처리 → HTTP 303 redirect로
+      // 성공/실패 페이지로 즉시 이동 (별도 postMessage/폴링 불필요)
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = kispgData.authUrl;
       form.acceptCharset = 'utf-8';
       form.style.display = 'none';
-      // _self: 같은 창에서 결제창 열기 (모바일 + PC 모두 호환)
-      // KISPG가 자체적으로 팝업을 열 수 있음 → postMessage 리스너 + 폴링으로 대비
       form.target = '_self';
 
       Object.entries(kispgData.formData).forEach(([key, value]) => {
