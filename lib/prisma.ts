@@ -778,6 +778,23 @@ function createDbProxy(db: D1DB) {
       const result = await db.prepare(sql).bind(...params).all();
       return result.results || [];
     },
+    // [2026-05-11 HOTFIX] tx.$executeRawUnsafe 미정의로 인한 결제하기 alert 에러
+    // "Function prototype.apply was called on undefined" 차단
+    // 사장님 발견 — 결제하기 클릭 시 /api/orders -> tx.$executeRawUnsafe(...) 호출 시점에서 발생
+    // (Prisma 표준 메소드. D1 wrapper 에 누락되어 있었음)
+    $executeRawUnsafe: async (sql: string, ...params: any[]) => {
+      const result = await db.prepare(sql).bind(...params).run();
+      return result?.meta?.changes ?? 0;
+    },
+    $executeRaw: async (query: any, ...params: any[]) => {
+      const sql = typeof query === 'string' ? query : query.strings.join('?');
+      const result = await db.prepare(sql).bind(...params).run();
+      return result?.meta?.changes ?? 0;
+    },
+    $queryRawUnsafe: async (sql: string, ...params: any[]) => {
+      const result = await db.prepare(sql).bind(...params).all();
+      return result.results || [];
+    },
   };
   
   for (const [modelName, tableName] of Object.entries(models)) {
