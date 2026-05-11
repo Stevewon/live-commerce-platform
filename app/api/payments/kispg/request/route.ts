@@ -72,8 +72,19 @@ export async function POST(request: NextRequest) {
 
     // 주문자 정보 (KISPG는 ordTel 필수 - 빈값이면 W008 에러 발생)
     const ordNm = (order.user?.name || order.shippingName || '주문자').replace(/[<>\"\'&\\]/g, '');
-    const rawTel = (order.shippingPhone || order.user?.phone || order.guestPhone || '').replace(/[^0-9-]/g, '');
-    const ordTel = rawTel || '01000000000'; // KISPG 필수값 - 비어있으면 기본값
+    // ordTel: KISPG 규격은 "숫자만" — 하이픈/공백/괄호 절대 불가 (9998 에러 원인)
+    // KR 휴대전화 11자리(010xxxxxxxx) 또는 일반 전화 9~11자리 허용, 그 외엔 안전 폴백
+    const rawTel = (order.shippingPhone || order.user?.phone || order.guestPhone || '').replace(/\D/g, '');
+    let ordTel = '01000000000'; // KISPG 필수값 기본 폴백
+    if (rawTel.length === 11 && rawTel.startsWith('01')) {
+      ordTel = rawTel; // 휴대전화 (010/011/016/017/018/019) 11자리
+    } else if (rawTel.length === 10 && rawTel.startsWith('01')) {
+      ordTel = rawTel; // 구형 01x 10자리
+    } else if (rawTel.length >= 9 && rawTel.length <= 11) {
+      ordTel = rawTel; // 일반 전화 (지역번호 등) 9~11자리 허용
+    } else if (rawTel.length > 0) {
+      console.warn('[KISPG Request] ordTel 형식 비정상, 기본값으로 폴백:', rawTel, 'len:', rawTel.length);
+    }
     const ordEmail = order.user?.email || order.guestEmail || '';
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';

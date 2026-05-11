@@ -41,4 +41,8 @@
     "KISPG_MID": "quanta001m",
     "KISPG_MERCHANT_KEY": "Vme+so0frfyol4Fx1qRVuegbtUezBuTEZuBWGQVFyCCgisZgU4UhepUiGQyypnP/NFv9uwaoCPymfu4KXx31jw=="
   }
+  // [2026-05-11 MED 3 패치] PENDING 30분 자동 취소 cron
+  // OpenNext(.open-next/worker.js) 는 scheduled() 핸들러를 자동 생성하지 않으므로
+  // wrangler triggers.crons 대신 GitHub Actions schedule 단일 트리거로 HTTP 호출 방식 채택.
+  // (사장님 영구 룰: cron 트리거 단 1개 - .github/workflows/cleanup-pending-orders.yml)
 }

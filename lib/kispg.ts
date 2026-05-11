@@ -126,7 +126,8 @@ export async function buildAuthFormData(params: KispgAuthParams) {
     goodsAmt,
     ordNo: params.ordNo,
     ordNm: params.ordNm,
-    ordTel: params.ordTel || '01000000000',
+    // ordTel 최종 안전망: 숫자만 허용 (호출부에서 정규화되지만 이중 보호)
+    ordTel: (params.ordTel || '').replace(/\D/g, '') || '01000000000',
     ordEmail: params.ordEmail || '',
     returnUrl: params.returnUrl,
     trxCd: params.trxCd || '0',
@@ -350,6 +351,50 @@ export async function cancelKispgPayment(params: KispgCancelParams) {
   }
 
   throw new Error(data.resultMsg || `KISPG 결제 취소 실패 (${data.resultCd})`);
+}
+
+// ─── payMethod 정규화 (한글/대문자 → KISPG 영문 코드) ───
+// [2026-05-11 HIGH 2 패치] DB에 저장된 paymentMethod는 한글('신용카드','계좌이체','가상계좌','휴대폰결제')
+// 일 수도, 영문('card','bank','vacnt','hp')일 수도 있음.
+// KISPG cancel API는 반드시 영문 코드(card/bank/vacnt/hp)를 요구하므로,
+// 한글이 그대로 들어가면 카드 외 결제수단(계좌이체/가상계좌/HP)은 취소 실패한다.
+// 이 함수가 입력값을 항상 KISPG 영문 코드로 정규화한다.
+export function normalizeKispgPayMethod(method: string | null | undefined): string {
+  if (!method) return 'card';
+  const m = String(method).trim();
+
+  // 영문 코드 (대소문자 무관) - 가장 흔한 경우 빠른 통과
+  const lower = m.toLowerCase();
+  if (lower === 'card' || lower === 'bank' || lower === 'vacnt' || lower === 'hp') {
+    return lower;
+  }
+
+  // 한글 → 영문 매핑
+  const koMap: Record<string, string> = {
+    '신용카드': 'card',
+    '카드': 'card',
+    '체크카드': 'card',
+    '계좌이체': 'bank',
+    '실시간계좌이체': 'bank',
+    '가상계좌': 'vacnt',
+    '무통장입금': 'vacnt',
+    '휴대폰결제': 'hp',
+    '휴대폰': 'hp',
+    '핸드폰결제': 'hp',
+    '모바일결제': 'hp',
+  };
+  if (koMap[m]) return koMap[m];
+
+  // 부분 매칭 (DB 데이터가 살짝 다를 경우 대비)
+  if (m.includes('카드')) return 'card';
+  if (m.includes('계좌')) return 'bank';
+  if (m.includes('가상')) return 'vacnt';
+  if (m.includes('무통장')) return 'vacnt';
+  if (m.includes('휴대폰') || m.includes('핸드폰') || m.includes('모바일')) return 'hp';
+
+  // 알 수 없는 값 - 기본값 card (KISPG 가장 흔한 결제수단)
+  console.warn('[normalizeKispgPayMethod] 알 수 없는 payMethod, card로 폴백:', method);
+  return 'card';
 }
 
 // ─── 인증 결과 검증 ───

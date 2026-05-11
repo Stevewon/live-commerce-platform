@@ -340,11 +340,28 @@ async function cancelOrderAndRestoreStock(prisma: any, orderId: string) {
         data: { status: 'CANCELLED', cancelledAt: new Date() },
       });
 
+      // 재고 복구 (batch update - N+1 쿼리 제거)
+      // 같은 productId 가 items 에 여러 번 나올 수 있으므로 productId 별로 합산
+      const stockIncrementMap = new Map<string, number>();
       for (const item of order.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
+        const qty = Number(item.quantity);
+        if (!item.productId || !Number.isFinite(qty) || qty <= 0) continue;
+        stockIncrementMap.set(
+          item.productId,
+          (stockIncrementMap.get(item.productId) || 0) + qty
+        );
+      }
+      if (stockIncrementMap.size > 0) {
+        const productIds = Array.from(stockIncrementMap.keys());
+        const caseParts: string[] = [];
+        const params: any[] = [];
+        for (const [pid, qty] of stockIncrementMap.entries()) {
+          caseParts.push(`WHEN ? THEN stock + ?`);
+          params.push(pid, qty);
+        }
+        const placeholders = productIds.map(() => '?').join(',');
+        const sql = `UPDATE "Product" SET stock = CASE id ${caseParts.join(' ')} ELSE stock END, "updatedAt" = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`;
+        await tx.$executeRawUnsafe(sql, ...params, ...productIds);
       }
     });
   } catch (err) {
