@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cancelKispgPayment } from '@/lib/kispg';
+import { cancelKispgPayment, normalizeKispgPayMethod } from '@/lib/kispg';
 import { getPrisma } from '@/lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth/middleware';
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       if (order.paymentKey) {
         try {
           const cancelResult = await cancelKispgPayment({
-            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            payMethod: normalizeKispgPayMethod(order.paymentMethod),
             tid: order.paymentKey,
             canAmt: order.total,
             canId: req.user?.userId || 'user',

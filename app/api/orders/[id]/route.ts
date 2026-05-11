@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
-import { cancelKispgPayment } from '@/lib/kispg';
+import { cancelKispgPayment, normalizeKispgPayMethod } from '@/lib/kispg';
 
 // 주문 상세 조회 (GET)
 export async function GET(
@@ -121,7 +121,7 @@ export async function PATCH(
       if (order.paymentKey) {
         try {
           await cancelKispgPayment({
-            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            payMethod: normalizeKispgPayMethod(order.paymentMethod),
             tid: order.paymentKey,
             canAmt: order.total,
             canId: userId,

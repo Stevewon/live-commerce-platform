@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
-import { orderConfirmationEmail } from '@/lib/email'
-import { orderConfirmationSMS } from '@/lib/sms'
+import { orderConfirmationEmail, sendEmail } from '@/lib/email'
+import { orderConfirmationSMS, sendSMS } from '@/lib/sms'
 import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
 // Cloudflare Workers compatible crypto
 
-// 주문 알림 전송 함수
+// ─── 휴대전화번호 정규화 (KR) ───
+// 입력 예: '010-1234-5678', '01012345678', '+82 10 1234 5678', '+821012345678'
+// 출력 예: '01012345678' (숫자만, 11자리). 유효성 미달 시 null.
+function normalizeKrPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let digits = String(raw).replace(/[^0-9]/g, '');
+  // +82 / 82 로 시작하는 국제표기 -> 국내 0 prefix 로 변환
+  if (digits.startsWith('82')) {
+    digits = '0' + digits.slice(2);
+  }
+  // 010/011/016/017/018/019 계열 휴대전화 11자리 (또는 일부 10자리 011~) 만 통과
+  if (!/^01[016789][0-9]{7,8}$/.test(digits)) return null;
+  return digits;
+}
+
+// 주문 알림 전송 함수 (회원 + 비회원 모두 지원)
+// [2026-05-11 v3] 비회원 SMS/이메일 알림 누락 패치 - 사장님 HIGH 1 지시
+// - 회원: sendEmailWithPreferences / sendSMSWithPreferences (사용자 알림설정 존중)
+// - 비회원: sendEmail / sendSMS 직접 호출 (체크아웃에서 받은 guestEmail/guestPhone 사용)
 async function sendOrderNotifications(order: any, userId?: string, guestEmail?: string, guestPhone?: string) {
   const prisma = await getPrisma();
   try {
@@ -25,8 +43,11 @@ async function sendOrderNotifications(order: any, userId?: string, guestEmail?: 
         name = user.name;
       }
     } else {
+      // 비회원: 체크아웃에서 받은 guestEmail/guestPhone 우선,
+      // 누락 시 shippingPhone(필수) 사용
       email = guestEmail || null;
-      phone = guestPhone || null;
+      phone = guestPhone || order.shippingPhone || null;
+      name = order.shippingName || '고객';
     }
 
     const orderWithItems = await prisma.order.findUnique({
@@ -44,7 +65,7 @@ async function sendOrderNotifications(order: any, userId?: string, guestEmail?: 
 
     if (!orderWithItems) return;
 
-    // 이메일 전송
+    // ─── 이메일 전송 ───
     if (email) {
       const emailHtml = orderConfirmationEmail({
         customerName: name,
@@ -61,30 +82,63 @@ async function sendOrderNotifications(order: any, userId?: string, guestEmail?: 
         shippingAddress: `${order.shippingName} / ${order.shippingPhone}\n${order.shippingAddress} ${order.shippingZipCode || ''}`
       });
 
+      const subject = `[QRLIVE] 주문이 접수되었습니다 (${order.orderNumber})`;
+
       if (userId) {
+        // 회원: 사용자 알림 설정 존중
         await sendEmailWithPreferences({
           userId,
           to: email,
-          subject: `[QRLIVE] 주문이 접수되었습니다 (${order.orderNumber})`,
+          subject,
           html: emailHtml,
           notificationType: 'order'
         });
+      } else {
+        // 비회원: 알림 설정 없음 -> 체크아웃에서 약관 동의했으므로 직접 발송
+        try {
+          await sendEmail({
+            to: email,
+            subject,
+            html: emailHtml,
+          });
+          console.log('[GuestOrder] 이메일 발송 완료:', email, 'orderNumber:', order.orderNumber);
+        } catch (e: any) {
+          console.error('[GuestOrder] 이메일 발송 실패:', e?.message || e);
+        }
       }
     }
 
-    // SMS 전송
-    if (phone && userId) {
+    // ─── SMS 전송 ───
+    const normalizedPhone = normalizeKrPhone(phone);
+    if (normalizedPhone) {
       const smsMessage = orderConfirmationSMS({
         customerName: name,
         orderNumber: order.orderNumber,
         total: order.total
       });
-      await sendSMSWithPreferences({
-        userId,
-        to: phone,
-        message: smsMessage,
-        notificationType: 'order'
-      });
+
+      if (userId) {
+        // 회원: 사용자 알림 설정 존중
+        await sendSMSWithPreferences({
+          userId,
+          to: normalizedPhone,
+          message: smsMessage,
+          notificationType: 'order'
+        });
+      } else {
+        // 비회원: 알림 설정 없음 -> 체크아웃에서 입력한 연락처로 직접 발송
+        try {
+          await sendSMS({
+            to: normalizedPhone,
+            message: smsMessage,
+          });
+          console.log('[GuestOrder] SMS 발송 완료:', normalizedPhone, 'orderNumber:', order.orderNumber);
+        } catch (e: any) {
+          console.error('[GuestOrder] SMS 발송 실패:', e?.message || e);
+        }
+      }
+    } else if (phone) {
+      console.warn('[OrderNotification] 휴대전화 번호 정규화 실패, SMS 미발송:', phone);
     }
   } catch (error) {
     console.error('Order notification error:', error);
@@ -142,19 +196,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 배송비 설정 조회 (DB에서 동적 배송비 가져오기)
+    // SiteSetting 테이블은 prisma/schema.prisma 에 정의되어 있고 D1 마이그레이션으로 생성됨
+    // (inline CREATE TABLE 제거 - 주문 1건당 불필요한 DDL 2회 실행 비용 절감)
     let configShippingFee = 3000;
     let configFreeThreshold = 50000;
     try {
-      // SiteSetting 테이블 자동 생성 (D1)
-      try {
-        const { getCloudflareContext } = await import('@opennextjs/cloudflare');
-        const ctx = await getCloudflareContext();
-        const db = (ctx.env as any).DB;
-        if (db) {
-          await db.prepare(`CREATE TABLE IF NOT EXISTS "SiteSetting" ("id" TEXT NOT NULL PRIMARY KEY, "key" TEXT NOT NULL, "value" TEXT NOT NULL, "description" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`).run();
-          await db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS "SiteSetting_key_key" ON "SiteSetting"("key")`).run();
-        }
-      } catch {}
       const shippingSettings = await prisma.siteSetting.findMany({
         where: { key: { in: ['SHIPPING_FEE', 'FREE_SHIPPING_THRESHOLD'] } },
       });
@@ -327,16 +373,30 @@ export async function POST(req: NextRequest) {
         }
       });
 
-      // 재고 차감
+      // 재고 차감 (batch update - N+1 쿼리 제거)
+      // 같은 productId가 items에 여러 번 나올 수 있으므로 productId별로 합산
+      const stockDecrementMap = new Map<string, number>();
       for (const item of validatedItems) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              decrement: item.quantity
-            }
-          }
-        });
+        const qty = Number(item.quantity);
+        if (!item.productId || !Number.isFinite(qty) || qty <= 0) continue;
+        stockDecrementMap.set(
+          item.productId,
+          (stockDecrementMap.get(item.productId) || 0) + qty
+        );
+      }
+      if (stockDecrementMap.size > 0) {
+        const productIds = Array.from(stockDecrementMap.keys());
+        // CASE WHEN 절 구성: 각 productId 별 다른 quantity 차감
+        const caseParts: string[] = [];
+        const params: any[] = [];
+        for (const [pid, qty] of stockDecrementMap.entries()) {
+          caseParts.push(`WHEN ? THEN stock - ?`);
+          params.push(pid, qty);
+        }
+        const placeholders = productIds.map(() => '?').join(',');
+        // WHERE 절에 동일 productIds 바인딩
+        const sql = `UPDATE "Product" SET stock = CASE id ${caseParts.join(' ')} ELSE stock END, "updatedAt" = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`;
+        await tx.$executeRawUnsafe(sql, ...params, ...productIds);
       }
 
       // 쿠폰 사용 횟수 증가
@@ -479,6 +539,22 @@ export async function GET(req: NextRequest) {
           paidAt: true,
           createdAt: true,
           updatedAt: true,
+          partner: {
+            select: {
+              id: true,
+              storeName: true,
+              storeSlug: true,
+            }
+          },
+          coupon: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              type: true,
+              value: true,
+            }
+          },
           items: {
             select: {
               id: true,

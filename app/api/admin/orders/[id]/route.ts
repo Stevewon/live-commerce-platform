@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import { cancelKispgPayment } from '@/lib/kispg';
+import { cancelKispgPayment, normalizeKispgPayMethod } from '@/lib/kispg';
 
 
 
@@ -109,7 +109,7 @@ export async function PATCH(
         }
         try {
           await cancelKispgPayment({
-            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            payMethod: normalizeKispgPayMethod(order.paymentMethod),
             tid: tidForCancel,
             canAmt: order.total,
             canId: 'admin',
@@ -138,7 +138,7 @@ export async function PATCH(
         }
         try {
           await cancelKispgPayment({
-            payMethod: order.paymentMethod === '신용카드' ? 'card' : (order.paymentMethod || 'card'),
+            payMethod: normalizeKispgPayMethod(order.paymentMethod),
             tid: tidForRefund,
             canAmt: order.total,
             canId: 'admin',
