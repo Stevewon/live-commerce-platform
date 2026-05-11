@@ -90,6 +90,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');  // 실제 검색에 사용되는 값 (Enter/버튼 클릭 시에만 갱신)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [trackingCompany, setTrackingCompany] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -101,7 +102,7 @@ export default function AdminOrdersPage() {
     if (user && user.role === 'ADMIN') {
       loadOrders();
     }
-  }, [user, statusFilter, pagination.page, searchQuery]);
+  }, [user, statusFilter, pagination.page, appliedSearch]);
 
   const loadOrders = async () => {
     try {
@@ -113,8 +114,8 @@ export default function AdminOrdersPage() {
         limit: pagination.limit.toString(),
       });
 
-      if (searchQuery) {
-        params.append('search', searchQuery);
+      if (appliedSearch) {
+        params.append('search', appliedSearch);
       }
 
       const res = await fetch(`/api/admin/orders?${params}`, {
@@ -165,8 +166,8 @@ export default function AdminOrdersPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setAppliedSearch(searchQuery.trim());
     setPagination({ ...pagination, page: 1 });
-    loadOrders();
   };
 
   const handleExportExcel = async () => {
@@ -383,7 +384,8 @@ export default function AdminOrdersPage() {
                   type="button"
                   onClick={() => {
                     setSearchQuery('');
-                    loadOrders();
+                    setAppliedSearch('');
+                    setPagination({ ...pagination, page: 1 });
                   }}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl"
                 >
