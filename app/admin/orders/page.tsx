@@ -23,10 +23,12 @@ interface Order {
   shippingAddress: string | null;
   trackingCompany: string | null;
   trackingNumber: string | null;
+  guestEmail: string | null;
+  guestPhone: string | null;
   user: {
     name: string;
     email: string;
-  };
+  } | null;
   partner: {
     storeName: string;
   } | null;
@@ -368,7 +370,7 @@ export default function AdminOrdersPage() {
             <div className="flex-1 relative group">
               <input
                 type="text"
-                placeholder="주문번호, 고객명, 이메일로 검색하세요..."
+                placeholder="주문번호, 주문자, 수령인, 연락처, 이메일로 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-14 pr-6 py-5 border-3 border-gray-300 rounded-2xl focus:ring-4 focus:ring-blue-300 focus:border-blue-500 transition-all text-lg font-medium shadow-inner bg-white group-hover:border-blue-400 placeholder:text-gray-400"
@@ -443,10 +445,10 @@ export default function AdminOrdersPage() {
                       🔢 주문번호
                     </th>
                     <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
-                      👤 고객
+                      👤 주문자
                     </th>
                     <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
-                      🏪 파트너
+                      📬 수령인
                     </th>
                     <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
                       💰 주문금액
@@ -476,16 +478,29 @@ export default function AdminOrdersPage() {
                       <td className="px-8 py-6">
                         <div>
                           <div className="text-base font-black text-gray-900">
-                            {order.user?.name || '미설정'}
+                            {order.user?.name || '비회원'}
                           </div>
                           <div className="text-sm text-gray-600 font-medium mt-1">
-                            📧 {order.user?.email || '-'}
+                            {order.user?.email || order.guestEmail || '-'}
                           </div>
+                          {order.guestPhone && (
+                            <div className="text-xs text-gray-500 font-medium mt-0.5">
+                              📱 {order.guestPhone}
+                            </div>
+                          )}
+                          {!order.user && (
+                            <span className="inline-block mt-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">비회원</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="text-sm font-bold text-gray-700">
-                          {order.partner?.storeName || '-'}
+                        <div>
+                          <div className="text-sm font-bold text-gray-900">
+                            {order.shippingName || '-'}
+                          </div>
+                          <div className="text-xs text-gray-500 font-medium mt-1">
+                            📱 {order.shippingPhone || '-'}
+                          </div>
                         </div>
                       </td>
                       <td className="px-8 py-6">
@@ -604,16 +619,46 @@ export default function AdminOrdersPage() {
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-200">
                 <h4 className="font-black text-gray-900 mb-4 text-lg flex items-center">
                   <span className="text-2xl mr-2">👤</span>
-                  고객 정보
+                  주문자 정보
+                  {!selectedOrder.user && (
+                    <span className="ml-2 px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">비회원</span>
+                  )}
                 </h4>
                 <div className="space-y-3 text-base">
                   <div className="flex justify-between items-center bg-white rounded-xl p-4">
                     <span className="text-gray-600 font-bold">이름:</span>
-                    <span className="font-black text-gray-900">{selectedOrder.user?.name || '미설정'}</span>
+                    <span className="font-black text-gray-900">{selectedOrder.user?.name || '비회원 주문'}</span>
                   </div>
                   <div className="flex justify-between items-center bg-white rounded-xl p-4">
                     <span className="text-gray-600 font-bold">이메일:</span>
-                    <span className="font-bold text-gray-700">{selectedOrder.user?.email || '-'}</span>
+                    <span className="font-bold text-gray-700">{selectedOrder.user?.email || selectedOrder.guestEmail || '-'}</span>
+                  </div>
+                  {selectedOrder.guestPhone && (
+                    <div className="flex justify-between items-center bg-white rounded-xl p-4">
+                      <span className="text-gray-600 font-bold">연락처 (비회원):</span>
+                      <span className="font-bold text-gray-700">{selectedOrder.guestPhone}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-cyan-50 to-teal-50 rounded-2xl p-6 border-2 border-cyan-200">
+                <h4 className="font-black text-gray-900 mb-4 text-lg flex items-center">
+                  <span className="text-2xl mr-2">📬</span>
+                  수령인 / 배송지 정보
+                </h4>
+                <div className="space-y-3 text-base">
+                  <div className="flex justify-between items-center bg-white rounded-xl p-4">
+                    <span className="text-gray-600 font-bold">수령인:</span>
+                    <span className="font-black text-gray-900">{selectedOrder.shippingName || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white rounded-xl p-4">
+                    <span className="text-gray-600 font-bold">연락처:</span>
+                    <span className="font-bold text-gray-700">{selectedOrder.shippingPhone || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white rounded-xl p-4">
+                    <span className="text-gray-600 font-bold">배송지:</span>
+                    <span className="font-bold text-gray-700 text-right max-w-[60%]">{selectedOrder.shippingAddress || '-'}</span>
                   </div>
                 </div>
               </div>
