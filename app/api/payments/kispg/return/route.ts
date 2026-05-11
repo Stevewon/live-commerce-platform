@@ -18,6 +18,16 @@ import { getPrisma } from '@/lib/prisma';
  *   → 수정: DB에서 실제 주문 상태를 재확인 후, 결제가 이미 승인됐으면 성공 처리
  * - approveKispgPayment()가 이제 "이미 처리된 거래"를 성공으로 반환 (_alreadyApproved 플래그)
  * - 승인 실패 시에도 PENDING 주문을 무조건 취소하지 않고, DB 재확인 후 판단
+ * 
+ * [BUG FIX 2026-05-11] PC 결제 완료 화면 미표시 + tid 미저장 수정
+ * - 근본 원인: KISPG PC 결제는 팝업 윈도우에서 진행됨.
+ *   NextResponse.redirect(303)는 팝업 내에서만 동작하여 부모 창에 결제 결과가 전달되지 않음.
+ *   → 팝업이 닫히면 부모 창은 결제 완료 화면을 표시할 수 없음
+ *   → tid가 DB에 저장되기 전에 팝업이 닫히면 tid도 미저장
+ * - 해결: HTTP 303 redirect 대신 HTML+JavaScript를 반환하여:
+ *   1) 팝업인 경우: window.opener(부모 창)에 결제 결과를 postMessage로 전달 후 팝업 닫기
+ *   2) 같은 창인 경우(모바일): location.href로 직접 이동
+ *   → 부모 창이 결과를 수신하고 성공/실패 페이지로 이동
  */
 export async function POST(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://qrlive.io';
@@ -83,7 +93,7 @@ export async function POST(request: NextRequest) {
     const failUrl = new URL('/payment/fail', baseUrl);
     failUrl.searchParams.set('code', 'PARSE_ERROR');
     failUrl.searchParams.set('message', '결제 결과를 수신하지 못했습니다. 관리자에게 문의해주세요.');
-    return NextResponse.redirect(failUrl.toString(), 303);
+    return htmlRedirectResponse(failUrl.toString(), baseUrl);
   }
 
   let prisma: any;
@@ -95,7 +105,7 @@ export async function POST(request: NextRequest) {
     failUrl.searchParams.set('code', 'DB_ERROR');
     failUrl.searchParams.set('message', '시스템 오류가 발생했습니다. 결제가 완료된 경우 자동 처리됩니다.');
     if (orderId) failUrl.searchParams.set('orderId', orderId);
-    return NextResponse.redirect(failUrl.toString(), 303);
+    return htmlRedirectResponse(failUrl.toString(), baseUrl);
   }
 
   try {
@@ -119,7 +129,7 @@ export async function POST(request: NextRequest) {
       failUrl.searchParams.set('code', resultCd || 'AUTH_FAILED');
       failUrl.searchParams.set('message', resultMsg || '결제 인증에 실패했습니다');
       if (orderId) failUrl.searchParams.set('orderId', orderId);
-      return NextResponse.redirect(failUrl.toString(), 303);
+      return htmlRedirectResponse(failUrl.toString(), baseUrl);
     }
 
     console.log('[KISPG Return] 인증 성공! resultCd:', resultCd, 'resultMsg:', resultMsg, 'tid:', tid);
@@ -139,7 +149,7 @@ export async function POST(request: NextRequest) {
       failUrl.searchParams.set('code', 'DB_QUERY_ERROR');
       failUrl.searchParams.set('message', '주문 조회 중 오류가 발생했습니다. 결제가 완료된 경우 관리자에게 문의해주세요.');
       if (orderId) failUrl.searchParams.set('orderId', orderId);
-      return NextResponse.redirect(failUrl.toString(), 303);
+      return htmlRedirectResponse(failUrl.toString(), baseUrl);
     }
 
     if (!order) {
@@ -147,7 +157,7 @@ export async function POST(request: NextRequest) {
       const failUrl = new URL('/payment/fail', baseUrl);
       failUrl.searchParams.set('code', 'ORDER_NOT_FOUND');
       failUrl.searchParams.set('message', '주문을 찾을 수 없습니다');
-      return NextResponse.redirect(failUrl.toString(), 303);
+      return htmlRedirectResponse(failUrl.toString(), baseUrl);
     }
 
     // 이미 결제 완료된 주문인 경우 바로 성공 페이지로 이동 (중복 처리 방지)
@@ -169,7 +179,7 @@ export async function POST(request: NextRequest) {
       failUrl.searchParams.set('code', 'AMOUNT_MISMATCH');
       failUrl.searchParams.set('message', `결제 금액 불일치 (주문: ${orderTotal}원, 결제: ${paidAmt}원). 관리자에게 문의해주세요.`);
       if (orderId) failUrl.searchParams.set('orderId', orderId);
-      return NextResponse.redirect(failUrl.toString(), 303);
+      return htmlRedirectResponse(failUrl.toString(), baseUrl);
     }
 
     // 3) 결제 승인 API 호출
@@ -232,7 +242,7 @@ export async function POST(request: NextRequest) {
       // 결제가 실제로 완료되었을 수 있으므로 PENDING 상태 유지 → 관리자가 확인
       failUrl.searchParams.set('message', userMessage);
       failUrl.searchParams.set('orderId', orderId);
-      return NextResponse.redirect(failUrl.toString(), 303);
+      return htmlRedirectResponse(failUrl.toString(), baseUrl);
     }
 
     // 4) 결제 성공 → DB 업데이트
@@ -280,11 +290,112 @@ export async function POST(request: NextRequest) {
     failUrl.searchParams.set('code', 'SYSTEM_ERROR');
     failUrl.searchParams.set('message', '결제 처리 중 시스템 오류가 발생했습니다. 결제가 완료된 경우 관리자에게 문의해주세요.');
     if (orderId) failUrl.searchParams.set('orderId', orderId);
-    return NextResponse.redirect(failUrl.toString(), 303);
+    return htmlRedirectResponse(failUrl.toString(), baseUrl);
   }
 }
 
+// ─── HTML+JS 기반 redirect 응답 (PC 팝업 + 모바일 동시 호환) ───
+/**
+ * [2026-05-11 BUG FIX]
+ * HTTP 303 redirect 대신 HTML 페이지를 반환하여 JS로 리다이렉트.
+ * 
+ * KISPG PC 결제는 팝업 윈도우를 사용함.
+ * HTTP 303은 팝업 내에서만 redirect되어 부모 창에 결과가 전달되지 않음.
+ * 
+ * 이 함수는:
+ * 1) 팝업 윈도우인 경우: window.opener(부모 창)에 postMessage로 URL 전달 후 팝업 닫기
+ * 2) 같은 창인 경우(모바일/iframe 없는 PC): location.href로 직접 이동
+ * 3) 어떤 경우든 3초 후 자동 이동 (안전장치)
+ */
+function htmlRedirectResponse(targetUrl: string, baseUrl: string) {
+  const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>결제 처리 중...</title>
+  <style>
+    body{margin:0;padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f8f9fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+    .container{text-align:center;padding:40px}
+    .spinner{width:48px;height:48px;border:4px solid #e9ecef;border-top:4px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .text{color:#6b7280;font-size:16px;font-weight:500}
+    .link{color:#3b82f6;text-decoration:underline;cursor:pointer;font-size:14px;margin-top:12px;display:inline-block}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <div class="text">결제 처리 중입니다...</div>
+    <a class="link" href="${escapeHtml(targetUrl)}">자동 이동되지 않으면 여기를 클릭하세요</a>
+  </div>
+  <script>
+    (function() {
+      var targetUrl = ${JSON.stringify(targetUrl)};
+      var baseOrigin = ${JSON.stringify(new URL(baseUrl).origin)};
+      
+      // 1) 팝업 윈도우인 경우: 부모 창에 결과 전달 후 팝업 닫기
+      if (window.opener && !window.opener.closed) {
+        try {
+          // 부모 창에 결제 결과 URL을 postMessage로 전달
+          window.opener.postMessage({
+            type: 'KISPG_PAYMENT_RESULT',
+            url: targetUrl
+          }, baseOrigin);
+          
+          // 부모 창으로 직접 이동 시도 (같은 origin인 경우 동작)
+          try {
+            window.opener.location.href = targetUrl;
+          } catch(e) {
+            // cross-origin이면 postMessage만 사용
+          }
+          
+          // 팝업 닫기 (약간의 딜레이 후)
+          setTimeout(function() {
+            try { window.close(); } catch(e) {}
+          }, 500);
+          
+          // 팝업이 안 닫히는 경우 자체적으로도 이동
+          setTimeout(function() {
+            if (!window.closed) {
+              window.location.href = targetUrl;
+            }
+          }, 2000);
+          return;
+        } catch(e) {
+          // opener 접근 실패 시 일반 redirect로 fallback
+          console.log('[KISPG] opener 접근 실패, 직접 이동:', e);
+        }
+      }
+      
+      // 2) 같은 창인 경우 (모바일 또는 팝업 없는 PC): 직접 이동
+      window.location.href = targetUrl;
+      
+      // 3) 안전장치: 3초 후에도 이동 안 되면 강제 이동
+      setTimeout(function() {
+        window.location.replace(targetUrl);
+      }, 3000);
+    })();
+  </script>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    },
+  });
+}
+
+// HTML escape helper
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // ─── 성공 페이지 redirect 헬퍼 ───
+// [2026-05-11] HTTP 303 → HTML+JS redirect로 변경 (PC 팝업 호환)
 function redirectToSuccess(baseUrl: string, orderId: string, orderNumber: string, amount: number, tid: string, payMethod: string, appNo?: string) {
   const successUrl = new URL('/payment/success', baseUrl);
   successUrl.searchParams.set('orderId', orderId);
@@ -295,7 +406,7 @@ function redirectToSuccess(baseUrl: string, orderId: string, orderNumber: string
   if (appNo) {
     successUrl.searchParams.set('appNo', appNo);
   }
-  return NextResponse.redirect(successUrl.toString(), 303);
+  return htmlRedirectResponse(successUrl.toString(), baseUrl);
 }
 
 // ─── 주문 취소 + 재고 복구 헬퍼 ───
@@ -364,6 +475,9 @@ function parseKispgDateTime(dt: string): Date {
  * [BUG FIX 2026-04-30]
  * - resultCd 체크 시 인증 성공 코드 목록을 사용하도록 수정 (이전: '0000'만 성공)
  * - 승인 실패 시에도 DB 재확인하여 이미 결제 완료된 경우 성공 처리
+ * 
+ * [BUG FIX 2026-05-11]
+ * - HTTP 303 → HTML+JS redirect로 변경 (PC 팝업 호환)
  */
 export async function GET(request: NextRequest) {
   console.log('[KISPG Return] GET 요청 수신 - URL:', request.url);
@@ -393,7 +507,7 @@ export async function GET(request: NextRequest) {
         const failUrl = new URL('/payment/fail', baseUrl);
         failUrl.searchParams.set('code', 'ORDER_NOT_FOUND');
         failUrl.searchParams.set('message', '주문을 찾을 수 없습니다');
-        return NextResponse.redirect(failUrl.toString(), 303);
+        return htmlRedirectResponse(failUrl.toString(), baseUrl);
       }
 
       // ★ 이미 결제 완료된 주문은 바로 성공 페이지로
@@ -461,7 +575,7 @@ export async function GET(request: NextRequest) {
           ? '결제가 취소되었습니다'
           : (resultMsg || '결제 인증에 실패했습니다'));
         failUrl.searchParams.set('orderId', orderId);
-        return NextResponse.redirect(failUrl.toString(), 303);
+        return htmlRedirectResponse(failUrl.toString(), baseUrl);
       }
     } catch (e) {
       console.error('[KISPG Return GET] DB 조회 실패:', e);
@@ -473,5 +587,5 @@ export async function GET(request: NextRequest) {
   failUrl.searchParams.set('code', 'INVALID_METHOD');
   failUrl.searchParams.set('message', '결제 처리를 완료하지 못했습니다. 주문 내역을 확인해주세요.');
   if (orderId) failUrl.searchParams.set('orderId', orderId);
-  return NextResponse.redirect(failUrl.toString(), 303);
+  return htmlRedirectResponse(failUrl.toString(), baseUrl);
 }
