@@ -250,7 +250,10 @@ export default function CheckoutPage() {
         shippingAddress: fullAddress,
         shippingZipCode,
         shippingMemo: finalMemo,
-        paymentMethod: 'card',
+        // [2026-05-11 v4 진단] 결제수단 단계별 마커:
+        //   '결제대기' (주문생성 시점, 여기) → '결제창진입' (KISPG 요청) → '신용카드' (return 핸들러 도달)
+        //   admin 에 어느 값이 보이느냐로 결제 흐름이 어디서 끊겼는지 즉시 진단 가능
+        paymentMethod: '결제대기',
         shippingFee,
       };
 

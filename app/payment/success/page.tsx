@@ -53,6 +53,24 @@ function PaymentSuccessContent() {
 
       setIsLoading(false);
 
+      // [2026-05-11 v4 안전망] 클라이언트 사이드 paymentKey sync
+      // → KISPG return 핸들러가 어떤 이유로 실패해도 success 페이지 진입 시점에 paymentKey/status 를 강제 동기화
+      // → 사용자 도달 확정 시점이므로 100% 실행 보장
+      if (orderId && tid) {
+        fetch('/api/payments/kispg/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            orderId,
+            tid,
+            payMethod: payMethod || 'card',
+            appNo: appNo || '',
+            amount: amount ? parseInt(amount) : 0,
+          }),
+        }).catch((e) => console.error('[sync] 실패(무시):', e));
+      }
+
       // 장바구니 비우기
       if (guestToken) {
         clearGuestCart();
