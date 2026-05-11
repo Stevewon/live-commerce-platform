@@ -38,14 +38,20 @@ export async function GET(req: NextRequest) {
       where.partnerId = partnerId;
     }
 
-    // 검색어가 있으면 주문번호로만 필터링 + 사용자 검색은 후처리
-    // (D1 래퍼가 nested relation 필터를 지원하지 않음)
-    let searchUserIds: string[] | null = null;
+    // 검색어가 있으면 주문번호 / 수령인(배송정보) / 비회원 정보 / 회원 정보 전체 검색
+    // 사장님 요청: 주문자/수령인/연락처 등 모두 검색 가능하게
     if (search) {
-      // 1) 주문번호 필터
-      const orderNumberFilter = { orderNumber: { contains: search } };
+      // Order 테이블 직접 필드 검색 (주문번호, 수령인, 비회원 정보)
+      const orConditions: any[] = [
+        { orderNumber: { contains: search } },       // 주문번호
+        { shippingName: { contains: search } },       // 수령인 이름 (받는사람)
+        { shippingPhone: { contains: search } },      // 수령인 연락처
+        { guestEmail: { contains: search } },         // 비회원 이메일
+        { guestPhone: { contains: search } },         // 비회원 연락처
+      ];
 
-      // 2) 사용자 이름/이메일로 검색하여 userId 목록 확보
+      // 회원(User) 이름/닉네임/이메일로 검색하여 userId 목록 확보
+      // (D1 래퍼가 nested relation 필터를 지원하지 않으므로 2단계 검색)
       try {
         const matchingUsers = await prisma.user.findMany({
           where: {
@@ -53,19 +59,19 @@ export async function GET(req: NextRequest) {
               { name: { contains: search } },
               { nickname: { contains: search } },
               { email: { contains: search } },
+              { phone: { contains: search } },        // 회원 연락처
             ],
           },
+          select: { id: true },
         });
-        searchUserIds = matchingUsers.map((u: any) => u.id);
+        const searchUserIds = matchingUsers.map((u: any) => u.id);
+        if (searchUserIds.length > 0) {
+          orConditions.push({ userId: { in: searchUserIds } });
+        }
       } catch {
-        searchUserIds = [];
+        // User 검색 실패해도 다른 조건으로 계속 검색
       }
 
-      // OR 조건: 주문번호 또는 매칭된 userId
-      const orConditions: any[] = [orderNumberFilter];
-      if (searchUserIds && searchUserIds.length > 0) {
-        orConditions.push({ userId: { in: searchUserIds } });
-      }
       where.OR = orConditions;
     }
 

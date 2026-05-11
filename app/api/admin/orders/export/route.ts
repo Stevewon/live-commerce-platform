@@ -52,9 +52,16 @@ export async function GET(req: NextRequest) {
       where.partnerId = partnerId;
     }
 
+    // 검색어가 있으면 주문번호 / 수령인 / 비회원 정보 / 회원 정보 전체 검색
     if (search) {
-      const orderNumberFilter = { orderNumber: { contains: search } };
-      let searchUserIds: string[] = [];
+      const orConditions: any[] = [
+        { orderNumber: { contains: search } },       // 주문번호
+        { shippingName: { contains: search } },       // 수령인 이름
+        { shippingPhone: { contains: search } },      // 수령인 연락처
+        { guestEmail: { contains: search } },         // 비회원 이메일
+        { guestPhone: { contains: search } },         // 비회원 연락처
+      ];
+
       try {
         const matchingUsers = await prisma.user.findMany({
           where: {
@@ -62,18 +69,19 @@ export async function GET(req: NextRequest) {
               { name: { contains: search } },
               { nickname: { contains: search } },
               { email: { contains: search } },
+              { phone: { contains: search } },
             ],
           },
+          select: { id: true },
         });
-        searchUserIds = matchingUsers.map((u: any) => u.id);
+        const searchUserIds = matchingUsers.map((u: any) => u.id);
+        if (searchUserIds.length > 0) {
+          orConditions.push({ userId: { in: searchUserIds } });
+        }
       } catch {
-        searchUserIds = [];
+        // User 검색 실패해도 다른 조건으로 계속 검색
       }
 
-      const orConditions: any[] = [orderNumberFilter];
-      if (searchUserIds.length > 0) {
-        orConditions.push({ userId: { in: searchUserIds } });
-      }
       where.OR = orConditions;
     }
 
