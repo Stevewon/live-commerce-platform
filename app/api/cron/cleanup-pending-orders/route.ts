@@ -114,6 +114,8 @@ async function handleCron(req: NextRequest) {
   let failed = 0;
   const cancelledOrderNumbers: string[] = [];
   const skippedHadTidOrderNumbers: string[] = [];
+  // 진단용: 24 failed 원인 추적을 위해 처음 5건의 에러 메시지 응답에 노출
+  const failureReasons: Array<{ orderNumber: string; error: string; stack?: string }> = [];
 
   // ─── 3) 각 주문 처리 (트랜잭션 단위) ───
   for (const order of pendingOrders) {
@@ -207,11 +209,22 @@ async function handleCron(req: NextRequest) {
       );
     } catch (e: any) {
       failed++;
+      const errMsg = e?.message || String(e);
+      const errStack = e?.stack ? String(e.stack).split('\n').slice(0, 5).join(' | ') : undefined;
       console.error(
         '[cron/cleanup-pending] 취소 실패:',
         order.orderNumber,
-        e?.message || e
+        errMsg,
+        errStack
       );
+      // 처음 5건의 에러만 응답에 노출 (응답 크기 제한)
+      if (failureReasons.length < 5) {
+        failureReasons.push({
+          orderNumber: order.orderNumber,
+          error: errMsg,
+          stack: errStack,
+        });
+      }
     }
   }
 
@@ -228,6 +241,8 @@ async function handleCron(req: NextRequest) {
     elapsedMs,
     cancelledOrderNumbers,
     skippedHadTidOrderNumbers,
+    // 진단용: 24 failed 추적 (정상 동작 검증 완료 후 제거 예정)
+    failureReasons: failureReasons.length > 0 ? failureReasons : undefined,
   };
   console.log('[cron/cleanup-pending] summary:', JSON.stringify(summary));
 
