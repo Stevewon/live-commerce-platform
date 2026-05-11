@@ -172,7 +172,10 @@ export async function POST(request: NextRequest) {
 
     // ★★★ [v2 핵심 수정 1] 승인 API 호출 전에 먼저 tid를 DB에 저장 ★★★
     // 승인 API가 실패/타임아웃 되더라도 tid는 DB에 남아있어 관리자가 수동 환불 가능
+    // [2026-05-11 v3 HOTFIX] D1 wrapper update() 가 silent fail 가능성 → raw SQL 폴백 동시 시도
     if (tid) {
+      // ① ORM update 시도
+      let preSaveOk = false;
       try {
         await prisma.order.update({
           where: { id: orderId },
@@ -181,10 +184,32 @@ export async function POST(request: NextRequest) {
             paymentMethod: payMethodToKorean(payMethod || 'card'),
           },
         });
-        console.log('[KISPG Return] tid 사전 저장 성공:', tid);
+        preSaveOk = true;
+        console.log('[KISPG Return] tid 사전 저장 성공 (ORM):', tid);
       } catch (preSaveErr: any) {
-        console.error('[KISPG Return] tid 사전 저장 실패:', preSaveErr.message);
-        // 실패해도 계속 진행 (승인 성공 후 다시 저장 시도)
+        console.error('[KISPG Return] tid 사전 저장 ORM 실패:', preSaveErr?.message || preSaveErr);
+      }
+      // ② raw SQL 확정 저장 — ORM 성공/실패 무관하게 항상 paymentKey 가 DB 에 있도록 강제
+      try {
+        const nowIso = new Date().toISOString();
+        const changes = await prisma.$executeRawUnsafe(
+          'UPDATE "Order" SET "paymentKey" = ?, "paymentMethod" = ?, "updatedAt" = ? WHERE "id" = ?',
+          tid, payMethodToKorean(payMethod || 'card'), nowIso, orderId
+        );
+        console.log('[KISPG Return] tid 사전 저장 raw SQL 결과 changes=', changes, 'tid=', tid, 'orderId=', orderId, 'ormOk=', preSaveOk);
+        // raw 도 변경 0 건이면 SELECT 로 진단
+        if (!changes || changes === 0) {
+          try {
+            const verify = await prisma.$queryRawUnsafe(
+              'SELECT id, status, paymentKey FROM "Order" WHERE id = ? LIMIT 1', orderId
+            );
+            console.error('[KISPG Return] tid 사전 저장 raw 0건 변경 — verify:', JSON.stringify(verify));
+          } catch (vErr: any) {
+            console.error('[KISPG Return] verify SELECT 실패:', vErr?.message || vErr);
+          }
+        }
+      } catch (rawErr: any) {
+        console.error('[KISPG Return] tid 사전 저장 raw SQL 실패:', rawErr?.message || rawErr);
       }
     }
 
@@ -257,49 +282,82 @@ export async function POST(request: NextRequest) {
     }
 
     // 4) 결제 성공 → DB 업데이트 (status + tid + paidAt)
-    // [2026-05-11 HOTFIX] paymentKey 저장 누락 차단:
-    //  - paidAt Date 객체가 Invalid Date 일 경우 .toISOString() 에서 RangeError 발생 → 전체 update 실패 → paymentKey 누락
-    //  - 해결: ISO string 으로 강제 변환 + Invalid 시 안전 폴백
-    //  - 추가 안전망: paymentKey/status 1차 저장 → paidAt 2차 저장 (분리)
-    //    paidAt 실패해도 거래번호는 무조건 DB 에 남도록
+    // [2026-05-11 v3 HOTFIX] D1 wrapper update() silent fail 차단:
+    //  - paidAt Date Invalid → .toISOString() RangeError 우회 (safePaidAtIso)
+    //  - ORM update() 가 어떤 이유로든 실패해도 raw SQL 로 paymentKey 무조건 저장
+    //  - 마지막에 SELECT 로 실제 저장 여부 검증 후 로그
     const paidAtIso = safePaidAtIso(approveResult?.appDtm);
+    const paymentMethodKr = payMethodToKorean(payMethod);
+    const nowIso = new Date().toISOString();
+
+    // ① ORM update 시도 (3단 폴백)
+    let ormOk = false;
     try {
       await prisma.order.update({
         where: { id: orderId },
         data: {
           status: 'CONFIRMED',
-          paymentMethod: payMethodToKorean(payMethod),
+          paymentMethod: paymentMethodKr,
           paymentKey: tid,
           paidAt: paidAtIso,
         },
       });
-      console.log('[KISPG Return] DB 업데이트 성공! orderId:', orderId, 'tid:', tid, 'paidAt:', paidAtIso);
+      ormOk = true;
+      console.log('[KISPG Return] DB 업데이트 성공 (ORM 1차)! orderId:', orderId, 'tid:', tid, 'paidAt:', paidAtIso);
     } catch (dbUpdateError: any) {
-      console.error('[KISPG Return] DB 업데이트 실패 (1차):', dbUpdateError?.message || dbUpdateError);
-      // ★ 1차 실패 시 paymentKey 단독 저장으로 폴백 — 거래번호는 무조건 DB 에 남겨야 함
+      console.error('[KISPG Return] DB 업데이트 실패 (ORM 1차):', dbUpdateError?.message || dbUpdateError);
       try {
         await prisma.order.update({
           where: { id: orderId },
-          data: {
-            status: 'CONFIRMED',
-            paymentMethod: payMethodToKorean(payMethod),
-            paymentKey: tid,
-          },
+          data: { status: 'CONFIRMED', paymentMethod: paymentMethodKr, paymentKey: tid },
         });
-        console.log('[KISPG Return] DB 업데이트 성공 (2차 폴백, paidAt 제외)! orderId:', orderId, 'tid:', tid);
+        ormOk = true;
+        console.log('[KISPG Return] DB 업데이트 성공 (ORM 2차 폴백)! tid:', tid);
       } catch (dbUpdateError2: any) {
-        console.error('[KISPG Return] DB 업데이트 실패 (2차):', dbUpdateError2?.message || dbUpdateError2);
-        // ★ 2차도 실패하면 paymentKey 만 단독으로 — 어떤 경우에도 거래번호 누락 금지
+        console.error('[KISPG Return] DB 업데이트 실패 (ORM 2차):', dbUpdateError2?.message || dbUpdateError2);
         try {
-          await prisma.order.update({
-            where: { id: orderId },
-            data: { paymentKey: tid },
-          });
-          console.log('[KISPG Return] paymentKey 단독 저장 성공 (3차 폴백)! orderId:', orderId, 'tid:', tid);
+          await prisma.order.update({ where: { id: orderId }, data: { paymentKey: tid } });
+          ormOk = true;
+          console.log('[KISPG Return] paymentKey 단독 저장 성공 (ORM 3차)! tid:', tid);
         } catch (dbUpdateError3: any) {
-          console.error('[KISPG Return] paymentKey 단독 저장도 실패 (3차):', dbUpdateError3?.message || dbUpdateError3);
+          console.error('[KISPG Return] ORM 3차 실패:', dbUpdateError3?.message || dbUpdateError3);
         }
       }
+    }
+
+    // ② raw SQL 강제 저장 — ORM 결과 무관, paymentKey 는 절대 누락되면 안 됨
+    try {
+      const changes = await prisma.$executeRawUnsafe(
+        'UPDATE "Order" SET "status" = ?, "paymentMethod" = ?, "paymentKey" = ?, "paidAt" = ?, "updatedAt" = ? WHERE "id" = ?',
+        'CONFIRMED', paymentMethodKr, tid, paidAtIso, nowIso, orderId
+      );
+      console.log('[KISPG Return] raw SQL 강제 저장 changes=', changes, 'tid=', tid, 'ormOk=', ormOk);
+    } catch (rawErr: any) {
+      console.error('[KISPG Return] raw SQL 강제 저장 실패:', rawErr?.message || rawErr);
+      // 마지막 안전망 — paymentKey 단독 raw
+      try {
+        const c2 = await prisma.$executeRawUnsafe(
+          'UPDATE "Order" SET "paymentKey" = ?, "updatedAt" = ? WHERE "id" = ?',
+          tid, nowIso, orderId
+        );
+        console.log('[KISPG Return] paymentKey 단독 raw SQL 결과 changes=', c2);
+      } catch (rawErr2: any) {
+        console.error('[KISPG Return] paymentKey 단독 raw SQL 도 실패:', rawErr2?.message || rawErr2);
+      }
+    }
+
+    // ③ 최종 검증 — 실제로 DB 에 저장됐는지 SELECT 로 확인
+    try {
+      const verify: any = await prisma.$queryRawUnsafe(
+        'SELECT id, status, paymentKey, paymentMethod, paidAt FROM "Order" WHERE id = ? LIMIT 1', orderId
+      );
+      const row = Array.isArray(verify) ? verify[0] : (verify?.results?.[0] || verify);
+      console.log('[KISPG Return] 최종 검증 SELECT:', JSON.stringify(row));
+      if (!row || !row.paymentKey) {
+        console.error('[KISPG Return] ★★★ 치명적: 모든 저장 시도 후에도 paymentKey 미저장! orderId=', orderId, 'tid=', tid);
+      }
+    } catch (verifyErr: any) {
+      console.error('[KISPG Return] 최종 검증 SELECT 실패:', verifyErr?.message || verifyErr);
     }
 
     console.log('[KISPG Return] 결제 성공! orderId:', orderId, 'tid:', tid, 'appNo:', approveResult.appNo);
@@ -484,58 +542,100 @@ export async function GET(request: NextRequest) {
       // PENDING 상태이고 tid가 있으면 승인 시도
       if (order.status === 'PENDING' && tid && tid.length > 10) {
         console.log('[KISPG Return GET] PENDING 주문 + tid 존재 → 승인 시도');
-        
-        // tid 사전 저장
+        const paymentMethodKrGet = payMethodToKorean(payMethod || 'card');
+        const nowIsoGet = new Date().toISOString();
+
+        // tid 사전 저장 (ORM + raw SQL 이중 안전망)
         try {
           await prisma.order.update({
             where: { id: orderId },
-            data: { paymentKey: tid, paymentMethod: payMethodToKorean(payMethod || 'card') },
+            data: { paymentKey: tid, paymentMethod: paymentMethodKrGet },
           });
         } catch {}
+        try {
+          const c = await prisma.$executeRawUnsafe(
+            'UPDATE "Order" SET "paymentKey" = ?, "paymentMethod" = ?, "updatedAt" = ? WHERE "id" = ?',
+            tid, paymentMethodKrGet, nowIsoGet, orderId
+          );
+          console.log('[KISPG Return GET] tid 사전 저장 raw SQL changes=', c, 'tid=', tid);
+        } catch (preRawErr: any) {
+          console.error('[KISPG Return GET] tid 사전 저장 raw SQL 실패:', preRawErr?.message || preRawErr);
+        }
 
         try {
           const approveResult = await approveKispgPayment({
             tid,
             goodsAmt: Math.round(order.total),
           });
-          
-          // [2026-05-11 HOTFIX] paidAt Invalid Date 차단 + 3단 폴백 — 거래번호 누락 절대 금지
+
+          // [2026-05-11 v3 HOTFIX] paidAt 안전 변환 + ORM 3단 폴백 + raw SQL 강제 저장 + 최종 검증
           const paidAtIsoGet = safePaidAtIso(approveResult?.appDtm);
+          let ormOkGet = false;
           try {
             await prisma.order.update({
               where: { id: orderId },
               data: {
                 status: 'CONFIRMED',
-                paymentMethod: payMethodToKorean(payMethod || 'card'),
+                paymentMethod: paymentMethodKrGet,
                 paymentKey: tid,
                 paidAt: paidAtIsoGet,
               },
             });
-            console.log('[KISPG Return GET] DB 업데이트 성공! orderId:', orderId, 'tid:', tid, 'paidAt:', paidAtIsoGet);
+            ormOkGet = true;
+            console.log('[KISPG Return GET] DB 업데이트 성공 (ORM 1차)! tid:', tid, 'paidAt:', paidAtIsoGet);
           } catch (dbErrGet1: any) {
-            console.error('[KISPG Return GET] DB 업데이트 실패 (1차):', dbErrGet1?.message || dbErrGet1);
+            console.error('[KISPG Return GET] DB 업데이트 실패 (ORM 1차):', dbErrGet1?.message || dbErrGet1);
             try {
               await prisma.order.update({
                 where: { id: orderId },
-                data: {
-                  status: 'CONFIRMED',
-                  paymentMethod: payMethodToKorean(payMethod || 'card'),
-                  paymentKey: tid,
-                },
+                data: { status: 'CONFIRMED', paymentMethod: paymentMethodKrGet, paymentKey: tid },
               });
-              console.log('[KISPG Return GET] DB 업데이트 성공 (2차 폴백, paidAt 제외)! tid:', tid);
+              ormOkGet = true;
+              console.log('[KISPG Return GET] DB 업데이트 성공 (ORM 2차 폴백)! tid:', tid);
             } catch (dbErrGet2: any) {
-              console.error('[KISPG Return GET] DB 업데이트 실패 (2차):', dbErrGet2?.message || dbErrGet2);
+              console.error('[KISPG Return GET] DB 업데이트 실패 (ORM 2차):', dbErrGet2?.message || dbErrGet2);
               try {
-                await prisma.order.update({
-                  where: { id: orderId },
-                  data: { paymentKey: tid },
-                });
-                console.log('[KISPG Return GET] paymentKey 단독 저장 성공 (3차 폴백)! tid:', tid);
+                await prisma.order.update({ where: { id: orderId }, data: { paymentKey: tid } });
+                ormOkGet = true;
+                console.log('[KISPG Return GET] paymentKey 단독 저장 성공 (ORM 3차)! tid:', tid);
               } catch (dbErrGet3: any) {
-                console.error('[KISPG Return GET] paymentKey 단독 저장 실패 (3차):', dbErrGet3?.message || dbErrGet3);
+                console.error('[KISPG Return GET] ORM 3차 실패:', dbErrGet3?.message || dbErrGet3);
               }
             }
+          }
+
+          // raw SQL 강제 저장 — ORM 결과 무관, paymentKey 절대 누락 금지
+          try {
+            const changes = await prisma.$executeRawUnsafe(
+              'UPDATE "Order" SET "status" = ?, "paymentMethod" = ?, "paymentKey" = ?, "paidAt" = ?, "updatedAt" = ? WHERE "id" = ?',
+              'CONFIRMED', paymentMethodKrGet, tid, paidAtIsoGet, nowIsoGet, orderId
+            );
+            console.log('[KISPG Return GET] raw SQL 강제 저장 changes=', changes, 'tid=', tid, 'ormOk=', ormOkGet);
+          } catch (rawErrGet: any) {
+            console.error('[KISPG Return GET] raw SQL 강제 저장 실패:', rawErrGet?.message || rawErrGet);
+            try {
+              const c2 = await prisma.$executeRawUnsafe(
+                'UPDATE "Order" SET "paymentKey" = ?, "updatedAt" = ? WHERE "id" = ?',
+                tid, nowIsoGet, orderId
+              );
+              console.log('[KISPG Return GET] paymentKey 단독 raw SQL changes=', c2);
+            } catch (rawErrGet2: any) {
+              console.error('[KISPG Return GET] paymentKey 단독 raw SQL 도 실패:', rawErrGet2?.message || rawErrGet2);
+            }
+          }
+
+          // 최종 검증
+          try {
+            const verifyGet: any = await prisma.$queryRawUnsafe(
+              'SELECT id, status, paymentKey, paymentMethod, paidAt FROM "Order" WHERE id = ? LIMIT 1', orderId
+            );
+            const rowGet = Array.isArray(verifyGet) ? verifyGet[0] : (verifyGet?.results?.[0] || verifyGet);
+            console.log('[KISPG Return GET] 최종 검증 SELECT:', JSON.stringify(rowGet));
+            if (!rowGet || !rowGet.paymentKey) {
+              console.error('[KISPG Return GET] ★★★ 치명적: 모든 저장 시도 후에도 paymentKey 미저장! orderId=', orderId, 'tid=', tid);
+            }
+          } catch (vErrGet: any) {
+            console.error('[KISPG Return GET] 최종 검증 SELECT 실패:', vErrGet?.message || vErrGet);
           }
 
           console.log('[KISPG Return GET] 승인 성공! alreadyApproved:', !!approveResult._alreadyApproved);
