@@ -122,6 +122,21 @@ export async function POST(request: NextRequest) {
     const authUrl = getKispgAuthUrl();
     console.log('[KISPG Request] Auth URL:', authUrl, 'formData.mid:', formData.mid, 'formData.goodsAmt:', formData.goodsAmt);
 
+    // [2026-05-11 v4 진단 마커] KISPG 결제창 진입 직전에 paymentMethod 업데이트
+    // → admin 에 '결제창진입' 으로 보이면 = 결제창은 떴지만 return 핸들러 미도달 (KISPG ↔ 우리서버 통신 끊김)
+    // → '신용카드' 로 보이면 = return 핸들러 정상 도달
+    // → '결제대기' 그대로면 = KISPG 결제창 진입 자체도 실패 (이 라우트 미호출)
+    try {
+      const nowIso = new Date().toISOString();
+      const changes = await prisma.$executeRawUnsafe(
+        'UPDATE "Order" SET "paymentMethod" = ?, "updatedAt" = ? WHERE "id" = ? AND "status" = ?',
+        '결제창진입', nowIso, orderId, 'PENDING'
+      );
+      console.log('[KISPG Request] paymentMethod 진입마커 changes=', changes, 'orderId=', orderId);
+    } catch (markErr: any) {
+      console.error('[KISPG Request] 진입마커 저장 실패:', markErr?.message || markErr);
+    }
+
     // JSON으로 form 데이터 반환 → 클라이언트에서 동적 form 생성 후 submit
     // (document.write() 방식은 PC Chrome에서 차단될 수 있으므로 사용하지 않음)
     return NextResponse.json({
