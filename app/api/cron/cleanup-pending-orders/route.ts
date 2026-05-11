@@ -70,25 +70,16 @@ async function handleCron(req: NextRequest) {
 
   let pendingOrders: any[] = [];
   try {
+    // ⚠️ D1 wrapper 호환성: select 로 relation 을 가져오면 hydration 안 됨 → include 사용
+    //   (lib/prisma.ts createModelProxy 의 select 처리는 relation 을 자동 resolve 안 함,
+    //    include 는 resolveIncludes() 로 별도 hydrate 됨)
     pendingOrders = await prisma.order.findMany({
       where: {
         status: 'PENDING',
         createdAt: { lt: cutoffIso as any },
       },
-      select: {
-        id: true,
-        orderNumber: true,
-        status: true,
-        paymentKey: true,
-        createdAt: true,
-        total: true,
-        items: {
-          select: {
-            id: true,
-            productId: true,
-            quantity: true,
-          },
-        },
+      include: {
+        items: true,
       },
       orderBy: { createdAt: 'asc' },
       take: 100, // 한 번에 최대 100건 (D1 쿼리 폭주 방지)
@@ -176,8 +167,10 @@ async function handleCron(req: NextRequest) {
 
         // 3-4) 재고 복구 (batch update - N+1 쿼리 제거)
         // 같은 productId 가 items 에 여러 번 나올 수 있으므로 productId 별로 합산
+        // ⚠️ order.items 안전망: undefined/null 일 경우 빈 배열로 처리 (D1 wrapper relation 누락 대비)
+        const orderItems = Array.isArray(order.items) ? order.items : [];
         const stockIncrementMap = new Map<string, number>();
-        for (const item of order.items) {
+        for (const item of orderItems) {
           const qty = Number(item.quantity);
           if (!item.productId || !Number.isFinite(qty) || qty <= 0) continue;
           stockIncrementMap.set(
@@ -205,7 +198,7 @@ async function handleCron(req: NextRequest) {
         '[cron/cleanup-pending] 취소+재고복구 완료:',
         order.orderNumber,
         'items:',
-        order.items.length
+        Array.isArray(order.items) ? order.items.length : 0
       );
     } catch (e: any) {
       failed++;
