@@ -2,9 +2,34 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import AdminCharts from '@/components/dashboard/AdminCharts'
+import dynamic from 'next/dynamic'
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import { useRouter } from 'next/navigation'
+
+// [2026-05-11 v2 PERF FIX] recharts 라이브러리 (419KB) 를 lazy-load
+// 대시보드 페이지 초기 로딩 시 차트 번들을 다운로드하지 않고,
+// 메인 대시보드 UI가 먼저 표시된 후 차트 컴포넌트를 비동기 로드
+const AdminCharts = dynamic(() => import('@/components/dashboard/AdminCharts'), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-6">
+      <div className="bg-white p-6 rounded-lg shadow animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-40 mb-4"></div>
+        <div className="h-[300px] bg-gray-100 rounded"></div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow animate-pulse">
+          <div className="h-6 bg-gray-200 rounded w-40 mb-4"></div>
+          <div className="h-[300px] bg-gray-100 rounded"></div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow animate-pulse">
+          <div className="h-6 bg-gray-200 rounded w-40 mb-4"></div>
+          <div className="h-[300px] bg-gray-100 rounded"></div>
+        </div>
+      </div>
+    </div>
+  ),
+})
 
 interface AdminStats {
   totalRevenue: number
