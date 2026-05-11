@@ -63,15 +63,17 @@ async function handleCron(req: NextRequest) {
 
   // ─── 2) 30분 이상 PENDING 주문 조회 ───
   // 안전 cutoff: 현재시각 - 30분
+  // ⚠️ D1 호환성: Date 객체는 D1_TYPE_ERROR 발생 → ISO string 으로 변환 후 전달
   const CUTOFF_MS = 30 * 60 * 1000; // 30분
   const cutoffDate = new Date(Date.now() - CUTOFF_MS);
+  const cutoffIso = cutoffDate.toISOString();
 
   let pendingOrders: any[] = [];
   try {
     pendingOrders = await prisma.order.findMany({
       where: {
         status: 'PENDING',
-        createdAt: { lt: cutoffDate },
+        createdAt: { lt: cutoffIso as any },
       },
       select: {
         id: true,
@@ -160,11 +162,12 @@ async function handleCron(req: NextRequest) {
         }
 
         // 3-3) 주문 취소 + cancelReason 기록
+        // ⚠️ D1 호환성: Date 객체 직접 전달 시 D1_TYPE_ERROR 가능 → ISO string 사용
         await tx.order.update({
           where: { id: order.id },
           data: {
             status: 'CANCELLED',
-            cancelledAt: new Date(),
+            cancelledAt: new Date().toISOString() as any,
             cancelReason: '결제 미완료 (30분 자동 취소)',
           },
         });
