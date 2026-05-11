@@ -257,6 +257,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 4) 결제 성공 → DB 업데이트 (status + tid + paidAt)
+    // [2026-05-11 HOTFIX] paymentKey 저장 누락 차단:
+    //  - paidAt Date 객체가 Invalid Date 일 경우 .toISOString() 에서 RangeError 발생 → 전체 update 실패 → paymentKey 누락
+    //  - 해결: ISO string 으로 강제 변환 + Invalid 시 안전 폴백
+    //  - 추가 안전망: paymentKey/status 1차 저장 → paidAt 2차 저장 (분리)
+    //    paidAt 실패해도 거래번호는 무조건 DB 에 남도록
+    const paidAtIso = safePaidAtIso(approveResult?.appDtm);
     try {
       await prisma.order.update({
         where: { id: orderId },
@@ -264,15 +270,36 @@ export async function POST(request: NextRequest) {
           status: 'CONFIRMED',
           paymentMethod: payMethodToKorean(payMethod),
           paymentKey: tid,
-          paidAt: approveResult.appDtm
-            ? parseKispgDateTime(approveResult.appDtm)
-            : new Date(),
+          paidAt: paidAtIso,
         },
       });
-      console.log('[KISPG Return] DB 업데이트 성공! orderId:', orderId, 'tid:', tid);
+      console.log('[KISPG Return] DB 업데이트 성공! orderId:', orderId, 'tid:', tid, 'paidAt:', paidAtIso);
     } catch (dbUpdateError: any) {
-      console.error('[KISPG Return] DB 업데이트 실패:', dbUpdateError.message);
-      // DB 업데이트 실패해도 결제는 이미 승인됨 → 성공 페이지로 보내야 함
+      console.error('[KISPG Return] DB 업데이트 실패 (1차):', dbUpdateError?.message || dbUpdateError);
+      // ★ 1차 실패 시 paymentKey 단독 저장으로 폴백 — 거래번호는 무조건 DB 에 남겨야 함
+      try {
+        await prisma.order.update({
+          where: { id: orderId },
+          data: {
+            status: 'CONFIRMED',
+            paymentMethod: payMethodToKorean(payMethod),
+            paymentKey: tid,
+          },
+        });
+        console.log('[KISPG Return] DB 업데이트 성공 (2차 폴백, paidAt 제외)! orderId:', orderId, 'tid:', tid);
+      } catch (dbUpdateError2: any) {
+        console.error('[KISPG Return] DB 업데이트 실패 (2차):', dbUpdateError2?.message || dbUpdateError2);
+        // ★ 2차도 실패하면 paymentKey 만 단독으로 — 어떤 경우에도 거래번호 누락 금지
+        try {
+          await prisma.order.update({
+            where: { id: orderId },
+            data: { paymentKey: tid },
+          });
+          console.log('[KISPG Return] paymentKey 단독 저장 성공 (3차 폴백)! orderId:', orderId, 'tid:', tid);
+        } catch (dbUpdateError3: any) {
+          console.error('[KISPG Return] paymentKey 단독 저장도 실패 (3차):', dbUpdateError3?.message || dbUpdateError3);
+        }
+      }
     }
 
     console.log('[KISPG Return] 결제 성공! orderId:', orderId, 'tid:', tid, 'appNo:', approveResult.appNo);
@@ -396,6 +423,26 @@ function parseKispgDateTime(dt: string): Date {
   return new Date(year, month, day, hour, minute, second);
 }
 
+// ─── [2026-05-11 HOTFIX] paidAt 안전 ISO 변환 ───
+// 목적: paidAt 으로 Invalid Date 가 들어가 .toISOString() RangeError 발생 → 전체 update 실패 → paymentKey(TID) 누락 차단
+// 1) appDtm 비어있음/짧음 → 현재 시각 ISO
+// 2) parseKispgDateTime 결과가 Invalid → 현재 시각 ISO 폴백
+// 3) 모든 예외 → 현재 시각 ISO 폴백 (절대 throw 안 함)
+function safePaidAtIso(appDtm: string | undefined | null): string {
+  try {
+    if (!appDtm || typeof appDtm !== 'string' || appDtm.length < 14) {
+      return new Date().toISOString();
+    }
+    const d = parseKispgDateTime(appDtm);
+    if (!d || isNaN(d.getTime())) {
+      return new Date().toISOString();
+    }
+    return d.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
 // ─── GET 핸들러 (모바일 일부 환경에서 GET redirect 대비) ───
 /**
  * [BUG FIX 2026-05-11 v2] HTTP 303 redirect 사용
@@ -452,17 +499,44 @@ export async function GET(request: NextRequest) {
             goodsAmt: Math.round(order.total),
           });
           
-          await prisma.order.update({
-            where: { id: orderId },
-            data: {
-              status: 'CONFIRMED',
-              paymentMethod: payMethodToKorean(payMethod || 'card'),
-              paymentKey: tid,
-              paidAt: approveResult.appDtm
-                ? parseKispgDateTime(approveResult.appDtm)
-                : new Date(),
-            },
-          });
+          // [2026-05-11 HOTFIX] paidAt Invalid Date 차단 + 3단 폴백 — 거래번호 누락 절대 금지
+          const paidAtIsoGet = safePaidAtIso(approveResult?.appDtm);
+          try {
+            await prisma.order.update({
+              where: { id: orderId },
+              data: {
+                status: 'CONFIRMED',
+                paymentMethod: payMethodToKorean(payMethod || 'card'),
+                paymentKey: tid,
+                paidAt: paidAtIsoGet,
+              },
+            });
+            console.log('[KISPG Return GET] DB 업데이트 성공! orderId:', orderId, 'tid:', tid, 'paidAt:', paidAtIsoGet);
+          } catch (dbErrGet1: any) {
+            console.error('[KISPG Return GET] DB 업데이트 실패 (1차):', dbErrGet1?.message || dbErrGet1);
+            try {
+              await prisma.order.update({
+                where: { id: orderId },
+                data: {
+                  status: 'CONFIRMED',
+                  paymentMethod: payMethodToKorean(payMethod || 'card'),
+                  paymentKey: tid,
+                },
+              });
+              console.log('[KISPG Return GET] DB 업데이트 성공 (2차 폴백, paidAt 제외)! tid:', tid);
+            } catch (dbErrGet2: any) {
+              console.error('[KISPG Return GET] DB 업데이트 실패 (2차):', dbErrGet2?.message || dbErrGet2);
+              try {
+                await prisma.order.update({
+                  where: { id: orderId },
+                  data: { paymentKey: tid },
+                });
+                console.log('[KISPG Return GET] paymentKey 단독 저장 성공 (3차 폴백)! tid:', tid);
+              } catch (dbErrGet3: any) {
+                console.error('[KISPG Return GET] paymentKey 단독 저장 실패 (3차):', dbErrGet3?.message || dbErrGet3);
+              }
+            }
+          }
 
           console.log('[KISPG Return GET] 승인 성공! alreadyApproved:', !!approveResult._alreadyApproved);
           return redirectToSuccess(baseUrl, orderId, order.orderNumber, Math.round(order.total), tid, payMethod || 'card', approveResult.appNo);
