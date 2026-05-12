@@ -151,6 +151,10 @@ export default function OrderDetailPage() {
                   src={item.product.thumbnail || 'https://via.placeholder.com/100'}
                   alt={item.product.name}
                   className="w-20 h-20 object-cover rounded"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement!.innerHTML = '<div class="w-20 h-20 rounded bg-gray-100 flex items-center justify-center text-3xl">📦</div>' + e.currentTarget.parentElement!.innerHTML;
+                  }}
                 />
                 <div className="flex-1">
                   <Link

@@ -367,6 +367,10 @@ export default function OrdersPage() {
                             src={item.product.thumbnail}
                             alt={item.product.name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-3xl">📦</div>';
+                            }}
                           />
                         </div>
                         <div className="flex-1">

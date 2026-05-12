@@ -345,6 +345,10 @@ export default function AdminProductsPage() {
                             src={product.thumbnail || product.imageUrl || ''}
                             alt={product.name}
                             className="h-14 w-14 object-cover rounded-lg border"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement!.innerHTML = '<div class="h-14 w-14 bg-gray-100 rounded-lg flex items-center justify-center text-2xl">📦</div>';
+                            }}
                           />
                         ) : (
                           <div className="h-14 w-14 bg-gray-100 rounded-lg flex items-center justify-center">

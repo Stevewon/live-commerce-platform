@@ -121,6 +121,10 @@ export default function LivesPage() {
                       src={live.thumbnail}
                       alt={live.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-white text-4xl">📺</div>';
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white text-4xl">
@@ -155,6 +159,10 @@ export default function LivesPage() {
                         src={live.partner.logo}
                         alt={live.partner.storeName}
                         className="w-8 h-8 rounded-full"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.innerHTML = '<div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm">🏪</div>';
+                        }}
                       />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-sm">
