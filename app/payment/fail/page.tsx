@@ -28,6 +28,14 @@ function PaymentFailContent() {
 
   // ★ 페이지 로드 시 주문 상태를 서버에서 재확인
   useEffect(() => {
+    // ★ PaymentWaitingScreen 중복 발동 방지 — sessionStorage 마커 cleanup
+    try {
+      sessionStorage.removeItem('pendingPaymentOrderId');
+      sessionStorage.removeItem('pendingPaymentOrderNumber');
+      sessionStorage.removeItem('pendingPaymentGuestToken');
+      sessionStorage.removeItem('pendingPaymentStartedAt');
+    } catch {}
+
     if (!orderId) {
       setVerifying(false);
       return;

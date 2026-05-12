@@ -9,6 +9,8 @@ import ShopNavigation from '@/components/ShopNavigation';
 import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
 import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
+import dynamic from 'next/dynamic';
+const PaymentWaitingScreen = dynamic(() => import('@/components/payment/PaymentWaitingScreen'), { ssr: false });
 
 interface CartItem {
   id: string;
@@ -339,6 +341,18 @@ export default function CheckoutPage() {
       });
 
       document.body.appendChild(form);
+
+      // [2026-05-12 v1.0.15] PC 결제완료 미표시 사고 방지 — 결제 대기 화면 폴링 마커
+      //   sessionStorage 에 결제 진행 중 주문 정보 기록 → PaymentWaitingScreen 이 감지 후 폴링 시작
+      //   모바일: returnUrl 응답이 정상 도달하므로 마커 사용 안 함 (즉시 success 페이지 이동)
+      //   PC: returnUrl 응답이 PC 에 안 와도 폴링이 DB/KISPG 상태 자동 감지 → 결과 페이지 자동 이동
+      try {
+        sessionStorage.setItem('pendingPaymentOrderId', order.id);
+        sessionStorage.setItem('pendingPaymentOrderNumber', order.orderNumber || '');
+        sessionStorage.setItem('pendingPaymentGuestToken', guestOrderToken || '');
+        sessionStorage.setItem('pendingPaymentStartedAt', String(Date.now()));
+      } catch {}
+
       // 모바일에서 form submit 지연 방지를 위해 약간의 딜레이
       setTimeout(() => {
         form.submit();
@@ -671,6 +685,7 @@ export default function CheckoutPage() {
           </div>
         </form>
       </div>
+      <PaymentWaitingScreen />
     </div>
   );
 }
