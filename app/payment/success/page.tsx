@@ -46,7 +46,7 @@ function PaymentSuccessContent() {
   const appNo = safeGet(searchParams, 'appNo');
 
   useEffect(() => {
-    // ★ [HOTFIX] useEffect 전체 try-catch — 어떤 throw 도 global error.tsx 로 전파 금지
+    // ★ [HOTFIX v1.0.17] useEffect 전체 try-catch — 어떤 throw 도 global error.tsx 로 전파 금지
     try {
       // sessionStorage cleanup (브라우저 환경 가드)
       if (typeof window !== 'undefined') {
