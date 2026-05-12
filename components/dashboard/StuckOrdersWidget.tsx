@@ -114,6 +114,57 @@ export default function StuckOrdersWidget() {
     }
   }
 
+  const handleForceCancelUnknown = async (order: StuckOrder) => {
+    const confirmed = window.confirm(
+      `[${order.orderNumber}] 결제 미완료로 취소 처리합니다.\n\n` +
+      `주문자: ${order.customerName || '비회원'}\n` +
+      `금액: ₩${order.total.toLocaleString()}\n\n` +
+      `이 작업은:\n` +
+      `1) KISPG 거래조회 재확인 (혹시 실제 결제됐는지 안전 검증)\n` +
+      `2) KISPG 측 거래 없음 확인 시 → CANCELLED 자동 처리\n` +
+      `3) KISPG 측에 실제 거래 있으면 → 자동 보호 (CANCELLED 안 함)\n\n` +
+      `cancelReason: '결제 미완료 (KISPG 측 거래 없음, 어드민 확정 취소)'\n\n` +
+      `진행하시겠습니까?`
+    )
+    if (!confirmed) return
+
+    setBusyOrderId(order.id)
+    setActionMsg(null)
+    try {
+      const res = await fetch('/api/admin/stuck-orders/inquire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ orderId: order.id, forceCancelOnUnknown: true }),
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (res.ok && data?.success) {
+        const kind = data?.classified?.kind || 'UNKNOWN'
+        if (kind === 'CONFIRMED') {
+          setActionMsg(`⚠️ ${order.orderNumber} 취소 보호 작동: KISPG 측에 실제 승인 거래 존재 → CONFIRMED 동기화 (TID: ${data?.kispg?.tid || '-'}). 취소 안 됨!`)
+        } else if (kind === 'CANCELLED') {
+          setActionMsg(`✅ ${order.orderNumber} KISPG 측 이미 취소된 거래 → CANCELLED 동기화 완료`)
+        } else if (kind === 'PENDING') {
+          setActionMsg(`⚠️ ${order.orderNumber} 취소 보호 작동: 가상계좌 입금대기 중 → 변경 없음`)
+        } else {
+          // UNKNOWN → forceCancel 적용됨
+          if (data?.updated) {
+            setActionMsg(`✅ ${order.orderNumber} 결제 미완료 확정 → CANCELLED 처리 완료`)
+          } else {
+            setActionMsg(`ℹ️ ${order.orderNumber} 이미 CANCELLED 상태 (변경 없음)`)
+          }
+        }
+        await load()
+      } else {
+        setActionMsg(`❌ ${order.orderNumber} 취소 처리 실패: ${data?.error || res.status}`)
+      }
+    } catch (e: any) {
+      setActionMsg(`❌ ${order.orderNumber} 예외: ${e?.message || String(e)}`)
+    } finally {
+      setBusyOrderId(null)
+    }
+  }
+
   const handleManualResolve = async (order: StuckOrder) => {
     const tid = window.prompt(
       `[${order.orderNumber}] KISPG 콘솔에서 확인한 실제 TID 를 입력해주세요\n` +
@@ -304,6 +355,14 @@ export default function StuckOrdersWidget() {
                   {busyOrderId === o.id ? '처리 중...' : '🔍 KISPG 자동조회'}
                 </button>
                 <button
+                  onClick={() => handleForceCancelUnknown(o)}
+                  disabled={busyOrderId === o.id}
+                  className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  title="KISPG 측 거래 없음 (UNKNOWN) 확정 시 CANCELLED 처리 — 실제 결제 있으면 자동 보호"
+                >
+                  {busyOrderId === o.id ? '처리 중...' : '❌ 결제 미완료로 취소'}
+                </button>
+                <button
                   onClick={() => handleManualResolve(o)}
                   disabled={busyOrderId === o.id}
                   className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -318,7 +377,8 @@ export default function StuckOrdersWidget() {
 
       <p className="mt-4 text-xs text-red-600 font-medium">
         ※ <b>🔍 KISPG 자동조회</b>: KISPG 거래조회 API 를 호출하여 실제 상태(승인/취소/입금대기)를 확인하고 자동 동기화 (TID 자동 저장). 1차 권장. <br/>
-        ※ <b>TID 입력 → 복구</b>: 자동조회가 실패한 경우, KISPG 콘솔에서 직접 확인한 TID 를 수동 입력하여 paymentKey 덮어쓰기 + CONFIRMED 처리.
+        ※ <b>❌ 결제 미완료로 취소</b>: 자동조회가 UNKNOWN(KISPG 측 거래 없음) 일 때 사용. 재확인 후 CANCELLED 처리 (실제 결제 있으면 자동 보호). 또한 30분 경과 시 cron 이 자동 처리. <br/>
+        ※ <b>TID 입력 → 복구</b>: KISPG 콘솔에서 직접 확인한 TID 를 수동 입력하여 paymentKey 덮어쓰기 + CONFIRMED 처리. 최후 수단.
       </p>
     </div>
   )

@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const orderId: string = (body?.orderId || '').trim();
     const orderNumber: string = (body?.orderNumber || '').trim();
+    const forceCancelOnUnknown: boolean = body?.forceCancelOnUnknown === true;
     if (!orderId && !orderNumber) {
       return NextResponse.json(
         { success: false, error: 'orderId 또는 orderNumber 중 하나는 필수' },
@@ -191,8 +192,40 @@ export async function POST(request: NextRequest) {
           console.error('[admin/stuck-orders/inquire] CANCELLED UPDATE 실패:', e?.message || e);
         }
       }
+    } else if (classified.kind === 'UNKNOWN' && forceCancelOnUnknown) {
+      // [표준 쇼핑몰 SOP] UNKNOWN + 사장님 결재(forceCancelOnUnknown=true) → 즉시 CANCELLED
+      //   KISPG 측에 거래 자체가 없음 = 돈 안 받음 = 안전 취소 가능
+      //   재고 hold 해제, 정산 집계 깨끗, 양쪽 정합성 회복
+      if (order.status === 'CANCELLED') {
+        console.log('[admin/stuck-orders/inquire] 이미 CANCELLED — skip');
+      } else {
+        try {
+          updateChanges = await prisma.$executeRawUnsafe(
+            `UPDATE "Order"
+             SET status = ?, cancelledAt = ?, cancelReason = ?, updatedAt = ?
+             WHERE id = ?`,
+            'CANCELLED', nowIso, '결제 미완료 (KISPG 측 거래 없음, 어드민 확정 취소)', nowIso, order.id
+          );
+          updated = true;
+          console.log(
+            '[admin/stuck-orders/inquire] ✅ UNKNOWN → 어드민 결재 CANCELLED:',
+            order.orderNumber, 'changes=', updateChanges
+          );
+        } catch (e: any) {
+          console.error('[admin/stuck-orders/inquire] UNKNOWN→CANCELLED UPDATE 실패:', e?.message || e);
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'DB UPDATE 실패 (UNKNOWN 강제 취소)',
+              detail: e?.message || String(e),
+              classified,
+            },
+            { status: 500 }
+          );
+        }
+      }
     }
-    // PENDING (가상계좌 입금대기) / UNKNOWN → DB 변경 없음
+    // PENDING (가상계좌 입금대기) / UNKNOWN (forceCancel 없을 때) → DB 변경 없음
 
     // 4) 사후 조회로 최종 상태 확인
     let after: any = null;
