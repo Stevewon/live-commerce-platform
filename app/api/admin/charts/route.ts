@@ -36,22 +36,14 @@ export async function GET(req: NextRequest) {
     thirtyDaysAgoDate.setDate(thirtyDaysAgoDate.getDate() - 30);
     const thirtyDaysAgo = thirtyDaysAgoDate.toISOString();
 
-    // [D1 WRAPPER FIX] orderItem.groupBy 의 nested relation 필터(`where: { order: { status: ... } }`)
-    // 가 D1 wrapper 에서 `c2.toUpperCase is not a function` 으로 죽음.
-    // → 1단계: 유효 주문 id 목록을 먼저 평면 쿼리로 확보
-    // → 2단계: orderItem.groupBy 에 `orderId: { in: [...] }` 평면 필터로 전달
-    const validOrders = await prisma.order.findMany({
-      where: { status: { notIn: ['CANCELLED', 'REFUNDED'] } },
-      select: { id: true },
-    });
-    const validOrderIds = validOrders.map((o) => o.id);
-
-    // ★ 모든 독립 쿼리를 병렬 실행
+    // [D1 WRAPPER FIX v2] orderItem.groupBy 자체가 D1 wrapper 에서
+    // `c2.toUpperCase is not a function` 으로 죽음 (nested where 제거 후에도 동일).
+    // → groupBy 호출 완전 제거, raw SQL 로 직접 집계 (D1 안전)
     const [
       recentOrders,
-      categoryStats,
+      categoryStatsRaw,
       hourlyOrders,
-      topProductsRaw,
+      topProductsRawSql,
     ] = await Promise.all([
       // 1) 최근 7일 매출 추이
       prisma.order.findMany({
@@ -65,14 +57,16 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // 2) 카테고리별 매출 — nested where 제거, 평면 orderId in 필터
-      validOrderIds.length > 0
-        ? prisma.orderItem.groupBy({
-            by: ['productId'],
-            _sum: { quantity: true, price: true },
-            where: { orderId: { in: validOrderIds } },
-          })
-        : Promise.resolve([] as any[]),
+      // 2) 카테고리별 매출 — raw SQL groupBy
+      prisma.$queryRawUnsafe(`
+        SELECT oi."productId" as productId,
+               SUM(oi."quantity") as quantity,
+               SUM(oi."price") as price
+        FROM "OrderItem" oi
+        INNER JOIN "Order" o ON o."id" = oi."orderId"
+        WHERE o."status" NOT IN ('CANCELLED', 'REFUNDED')
+        GROUP BY oi."productId"
+      `),
 
       // 3) 시간대별 주문 (최근 30일로 제한 - 이전: 전체 조회)
       prisma.order.findMany({
@@ -82,18 +76,31 @@ export async function GET(req: NextRequest) {
         select: { createdAt: true },
       }),
 
-      // 4) 인기 상품 Top 5 — nested where 제거, 평면 orderId in 필터
-      validOrderIds.length > 0
-        ? prisma.orderItem.groupBy({
-            by: ['productId'],
-            _sum: { quantity: true, price: true },
-            _count: { id: true },
-            orderBy: { _sum: { quantity: 'desc' } },
-            take: 5,
-            where: { orderId: { in: validOrderIds } },
-          })
-        : Promise.resolve([] as any[]),
+      // 4) 인기 상품 Top 5 — raw SQL groupBy + orderBy
+      prisma.$queryRawUnsafe(`
+        SELECT oi."productId" as productId,
+               SUM(oi."quantity") as quantity,
+               SUM(oi."price") as price,
+               COUNT(oi."id") as cnt
+        FROM "OrderItem" oi
+        INNER JOIN "Order" o ON o."id" = oi."orderId"
+        WHERE o."status" NOT IN ('CANCELLED', 'REFUNDED')
+        GROUP BY oi."productId"
+        ORDER BY SUM(oi."quantity") DESC
+        LIMIT 5
+      `),
     ]);
+
+    // raw SQL 결과 → groupBy 결과와 동일한 형태로 정규화
+    const categoryStats = (Array.isArray(categoryStatsRaw) ? categoryStatsRaw : []).map((r: any) => ({
+      productId: r.productId,
+      _sum: { quantity: Number(r.quantity) || 0, price: Number(r.price) || 0 },
+    }));
+    const topProductsRaw = (Array.isArray(topProductsRawSql) ? topProductsRawSql : []).map((r: any) => ({
+      productId: r.productId,
+      _sum: { quantity: Number(r.quantity) || 0, price: Number(r.price) || 0 },
+      _count: { id: Number(r.cnt) || 0 },
+    }));
 
     // --- 1) 일별 매출 그룹화 ---
     // [SAFE] D1 에서 createdAt 이 string 또는 Date 어느쪽으로 와도 안전하게 처리
