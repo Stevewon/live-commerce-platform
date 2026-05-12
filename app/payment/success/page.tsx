@@ -6,6 +6,28 @@ import Link from 'next/link';
 import { clearGuestCart } from '@/lib/utils/guestCart';
 import { authFetch } from '@/lib/auth/clientFetch';
 
+/**
+ * [2026-05-12 v1.0.17 HOTFIX] PC 카드결제 후 흰 창 + "오류가 발생했습니다" 사고
+ *
+ * 사고 증상:
+ *   - 사장님 PC 에서 결제 완료 → /payment/success 진입 → 흰 창 + "오류가 발생했습니다" (app/error.tsx)
+ *   - 결제는 정상 처리됐지만 화면이 깨짐
+ *
+ * 원인 추적:
+ *   1. useEffect 안에서 alert() / router.push() 즉시 호출 — hydration 중 throw 가능
+ *   2. localStorage / sessionStorage / clearGuestCart 호출이 try-catch 없거나 일부만 보호됨
+ *   3. sync API 응답 키 미스매치: 서버 `{ok: true, ...}` 인데 클라이언트 `data.success` 체크 → 항상 false →
+ *      3회 재시도 모두 false 판정 → "동기화 지연" 경고를 항상 노출 (실제는 성공)
+ *   4. orderInfo?.amount?.toLocaleString() 같은 chain 이 amount NaN 일 때 throw 가능
+ *
+ * 패치:
+ *   1. useEffect 전체를 try-catch 로 감싸서 throw 가 global error.tsx 로 전파되지 않도록 차단
+ *   2. 모든 storage / browser API 접근에 typeof window 가드 + try-catch
+ *   3. orderId 없는 경우 alert/router.push 대신 안전한 fallback UI (즉시 종료 안 함)
+ *   4. sync API 응답 검증을 `ok || success` 둘 다 허용 (호환 패치)
+ *   5. amount/orderNumber 안전 변환 + parseInt NaN 가드
+ *   6. ErrorBoundary 패턴: handleKispgSuccess / fetchOrderInfo 둘 다 throw 0건 보장
+ */
 function PaymentSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -13,50 +35,82 @@ function PaymentSuccessContent() {
   const [orderInfo, setOrderInfo] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'retrying' | 'failed'>('idle');
+  const [fatalError, setFatalError] = useState<string | null>(null);
 
-  // KISPG 결제 완료 후 파라미터
-  const orderId = searchParams.get('orderId');
-  const orderNumber = searchParams.get('orderNumber');
-  const amount = searchParams.get('amount');
-  const tid = searchParams.get('tid');
-  const payMethod = searchParams.get('payMethod');
-  const appNo = searchParams.get('appNo');
+  // KISPG 결제 완료 후 파라미터 (모든 접근에 안전 가드)
+  const orderId = safeGet(searchParams, 'orderId');
+  const orderNumber = safeGet(searchParams, 'orderNumber');
+  const amount = safeGet(searchParams, 'amount');
+  const tid = safeGet(searchParams, 'tid');
+  const payMethod = safeGet(searchParams, 'payMethod');
+  const appNo = safeGet(searchParams, 'appNo');
 
   useEffect(() => {
-    // [2026-05-12 v1.0.16] /payment/waiting 폴링 마커 cleanup
-    //   결제 완료 도달 시 sessionStorage kispgFormData 정리 (잔류 방지)
+    // ★ [HOTFIX v1.0.17] useEffect 전체 try-catch — 어떤 throw 도 global error.tsx 로 전파 금지
     try {
-      sessionStorage.removeItem('kispgFormData');
-    } catch {}
+      // sessionStorage cleanup (브라우저 환경 가드)
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.removeItem('kispgFormData');
+        } catch {}
+      }
 
-    if (!orderId) {
-      alert('잘못된 접근입니다');
-      router.push('/');
-      return;
-    }
+      if (!orderId) {
+        // orderId 없으면 fallback UI 표시 (alert/router.push 제거 → hydration 안전)
+        setFatalError('주문 정보가 없습니다');
+        setIsLoading(false);
+        return;
+      }
 
-    // KISPG 결제의 경우: 승인이 이미 return route에서 처리되었으므로
-    // 별도 verify 없이 바로 주문 정보 표시
-    if (tid || orderNumber) {
-      handleKispgSuccess();
-    } else {
-      // orderId만 있는 경우: DB에서 직접 조회
-      fetchOrderInfo();
+      // KISPG 결제: tid 또는 orderNumber 있으면 URL 파라미터 기반 즉시 표시
+      if (tid || orderNumber) {
+        handleKispgSuccess().catch((e) => {
+          console.error('[Success] handleKispgSuccess unhandled:', e);
+          setIsLoading(false);
+        });
+      } else {
+        fetchOrderInfo().catch((e) => {
+          console.error('[Success] fetchOrderInfo unhandled:', e);
+          setIsLoading(false);
+        });
+      }
+    } catch (e) {
+      console.error('[Success] useEffect 예외 차단:', e);
+      setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // KISPG 결제 성공 처리
+  // KISPG 결제 성공 처리 (모든 단계 try-catch)
   const handleKispgSuccess = async () => {
     try {
-      // [L2 fix] 비회원 판별: URL param guestToken 우선 → localStorage 폴백
-      const urlGuestToken = searchParams.get('guestToken') || '';
-      const localGuestToken = localStorage.getItem('guestOrderToken') || '';
+      // 비회원 판별: URL param guestToken 우선 → localStorage 폴백 (각 단계 try-catch)
+      let urlGuestToken = '';
+      let localGuestToken = '';
+      try {
+        urlGuestToken = safeGet(searchParams, 'guestToken');
+      } catch {}
+      try {
+        if (typeof window !== 'undefined') {
+          localGuestToken = window.localStorage.getItem('guestOrderToken') || '';
+        }
+      } catch {}
       const guestToken = urlGuestToken || localGuestToken;
       setIsGuest(!!guestToken);
 
+      // 안전한 숫자 변환
+      const safeAmount = (() => {
+        try {
+          const n = amount ? parseInt(amount, 10) : 0;
+          return Number.isFinite(n) ? n : 0;
+        } catch {
+          return 0;
+        }
+      })();
+
       setOrderInfo({
         orderNumber: orderNumber || '',
-        amount: amount ? parseInt(amount) : 0,
+        amount: safeAmount,
         paymentKey: tid || '',
         method: payMethodToKorean(payMethod || 'card'),
         appNo: appNo || '',
@@ -64,38 +118,42 @@ function PaymentSuccessContent() {
 
       setIsLoading(false);
 
-      // [2026-05-12 v5 강화 안전망 — 옵션 3-1 공격적 재시도]
-      // → KISPG return 핸들러가 어떤 이유로 실패해도 success 페이지 진입 시점에 paymentKey/status 를 강제 동기화
-      // → 사용자 도달 확정 시점이므로 100% 실행 보장
-      // → 1차 즉시 호출 + 실패/응답불량 시 3초 후 재시도 (최대 3회)
-      // → 결제사고 재발 방지 (지나/hero zina 사례 — return 핸들러 실패 시 TID 미저장으로 결제대기 노출)
+      // paymentKey sync — 비동기, 실패해도 화면에 영향 없음
       if (orderId && tid) {
         runSyncWithRetry({
           orderId,
           tid,
           payMethod: payMethod || 'card',
           appNo: appNo || '',
-          amount: amount ? parseInt(amount) : 0,
-        });
+          amount: safeAmount,
+        }).catch((e) => console.error('[Success] runSyncWithRetry unhandled:', e));
       }
 
-      // 장바구니 비우기
-      if (guestToken) {
-        clearGuestCart();
-      } else {
-        await authFetch('/api/cart', {
-          method: 'DELETE',
-        }).catch(() => {});
+      // 장바구니 비우기 (실패 무시)
+      try {
+        if (guestToken) {
+          clearGuestCart();
+        } else {
+          await authFetch('/api/cart', { method: 'DELETE' }).catch(() => {});
+        }
+      } catch (e) {
+        console.error('[Success] cart clear 실패 (무시):', e);
       }
     } catch (error: any) {
-      console.error('KISPG success handling error:', error);
+      console.error('[Success] handleKispgSuccess error:', error);
+      // throw 하지 않고 화면 표시 진행 (가능한 데이터로 fallback)
+      setOrderInfo((prev: any) => prev || {
+        orderNumber: orderNumber || '',
+        amount: 0,
+        paymentKey: tid || '',
+        method: '카드',
+        appNo: '',
+      });
       setIsLoading(false);
     }
   };
 
-  // [2026-05-12 옵션 3-1] paymentKey sync 공격적 재시도
-  // → 1차 즉시 호출, 실패/응답불량 시 3초 후 재시도, 최대 3회까지
-  // → 모든 시도 실패 시 console.error + 시각 피드백 (사장님 어드민 대시보드 옵션 3-3 에서 감지)
+  // paymentKey sync 공격적 재시도 (응답 키 호환 패치)
   const runSyncWithRetry = async (payload: {
     orderId: string;
     tid: string;
@@ -120,13 +178,14 @@ function PaymentSuccessContent() {
         }
 
         const data: any = await res.json().catch(() => null);
-        // sync route 응답: { success: true, ... } 또는 idempotent skip 도 success:true
-        if (data && data.success) {
+        // ★ [HOTFIX] 서버 응답: { ok: true, ... } — 클라 호환을 위해 success/ok 둘 다 허용
+        const succeeded = !!(data && (data.ok === true || data.success === true || data.skipped === true));
+        if (succeeded) {
           console.log(`[sync] OK — attempt ${attempt}/${MAX_ATTEMPTS}`, data);
           setSyncStatus('success');
           return true;
         }
-        console.error(`[sync] success=false — attempt ${attempt}/${MAX_ATTEMPTS}`, data);
+        console.error(`[sync] not ok — attempt ${attempt}/${MAX_ATTEMPTS}`, data);
         return false;
       } catch (e) {
         console.error(`[sync] 예외 — attempt ${attempt}/${MAX_ATTEMPTS}:`, e);
@@ -141,41 +200,80 @@ function PaymentSuccessContent() {
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       }
     }
-    // 모든 재시도 실패 — 어드민 대시보드(옵션 3-3) 에서 stuck order 로 감지됨
     console.error(`[sync] 모든 재시도(${MAX_ATTEMPTS}회) 실패 — orderId=${payload.orderId} tid=${payload.tid}`);
     setSyncStatus('failed');
   };
 
-  // DB에서 주문 정보 직접 조회 — 회원/비회원 모두 지원
+  // DB에서 주문 정보 직접 조회
   const fetchOrderInfo = async () => {
     try {
-      const guestToken = localStorage.getItem('guestOrderToken') || '';
-      // 비회원: x-guest-order-token 헤더로 인증
+      let guestToken = '';
+      try {
+        if (typeof window !== 'undefined') {
+          guestToken = window.localStorage.getItem('guestOrderToken') || '';
+        }
+      } catch {}
       const headers: Record<string, string> = {};
       if (guestToken) {
         headers['x-guest-order-token'] = guestToken;
       }
 
-      const res = await authFetch(`/api/orders/${orderId}`, {
-        headers,
-      });
+      const res = await authFetch(`/api/orders/${orderId}`, { headers });
       if (res.ok) {
-        const data = await res.json();
-        const order = data.data || data.order;
+        const data = await res.json().catch(() => null);
+        const order = data?.data || data?.order;
         if (order) {
+          const safeTotal = (() => {
+            try {
+              const n = Number(order.total);
+              return Number.isFinite(n) ? n : 0;
+            } catch {
+              return 0;
+            }
+          })();
           setOrderInfo({
-            orderNumber: order.orderNumber,
-            amount: order.total,
+            orderNumber: order.orderNumber || '',
+            amount: safeTotal,
             method: order.paymentMethod || '카드',
           });
           setIsGuest(!order.userId);
         }
       }
     } catch (err) {
-      console.error('Order fetch error:', err);
+      console.error('[Success] Order fetch error:', err);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
+
+  // ★ [HOTFIX] orderId 누락 등 fallback UI — 흰 창 대신 친절한 안내
+  if (fatalError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow p-8 text-center">
+          <div className="text-5xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">{fatalError}</h1>
+          <p className="text-sm text-gray-600 mb-6">
+            결제가 완료된 경우 주문 내역에서 확인하실 수 있습니다.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/my-orders"
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition"
+            >
+              주문 내역 보기
+            </Link>
+            <Link
+              href="/"
+              className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition"
+            >
+              홈으로
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -187,6 +285,17 @@ function PaymentSuccessContent() {
       </div>
     );
   }
+
+  // 안전한 amount 표시
+  const displayAmount = (() => {
+    try {
+      const n = Number(orderInfo?.amount);
+      if (!Number.isFinite(n)) return '0';
+      return n.toLocaleString();
+    } catch {
+      return '0';
+    }
+  })();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -207,7 +316,7 @@ function PaymentSuccessContent() {
           <div className="space-y-4">
             <div className="flex justify-between border-b pb-3">
               <span className="text-gray-500">주문번호</span>
-              <span className="font-bold text-gray-900">{orderInfo?.orderNumber}</span>
+              <span className="font-bold text-gray-900">{orderInfo?.orderNumber || '-'}</span>
             </div>
             <div className="flex justify-between border-b pb-3">
               <span className="text-gray-500">결제수단</span>
@@ -222,12 +331,12 @@ function PaymentSuccessContent() {
             <div className="flex justify-between pt-2">
               <span className="text-gray-500 text-lg">결제 금액</span>
               <span className="text-2xl font-bold text-blue-600">
-                ₩{orderInfo?.amount?.toLocaleString()}
+                ₩{displayAmount}
               </span>
             </div>
           </div>
 
-          {/* [2026-05-12 옵션 3-1] sync 상태 인디케이터 — 실패 시에만 사용자에게 노출 */}
+          {/* sync 상태 인디케이터 — 실패 시에만 노출 */}
           {syncStatus === 'failed' && (
             <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
               <div className="flex items-start gap-2">
@@ -260,10 +369,10 @@ function PaymentSuccessContent() {
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 mb-6">
             <h3 className="text-orange-800 font-semibold mb-2">비회원 주문 안내</h3>
             <p className="text-sm text-orange-700 mb-3">
-              주문번호 <span className="font-bold">{orderInfo?.orderNumber}</span>를 기억해주세요.
+              주문번호 <span className="font-bold">{orderInfo?.orderNumber || '-'}</span>를 기억해주세요.
               주문 조회 시 필요합니다.
             </p>
-            <Link 
+            <Link
               href="/register"
               className="inline-flex items-center gap-1 text-sm font-bold text-orange-600 hover:text-orange-700"
             >
@@ -311,6 +420,16 @@ function PaymentSuccessContent() {
   );
 }
 
+// ★ searchParams.get() 안전 래퍼 (null/undefined/throw 모두 방어)
+function safeGet(sp: URLSearchParams | ReturnType<typeof useSearchParams>, key: string): string {
+  try {
+    const v = sp?.get(key);
+    return v === null || v === undefined ? '' : String(v);
+  } catch {
+    return '';
+  }
+}
+
 function payMethodToKorean(method: string): string {
   const map: Record<string, string> = {
     card: '신용카드', CARD: '신용카드',
@@ -318,7 +437,7 @@ function payMethodToKorean(method: string): string {
     vacnt: '가상계좌', VACNT: '가상계좌',
     hp: '휴대폰결제', HP: '휴대폰결제',
   };
-  return map[method] || method;
+  return map[method] || method || '신용카드';
 }
 
 export default function PaymentSuccessPage() {
