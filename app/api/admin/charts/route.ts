@@ -36,6 +36,16 @@ export async function GET(req: NextRequest) {
     thirtyDaysAgoDate.setDate(thirtyDaysAgoDate.getDate() - 30);
     const thirtyDaysAgo = thirtyDaysAgoDate.toISOString();
 
+    // [D1 WRAPPER FIX] orderItem.groupBy 의 nested relation 필터(`where: { order: { status: ... } }`)
+    // 가 D1 wrapper 에서 `c2.toUpperCase is not a function` 으로 죽음.
+    // → 1단계: 유효 주문 id 목록을 먼저 평면 쿼리로 확보
+    // → 2단계: orderItem.groupBy 에 `orderId: { in: [...] }` 평면 필터로 전달
+    const validOrders = await prisma.order.findMany({
+      where: { status: { notIn: ['CANCELLED', 'REFUNDED'] } },
+      select: { id: true },
+    });
+    const validOrderIds = validOrders.map((o) => o.id);
+
     // ★ 모든 독립 쿼리를 병렬 실행
     const [
       recentOrders,
@@ -55,16 +65,14 @@ export async function GET(req: NextRequest) {
         },
       }),
 
-      // 2) 카테고리별 매출
-      prisma.orderItem.groupBy({
-        by: ['productId'],
-        _sum: { quantity: true, price: true },
-        where: {
-          order: {
-            status: { notIn: ['CANCELLED', 'REFUNDED'] },
-          },
-        },
-      }),
+      // 2) 카테고리별 매출 — nested where 제거, 평면 orderId in 필터
+      validOrderIds.length > 0
+        ? prisma.orderItem.groupBy({
+            by: ['productId'],
+            _sum: { quantity: true, price: true },
+            where: { orderId: { in: validOrderIds } },
+          })
+        : Promise.resolve([] as any[]),
 
       // 3) 시간대별 주문 (최근 30일로 제한 - 이전: 전체 조회)
       prisma.order.findMany({
@@ -74,25 +82,25 @@ export async function GET(req: NextRequest) {
         select: { createdAt: true },
       }),
 
-      // 4) 인기 상품 Top 5
-      prisma.orderItem.groupBy({
-        by: ['productId'],
-        _sum: { quantity: true, price: true },
-        _count: { id: true },
-        orderBy: { _sum: { quantity: 'desc' } },
-        take: 5,
-        where: {
-          order: {
-            status: { notIn: ['CANCELLED', 'REFUNDED'] },
-          },
-        },
-      }),
+      // 4) 인기 상품 Top 5 — nested where 제거, 평면 orderId in 필터
+      validOrderIds.length > 0
+        ? prisma.orderItem.groupBy({
+            by: ['productId'],
+            _sum: { quantity: true, price: true },
+            _count: { id: true },
+            orderBy: { _sum: { quantity: 'desc' } },
+            take: 5,
+            where: { orderId: { in: validOrderIds } },
+          })
+        : Promise.resolve([] as any[]),
     ]);
 
     // --- 1) 일별 매출 그룹화 ---
+    // [SAFE] D1 에서 createdAt 이 string 또는 Date 어느쪽으로 와도 안전하게 처리
     const salesByDate: Record<string, { sales: number; orders: number }> = {};
-    recentOrders.forEach((order) => {
-      const dateKey = order.createdAt.toISOString().split('T')[0];
+    recentOrders.forEach((order: any) => {
+      const d = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+      const dateKey = d.toISOString().split('T')[0];
       if (!salesByDate[dateKey]) {
         salesByDate[dateKey] = { sales: 0, orders: 0 };
       }
@@ -147,8 +155,9 @@ export async function GET(req: NextRequest) {
       count: 0,
     }));
 
-    hourlyOrders.forEach((order) => {
-      const hour = order.createdAt.getHours();
+    hourlyOrders.forEach((order: any) => {
+      const d = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt);
+      const hour = d.getHours();
       ordersByHour[hour].count++;
     });
 

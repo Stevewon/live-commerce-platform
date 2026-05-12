@@ -1,6 +1,6 @@
 {
   "name": "qrlive-platform",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "큐라이브 분양형 쇼핑몰 플랫폼",
   "scripts": {
     "dev": "next dev",
