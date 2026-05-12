@@ -22,6 +22,15 @@ function PaymentSuccessContent() {
   const appNo = searchParams.get('appNo');
 
   useEffect(() => {
+    // [2026-05-12 v1.0.15] 결제 대기 화면 폴링 마커 cleanup
+    //   PC 결제완료 도달 시 sessionStorage 마커 즉시 제거 → PaymentWaitingScreen 중복 발동 방지
+    try {
+      sessionStorage.removeItem('pendingPaymentOrderId');
+      sessionStorage.removeItem('pendingPaymentOrderNumber');
+      sessionStorage.removeItem('pendingPaymentGuestToken');
+      sessionStorage.removeItem('pendingPaymentStartedAt');
+    } catch {}
+
     if (!orderId) {
       alert('잘못된 접근입니다');
       router.push('/');
