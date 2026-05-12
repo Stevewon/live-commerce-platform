@@ -27,11 +27,13 @@ export async function GET(request: NextRequest) {
     }
 
     // 오늘 날짜 계산 (한국 시간 기준 자정 → UTC 변환)
+    // [D1_TYPE_ERROR FIX] D1 (Cloudflare SQLite) 가 Date 객체 바인딩 거부 → 반드시 ISO string 사용
     const now = new Date()
     const kstOffset = 9 * 60 * 60 * 1000 // UTC+9
     const kstNow = new Date(now.getTime() + kstOffset)
-    const todayStart = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate())
-    todayStart.setTime(todayStart.getTime() - kstOffset) // KST 자정을 UTC로 변환
+    const todayStartDate = new Date(kstNow.getFullYear(), kstNow.getMonth(), kstNow.getDate())
+    todayStartDate.setTime(todayStartDate.getTime() - kstOffset) // KST 자정을 UTC로 변환
+    const todayStart = todayStartDate.toISOString()
 
     // ★ 모든 쿼리를 병렬 실행하여 응답 시간 최소화
     const [

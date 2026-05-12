@@ -22,8 +22,9 @@ export async function GET(req: NextRequest) {
 
     if (type === 'monthly') {
       // 월별 매출 집계
-      const startDate = new Date(year, 0, 1);
-      const endDate = new Date(year + 1, 0, 1);
+      // [D1_TYPE_ERROR FIX] D1 가 Date 객체 바인딩 거부 → ISO string 사용
+      const startDate = new Date(year, 0, 1).toISOString();
+      const endDate = new Date(year + 1, 0, 1).toISOString();
 
       const orders = await prisma.order.findMany({
         where: {
@@ -144,17 +145,18 @@ export async function GET(req: NextRequest) {
 
     if (type === 'cancellations') {
       // 취소/환불 상세 내역
+      // [D1_TYPE_ERROR FIX] D1 가 Date 객체 바인딩 거부 → ISO string 사용
       const targetMonth = month ? parseInt(month) : null;
       
-      let startDate: Date;
-      let endDate: Date;
+      let startDate: string;
+      let endDate: string;
       
       if (targetMonth) {
-        startDate = new Date(year, targetMonth - 1, 1);
-        endDate = new Date(year, targetMonth, 1);
+        startDate = new Date(year, targetMonth - 1, 1).toISOString();
+        endDate = new Date(year, targetMonth, 1).toISOString();
       } else {
-        startDate = new Date(year, 0, 1);
-        endDate = new Date(year + 1, 0, 1);
+        startDate = new Date(year, 0, 1).toISOString();
+        endDate = new Date(year + 1, 0, 1).toISOString();
       }
 
       const page = parseInt(searchParams.get('page') || '1');

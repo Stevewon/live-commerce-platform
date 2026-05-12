@@ -69,8 +69,10 @@ export async function GET(req: NextRequest) {
     ]);
 
     // 2. 오늘 통계
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // [D1_TYPE_ERROR FIX] D1 가 Date 객체 바인딩 거부 → ISO string 사용
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const today = todayDate.toISOString();
 
     const [todayOrders, todayRevenue, todayUsers] = await Promise.all([
       // 오늘 주문 수

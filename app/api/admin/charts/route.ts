@@ -26,12 +26,15 @@ export async function GET(req: NextRequest) {
     }
 
     // 최근 7일 범위
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // [D1_TYPE_ERROR FIX] D1 가 Date 객체 바인딩 거부 → ISO string 사용
+    const sevenDaysAgoDate = new Date();
+    sevenDaysAgoDate.setDate(sevenDaysAgoDate.getDate() - 7);
+    const sevenDaysAgo = sevenDaysAgoDate.toISOString();
     
     // 최근 30일 범위 (시간대별 통계용 - 전체 주문 대신 30일로 제한)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoDate = new Date();
+    thirtyDaysAgoDate.setDate(thirtyDaysAgoDate.getDate() - 30);
+    const thirtyDaysAgo = thirtyDaysAgoDate.toISOString();
 
     // ★ 모든 독립 쿼리를 병렬 실행
     const [
