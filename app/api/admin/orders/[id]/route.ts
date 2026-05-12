@@ -69,18 +69,18 @@ export async function PATCH(
       return NextResponse.json({ error: '주문을 찾을 수 없습니다' }, { status: 404 });
     }
 
-    // 취소 시 재고 복구
-    if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+    // 취소 시 재고 복구 (batch CASE WHEN — N+1 제거)
+    if (status === 'CANCELLED' && order.status !== 'CANCELLED' && order.items.length > 0) {
+      const stockMap = new Map<string, number>();
       for (const item of order.items) {
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              increment: item.quantity,
-            },
-          },
-        });
+        stockMap.set(item.productId, (stockMap.get(item.productId) || 0) + item.quantity);
       }
+      const ids = Array.from(stockMap.keys());
+      const caseParts = ids.map(pid => `WHEN '${pid}' THEN stock + ${stockMap.get(pid)}`).join(' ');
+      const inList = ids.map(pid => `'${pid}'`).join(',');
+      await prisma.$executeRawUnsafe(
+        `UPDATE Product SET stock = CASE id ${caseParts} ELSE stock END, updatedAt = datetime('now') WHERE id IN (${inList})`
+      );
     }
 
     // 업데이트 데이터 구성
@@ -92,13 +92,13 @@ export async function PATCH(
 
     // 상태별 자동 시각 기록
     if (status === 'SHIPPING' && order.status !== 'SHIPPING') {
-      updateData.shippedAt = new Date();
+      updateData.shippedAt = new Date().toISOString();
     }
     if (status === 'DELIVERED' && order.status !== 'DELIVERED') {
-      updateData.deliveredAt = new Date();
+      updateData.deliveredAt = new Date().toISOString();
     }
     if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
-      updateData.cancelledAt = new Date();
+      updateData.cancelledAt = new Date().toISOString();
       
       // KISPG 실결제 취소 - paymentKey 또는 수동 입력한 TID 사용
       const tidForCancel = order.paymentKey || body.manualTid;
@@ -117,7 +117,7 @@ export async function PATCH(
             canMsg: body.cancelReason || '관리자에 의한 주문 취소',
           });
           updateData.refundAmount = order.total;
-          updateData.refundedAt = new Date();
+          updateData.refundedAt = new Date().toISOString();
         } catch (pgError: any) {
           console.error('KISPG payment cancel failed (admin):', pgError.message);
           // PG 취소 실패 시 에러 메시지 포함하여 반환 (주문 취소는 진행)
@@ -128,7 +128,7 @@ export async function PATCH(
 
     // REFUNDED 상태 처리
     if (status === 'REFUNDED' && order.status !== 'REFUNDED') {
-      updateData.refundedAt = new Date();
+      updateData.refundedAt = new Date().toISOString();
       
       // KISPG 실결제 취소 (환불) - paymentKey 또는 수동 TID 사용
       const tidForRefund = order.paymentKey || body.manualTid;

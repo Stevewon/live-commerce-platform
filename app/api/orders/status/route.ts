@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         status: true,
         total: true,
         paymentMethod: true,
-        paymentKey: true,
+        // [M5 fix] paymentKey(TID) 제거 — 인증 불필요 API에서 민감 결제 정보 노출 방지
         paidAt: true,
         createdAt: true,
       },

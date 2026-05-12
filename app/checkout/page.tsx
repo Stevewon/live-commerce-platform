@@ -321,8 +321,8 @@ export default function CheckoutPage() {
 
       // [2026-05-11 v2] 동적 form 생성 후 KISPG 결제창으로 POST submit
       // form.target='_self'로 같은 창에서 KISPG 결제창이 열림
-      // 결제 완료 후 KISPG가 returnUrl로 POST → 서버에서 승인 처리 → HTTP 303 redirect로
-      // 성공/실패 페이지로 즉시 이동 (별도 postMessage/폴링 불필요)
+      // 결제 완료 후 KISPG가 returnUrl로 POST → 서버에서 승인 처리 → htmlRedirect()로
+      // 성공/실패 페이지로 즉시 이동 (HTML+JS+meta 3중 redirect, 별도 postMessage/폴링 불필요)
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = kispgData.authUrl;

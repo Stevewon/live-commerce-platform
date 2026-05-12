@@ -40,7 +40,10 @@ function PaymentSuccessContent() {
   // KISPG 결제 성공 처리
   const handleKispgSuccess = async () => {
     try {
-      const guestToken = localStorage.getItem('guestOrderToken');
+      // [L2 fix] 비회원 판별: URL param guestToken 우선 → localStorage 폴백
+      const urlGuestToken = searchParams.get('guestToken') || '';
+      const localGuestToken = localStorage.getItem('guestOrderToken') || '';
+      const guestToken = urlGuestToken || localGuestToken;
       setIsGuest(!!guestToken);
 
       setOrderInfo({
@@ -86,11 +89,19 @@ function PaymentSuccessContent() {
     }
   };
 
-  // DB에서 주문 정보 직접 조회
+  // DB에서 주문 정보 직접 조회 — 회원/비회원 모두 지원
   const fetchOrderInfo = async () => {
     try {
+      const guestToken = localStorage.getItem('guestOrderToken') || '';
+      // 비회원: x-guest-order-token 헤더로 인증
+      const headers: Record<string, string> = {};
+      if (guestToken) {
+        headers['x-guest-order-token'] = guestToken;
+      }
+
       const res = await fetch(`/api/orders/${orderId}`, {
         credentials: 'include',
+        headers,
       });
       if (res.ok) {
         const data = await res.json();
