@@ -11,6 +11,7 @@ function PaymentSuccessContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [orderInfo, setOrderInfo] = useState<any>(null);
   const [isGuest, setIsGuest] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'retrying' | 'failed'>('idle');
 
   // KISPG 결제 완료 후 파라미터
   const orderId = searchParams.get('orderId');
@@ -56,22 +57,19 @@ function PaymentSuccessContent() {
 
       setIsLoading(false);
 
-      // [2026-05-11 v4 안전망] 클라이언트 사이드 paymentKey sync
+      // [2026-05-12 v5 강화 안전망 — 옵션 3-1 공격적 재시도]
       // → KISPG return 핸들러가 어떤 이유로 실패해도 success 페이지 진입 시점에 paymentKey/status 를 강제 동기화
       // → 사용자 도달 확정 시점이므로 100% 실행 보장
+      // → 1차 즉시 호출 + 실패/응답불량 시 3초 후 재시도 (최대 3회)
+      // → 결제사고 재발 방지 (지나/hero zina 사례 — return 핸들러 실패 시 TID 미저장으로 결제대기 노출)
       if (orderId && tid) {
-        fetch('/api/payments/kispg/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            orderId,
-            tid,
-            payMethod: payMethod || 'card',
-            appNo: appNo || '',
-            amount: amount ? parseInt(amount) : 0,
-          }),
-        }).catch((e) => console.error('[sync] 실패(무시):', e));
+        runSyncWithRetry({
+          orderId,
+          tid,
+          payMethod: payMethod || 'card',
+          appNo: appNo || '',
+          amount: amount ? parseInt(amount) : 0,
+        });
       }
 
       // 장바구니 비우기
@@ -87,6 +85,61 @@ function PaymentSuccessContent() {
       console.error('KISPG success handling error:', error);
       setIsLoading(false);
     }
+  };
+
+  // [2026-05-12 옵션 3-1] paymentKey sync 공격적 재시도
+  // → 1차 즉시 호출, 실패/응답불량 시 3초 후 재시도, 최대 3회까지
+  // → 모든 시도 실패 시 console.error + 시각 피드백 (사장님 어드민 대시보드 옵션 3-3 에서 감지)
+  const runSyncWithRetry = async (payload: {
+    orderId: string;
+    tid: string;
+    payMethod: string;
+    appNo: string;
+    amount: number;
+  }) => {
+    const MAX_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 3000;
+
+    const attemptSync = async (attempt: number): Promise<boolean> => {
+      try {
+        setSyncStatus(attempt === 1 ? 'syncing' : 'retrying');
+        const res = await fetch('/api/payments/kispg/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          console.error(`[sync] HTTP ${res.status} — attempt ${attempt}/${MAX_ATTEMPTS}`);
+          return false;
+        }
+
+        const data: any = await res.json().catch(() => null);
+        // sync route 응답: { success: true, ... } 또는 idempotent skip 도 success:true
+        if (data && data.success) {
+          console.log(`[sync] OK — attempt ${attempt}/${MAX_ATTEMPTS}`, data);
+          setSyncStatus('success');
+          return true;
+        }
+        console.error(`[sync] success=false — attempt ${attempt}/${MAX_ATTEMPTS}`, data);
+        return false;
+      } catch (e) {
+        console.error(`[sync] 예외 — attempt ${attempt}/${MAX_ATTEMPTS}:`, e);
+        return false;
+      }
+    };
+
+    for (let i = 1; i <= MAX_ATTEMPTS; i++) {
+      const ok = await attemptSync(i);
+      if (ok) return;
+      if (i < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      }
+    }
+    // 모든 재시도 실패 — 어드민 대시보드(옵션 3-3) 에서 stuck order 로 감지됨
+    console.error(`[sync] 모든 재시도(${MAX_ATTEMPTS}회) 실패 — orderId=${payload.orderId} tid=${payload.tid}`);
+    setSyncStatus('failed');
   };
 
   // DB에서 주문 정보 직접 조회 — 회원/비회원 모두 지원
@@ -170,6 +223,21 @@ function PaymentSuccessContent() {
               </span>
             </div>
           </div>
+
+          {/* [2026-05-12 옵션 3-1] sync 상태 인디케이터 — 실패 시에만 사용자에게 노출 */}
+          {syncStatus === 'failed' && (
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="font-semibold">결제는 정상 처리되었으나 일부 정보 동기화가 지연되고 있습니다.</p>
+                  <p className="mt-1 text-yellow-700">주문 내역에 잠시 후 반영됩니다. 문제가 지속되면 고객센터로 문의해주세요.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 안내 메시지 */}
