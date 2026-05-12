@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface Live {
   id: string;
@@ -47,8 +48,7 @@ export default function PartnerLivesPage() {
     
     setIsLoading(true);
     try {
-      const res = await fetch('/api/partner/lives', {
-        credentials: 'include',
+      const res = await authFetch('/api/partner/lives', {
       });
       const data = await res.json();
       if (data.success) {
@@ -71,9 +71,8 @@ export default function PartnerLivesPage() {
     }
 
     try {
-      const res = await fetch('/api/partner/lives', {
+      const res = await authFetch('/api/partner/lives', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -102,9 +101,8 @@ export default function PartnerLivesPage() {
     if (!confirm(`라이브를 "${newStatus}" 상태로 변경하시겠습니까?`)) return;
 
     try {
-      const res = await fetch(`/api/partner/lives/${liveId}`, {
+      const res = await authFetch(`/api/partner/lives/${liveId}`, {
         method: 'PATCH',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -131,9 +129,8 @@ export default function PartnerLivesPage() {
     if (!confirm('정말 삭제하시겠습니까?')) return;
 
     try {
-      const res = await fetch(`/api/partner/lives/${liveId}`, {
+      const res = await authFetch(`/api/partner/lives/${liveId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
 
       const data = await res.json();

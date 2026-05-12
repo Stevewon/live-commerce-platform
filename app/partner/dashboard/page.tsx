@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth'
 import PartnerCharts from '@/components/dashboard/PartnerCharts'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface PartnerStats {
   totalSales: number
@@ -46,8 +47,7 @@ export default function PartnerDashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      const res = await fetch('/api/partner/dashboard', {
-        credentials: 'include'
+      const res = await authFetch('/api/partner/dashboard', {
       })
 
       const data = await res.json()

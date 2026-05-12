@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface Product {
   id: string
@@ -41,15 +42,13 @@ export default function PartnerProducts() {
   const fetchData = async () => {
     try {
       // 모든 제품 조회
-      const allResponse = await fetch('/api/admin/products', {
-        credentials: 'include',
+      const allResponse = await authFetch('/api/admin/products', {
         headers: {
         }
       })
 
       // 내가 선택한 제품 조회
-      const myResponse = await fetch('/api/partner/products', {
-        credentials: 'include',
+      const myResponse = await authFetch('/api/partner/products', {
         headers: {
         }
       })
@@ -77,9 +76,8 @@ export default function PartnerProducts() {
       const isSelected = isProductSelected(productId)
       const action = isSelected ? 'remove' : 'add'
 
-      const response = await fetch('/api/partner/products', {
+      const response = await authFetch('/api/partner/products', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },

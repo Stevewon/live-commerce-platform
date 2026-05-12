@@ -3,8 +3,8 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'
-;
+import { useRouter } from 'next/navigation';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface Order {
   id: string;
@@ -118,9 +118,7 @@ export default function AdminOrdersPage() {
         params.append('search', appliedSearch);
       }
 
-      const res = await fetch(`/api/admin/orders?${params}`, {
-        credentials: 'include',
-      });
+      const res = await authFetch(`/api/admin/orders?${params}`);
 
       if (!res.ok) throw new Error('주문 목록 로드 실패');
 
@@ -145,12 +143,8 @@ export default function AdminOrdersPage() {
       if (tracking?.company) body.trackingCompany = tracking.company;
       if (tracking?.number) body.trackingNumber = tracking.number;
 
-      const res = await fetch(`/api/admin/orders/${orderId}`, {
+      const res = await authFetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
         body: JSON.stringify(body),
       });
 
@@ -178,9 +172,7 @@ export default function AdminOrdersPage() {
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
       if (searchQuery) params.append('search', searchQuery);
 
-      const res = await fetch(`/api/admin/orders/export?${params}`, {
-        credentials: 'include',
-      });
+      const res = await authFetch(`/api/admin/orders/export?${params}`);
 
       if (!res.ok) throw new Error('다운로드 실패');
 
@@ -456,6 +448,9 @@ export default function AdminOrdersPage() {
                       💰 주문금액
                     </th>
                     <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                      💳 결제정보
+                    </th>
+                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
                       📊 상태
                     </th>
                     <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
@@ -509,6 +504,27 @@ export default function AdminOrdersPage() {
                         <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
                           {formatCurrency(order.total)}
                         </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        {order.paymentKey ? (
+                          <div className="space-y-1">
+                            <div className="text-xs font-bold text-gray-500">TID</div>
+                            <div className="font-mono text-xs text-gray-900 break-all max-w-[200px]" title={order.paymentKey}>
+                              {order.paymentKey}
+                            </div>
+                            {order.paidAt && (
+                              <div className="text-xs text-emerald-700 font-bold mt-1">
+                                💚 {formatDate(order.paidAt)}
+                              </div>
+                            )}
+                            <span className="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full">결제완료</span>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <span className="inline-block px-2 py-0.5 bg-yellow-100 text-yellow-700 text-[10px] font-black rounded-full">⚠️ TID 미등록</span>
+                            <div className="text-[10px] text-gray-400 font-medium">상세에서 수동 등록 가능</div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-8 py-6">{getStatusBadge(order.status)}</td>
                       <td className="px-8 py-6">
@@ -764,10 +780,8 @@ export default function AdminOrdersPage() {
                         }
                         if (!confirm(`거래번호(TID)를 등록하시겠습니까?\n\nTID: ${tidInput}`)) return;
                         try {
-                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                          const res = await authFetch(`/api/admin/orders/${selectedOrder.id}`, {
                             method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
                             body: JSON.stringify({
                               paymentKey: tidInput,
                               paymentMethod: '신용카드',
@@ -854,10 +868,8 @@ export default function AdminOrdersPage() {
                           };
                           if (manualTid) bodyData.manualTid = manualTid;
                           
-                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                          const res = await authFetch(`/api/admin/orders/${selectedOrder.id}`, {
                             method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
                             body: JSON.stringify(bodyData),
                           });
                           const data = await res.json();
@@ -916,10 +928,8 @@ export default function AdminOrdersPage() {
                           };
                           if (manualTid) bodyData.manualTid = manualTid;
                           
-                          const res = await fetch(`/api/admin/orders/${selectedOrder.id}`, {
+                          const res = await authFetch(`/api/admin/orders/${selectedOrder.id}`, {
                             method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
                             body: JSON.stringify(bodyData),
                           });
                           const data = await res.json();

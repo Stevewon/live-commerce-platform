@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface MonthlyData {
   month: number;
@@ -90,8 +91,7 @@ export default function AdminReportsPage() {
   const loadMonthlyData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/reports?type=monthly&year=${year}`, {
-        credentials: 'include',
+      const res = await authFetch(`/api/admin/reports?type=monthly&year=${year}`, {
       });
       if (!res.ok) throw new Error('Failed to load');
       const data = await res.json();
@@ -111,7 +111,7 @@ export default function AdminReportsPage() {
       if (selectedMonth) {
         url += `&month=${selectedMonth}`;
       }
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await authFetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load');
       const data = await res.json();
       setCancellations(data.cancellations || []);

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import ShopNavigation from '@/components/ShopNavigation';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface RecentOrder {
   id: string;
@@ -48,7 +49,7 @@ export default function MyPage() {
     setIsLoading(true);
     try {
       // 주문 내역 서버 조회
-      const ordersRes = await fetch('/api/orders', { credentials: 'include' });
+      const ordersRes = await authFetch('/api/orders');
       if (ordersRes.ok) {
         const data = await ordersRes.json();
         const orders = data.orders || data.data?.orders || [];
@@ -57,7 +58,7 @@ export default function MyPage() {
       }
 
       // 위시리스트 서버 조회
-      const wishlistRes = await fetch('/api/wishlist', { credentials: 'include' });
+      const wishlistRes = await authFetch('/api/wishlist');
       if (wishlistRes.ok) {
         const data = await wishlistRes.json();
         const items = data.data || [];

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 /**
  * [BUG FIX 2026-04-30]
@@ -28,12 +29,9 @@ function PaymentFailContent() {
 
   // ★ 페이지 로드 시 주문 상태를 서버에서 재확인
   useEffect(() => {
-    // ★ PaymentWaitingScreen 중복 발동 방지 — sessionStorage 마커 cleanup
+    // ★ [2026-05-12 v1.0.16] /payment/waiting 폴링 마커 cleanup
     try {
-      sessionStorage.removeItem('pendingPaymentOrderId');
-      sessionStorage.removeItem('pendingPaymentOrderNumber');
-      sessionStorage.removeItem('pendingPaymentGuestToken');
-      sessionStorage.removeItem('pendingPaymentStartedAt');
+      sessionStorage.removeItem('kispgFormData');
     } catch {}
 
     if (!orderId) {
@@ -107,10 +105,8 @@ function PaymentFailContent() {
     }
 
     try {
-      const res = await fetch('/api/payments/kispg/request', {
+      const res = await authFetch('/api/payments/kispg/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ orderId }),
       });
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface Order {
   id: string;
@@ -61,8 +62,7 @@ export default function PartnerOrdersPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/partner/orders', {
-        credentials: 'include',
+      const res = await authFetch('/api/partner/orders', {
         headers: {
         },
       });

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import ProductForm from '@/components/admin/ProductForm'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 export default function EditProductPage() {
   const { user, loading: authLoading } = useAdminAuth()
@@ -23,8 +24,7 @@ export default function EditProductPage() {
 
   const fetchProduct = async () => {
     try {
-      const res = await fetch(`/api/admin/products/${productId}`, {
-        credentials: 'include'
+      const res = await authFetch(`/api/admin/products/${productId}`, {
       })
       const data = await res.json()
       if (data.success) {

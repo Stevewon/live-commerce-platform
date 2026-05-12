@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePartnerAuth } from '@/lib/hooks/usePartnerAuth'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface Settlement {
   id: string
@@ -34,8 +35,7 @@ export default function PartnerSettlements() {
 
   const fetchSettlements = async () => {
     try {
-      const response = await fetch('/api/partner/settlements', {
-        credentials: 'include',
+      const response = await authFetch('/api/partner/settlements', {
         headers: {
         }
       })
@@ -54,8 +54,7 @@ export default function PartnerSettlements() {
 
   const fetchAvailableAmount = async () => {
     try {
-      const response = await fetch('/api/partner/dashboard', {
-        credentials: 'include',
+      const response = await authFetch('/api/partner/dashboard', {
         headers: {
         }
       })
@@ -89,9 +88,8 @@ export default function PartnerSettlements() {
         return
       }
 
-      const response = await fetch('/api/partner/settlements', {
+      const response = await authFetch('/api/partner/settlements', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },

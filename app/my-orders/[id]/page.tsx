@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { ORDER_STATUS_MAP, COURIER_COMPANIES, getTrackingUrl } from '@/lib/utils/courier';
 
@@ -71,7 +72,7 @@ export default function OrderDetailPage() {
 
   const fetchOrder = async () => {
     try {
-      const res = await fetch(`/api/orders/${orderId}`, { credentials: 'include' });
+      const res = await authFetch(`/api/orders/${orderId}`);
       if (res.ok) {
         const data = await res.json();
         setOrder(data.order);
@@ -88,10 +89,8 @@ export default function OrderDetailPage() {
   const handleCancel = async () => {
     if (!confirm('주문을 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const res = await authFetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CANCELLED' }),
       });
       if (res.ok) {

@@ -3,6 +3,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 export default function AdminSettingsPage() {
   const { user, loading: authLoading } = useAdminAuth();
@@ -26,8 +27,7 @@ export default function AdminSettingsPage() {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin/settings/shipping', {
-        credentials: 'include',
+      const res = await authFetch('/api/admin/settings/shipping', {
       });
       if (res.ok) {
         const data = await res.json();
@@ -48,10 +48,9 @@ export default function AdminSettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const res = await fetch('/api/admin/settings/shipping', {
+      const res = await authFetch('/api/admin/settings/shipping', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           shippingFee,
           freeShippingThreshold,

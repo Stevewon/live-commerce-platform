@@ -9,8 +9,7 @@ import ShopNavigation from '@/components/ShopNavigation';
 import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
 import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
-import dynamic from 'next/dynamic';
-const PaymentWaitingScreen = dynamic(() => import('@/components/payment/PaymentWaitingScreen'), { ssr: false });
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface CartItem {
   id: string;
@@ -145,7 +144,7 @@ export default function CheckoutPage() {
 
   const fetchCart = async () => {
     try {
-      const res = await fetch('/api/cart', { credentials: 'include' });
+      const res = await authFetch('/api/cart');
       if (res.ok) {
         const data = await res.json();
         const serverItems = data.data || [];
@@ -276,10 +275,8 @@ export default function CheckoutPage() {
         orderData.guestPhone = guestPhone || shippingPhone;
       }
 
-      const res = await fetch('/api/orders', {
+      const res = await authFetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(orderData),
       });
 
@@ -304,10 +301,8 @@ export default function CheckoutPage() {
       } catch {}
 
       // KISPG 결제창 호출 (서버에서 JSON 반환 → 클라이언트에서 동적 form 생성 후 submit)
-      const kispgRes = await fetch('/api/payments/kispg/request', {
+      const kispgRes = await authFetch('/api/payments/kispg/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ orderId: order.id }),
       });
 
@@ -321,42 +316,32 @@ export default function CheckoutPage() {
         throw new Error(kispgData.error || '결제 데이터를 가져오지 못했습니다.');
       }
 
-      // [2026-05-11 v2] 동적 form 생성 후 KISPG 결제창으로 POST submit
-      // form.target='_self'로 같은 창에서 KISPG 결제창이 열림
-      // 결제 완료 후 KISPG가 returnUrl로 POST → 서버에서 승인 처리 → htmlRedirect()로
-      // 성공/실패 페이지로 즉시 이동 (HTML+JS+meta 3중 redirect, 별도 postMessage/폴링 불필요)
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = kispgData.authUrl;
-      form.acceptCharset = 'utf-8';
-      form.style.display = 'none';
-      form.target = '_self';
+      // [2026-05-12 v1.0.16] 폴링 화면 아키텍처 재설계 — /payment/waiting 별도 페이지로 분리
+      //   기존 (v1.0.15): checkout 페이지에 PaymentWaitingScreen 마운트 → form.submit() 으로
+      //                  checkout DOM 통째로 unmount → 폴링 영구 사라짐 (사고 재발 원인)
+      //   개선 (v1.0.16): /payment/waiting 페이지로 이동 → 그 페이지에서 KISPG form 자동 submit
+      //                  → 결제창 닫혀도 waiting 페이지가 살아있어 폴링 정상 동작
+      //   모바일: returnUrl 정상 도달 → success/fail 로 즉시 이동 → waiting 페이지 unmount
+      //   PC: returnUrl 안 와도 waiting 페이지에서 폴링이 KISPG /v2/order 자동 호출
 
-      Object.entries(kispgData.formData).forEach(([key, value]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-
-      // [2026-05-12 v1.0.15] PC 결제완료 미표시 사고 방지 — 결제 대기 화면 폴링 마커
-      //   sessionStorage 에 결제 진행 중 주문 정보 기록 → PaymentWaitingScreen 이 감지 후 폴링 시작
-      //   모바일: returnUrl 응답이 정상 도달하므로 마커 사용 안 함 (즉시 success 페이지 이동)
-      //   PC: returnUrl 응답이 PC 에 안 와도 폴링이 DB/KISPG 상태 자동 감지 → 결과 페이지 자동 이동
+      // KISPG form data 를 sessionStorage 에 임시 저장 (waiting 페이지에서 자동 submit)
       try {
-        sessionStorage.setItem('pendingPaymentOrderId', order.id);
-        sessionStorage.setItem('pendingPaymentOrderNumber', order.orderNumber || '');
-        sessionStorage.setItem('pendingPaymentGuestToken', guestOrderToken || '');
-        sessionStorage.setItem('pendingPaymentStartedAt', String(Date.now()));
-      } catch {}
+        sessionStorage.setItem('kispgFormData', JSON.stringify({
+          authUrl: kispgData.authUrl,
+          formData: kispgData.formData,
+        }));
+      } catch (e) {
+        console.error('kispgFormData 저장 실패:', e);
+      }
 
-      // 모바일에서 form submit 지연 방지를 위해 약간의 딜레이
-      setTimeout(() => {
-        form.submit();
-      }, 100);
+      // /payment/waiting 페이지로 이동 (autoSubmit=kispg 로 form 자동 submit 트리거)
+      const waitingUrl = new URL('/payment/waiting', window.location.origin);
+      waitingUrl.searchParams.set('orderId', order.id);
+      if (order.orderNumber) waitingUrl.searchParams.set('orderNumber', order.orderNumber);
+      if (guestOrderToken) waitingUrl.searchParams.set('guestToken', guestOrderToken);
+      waitingUrl.searchParams.set('autoSubmit', 'kispg');
+
+      window.location.replace(waitingUrl.toString());
       return; // 결제 페이지로 이동 중이므로 여기서 종료
     } catch (error: any) {
       console.error('주문 실패:', error);
@@ -561,9 +546,8 @@ export default function CheckoutPage() {
                             onClick={async () => {
                               if (user && !item.id.startsWith('guest-') && !item.id.startsWith('buynow-')) {
                                 try {
-                                  await fetch(`/api/cart?productId=${item.productId}`, {
+                                  await authFetch(`/api/cart?productId=${item.productId}`, {
                                     method: 'DELETE',
-                                    credentials: 'include',
                                   });
                                 } catch {}
                               } else if (!user) {
@@ -685,7 +669,6 @@ export default function CheckoutPage() {
           </div>
         </form>
       </div>
-      <PaymentWaitingScreen />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface ReviewFormProps {
   orderId: string;
@@ -28,12 +29,8 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
       setLoading(true);
       setError('');
 
-      const response = await fetch('/api/reviews', {
+      const response = await authFetch('/api/reviews', {
         method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           orderId,
           productId,

@@ -3,6 +3,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface Product {
   id: string
@@ -60,8 +61,7 @@ export default function AdminProductsPage() {
         limit: '20'
       })
 
-      const res = await fetch(`/api/admin/products?${params}`, {
-        credentials: 'include',
+      const res = await authFetch(`/api/admin/products?${params}`, {
         headers: { 'Content-Type': 'application/json' }
       })
 
@@ -80,7 +80,7 @@ export default function AdminProductsPage() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories')
+      const res = await authFetch('/api/categories')
       const data = await res.json()
       if (data.success) {
         setCategories(data.data)
@@ -93,9 +93,8 @@ export default function AdminProductsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('정말 이 상품을 삭제하시겠습니까?')) return
     try {
-      const res = await fetch(`/api/admin/products/${id}`, {
+      const res = await authFetch(`/api/admin/products/${id}`, {
         method: 'DELETE',
-        credentials: 'include'
       })
       const data = await res.json()
       if (data.success) {
@@ -111,9 +110,8 @@ export default function AdminProductsPage() {
 
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
     try {
-      const res = await fetch(`/api/admin/products/${id}`, {
+      const res = await authFetch(`/api/admin/products/${id}`, {
         method: 'PATCH',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !currentStatus })
       })
@@ -135,11 +133,10 @@ export default function AdminProductsPage() {
 
     for (const id of selectedIds) {
       if (action === 'delete') {
-        await fetch(`/api/admin/products/${id}`, { method: 'DELETE', credentials: 'include' })
+        await authFetch(`/api/admin/products/${id}`, { method: 'DELETE', credentials: 'include' })
       } else {
-        await fetch(`/api/admin/products/${id}`, {
+        await authFetch(`/api/admin/products/${id}`, {
           method: 'PATCH',
-          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isActive: action === 'activate' })
         })

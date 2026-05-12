@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { ORDER_STATUS_MAP } from '@/lib/utils/courier';
 
@@ -51,7 +52,7 @@ export default function MyOrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders', { credentials: 'include' });
+      const res = await authFetch('/api/orders');
       if (res.ok) {
         const data = await res.json();
         setOrders(data.orders || data.data || []);
@@ -66,10 +67,8 @@ export default function MyOrdersPage() {
   const handleCancel = async (orderId: string) => {
     if (!confirm('주문을 취소하시겠습니까?')) return;
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const res = await authFetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CANCELLED' }),
       });
       if (res.ok) {

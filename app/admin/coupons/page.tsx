@@ -3,6 +3,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface Coupon {
   id: string;
@@ -73,8 +74,7 @@ export default function AdminCouponsPage() {
         ...(searchTerm && { search: searchTerm }),
       });
 
-      const response = await fetch(`/api/admin/coupons?${params}`, {
-        credentials: 'include',
+      const response = await authFetch(`/api/admin/coupons?${params}`, {
       headers: {
         },
       });
@@ -104,9 +104,8 @@ export default function AdminCouponsPage() {
         : '/api/admin/coupons';
       const method = editingCoupon ? 'PATCH' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
-        credentials: 'include',
       headers: {
           'Content-Type': 'application/json',
         },
@@ -135,9 +134,8 @@ export default function AdminCouponsPage() {
     if (!confirm('정말 이 쿠폰을 삭제하시겠습니까?')) return;
 
     try {
-      const response = await fetch(`/api/admin/coupons/${id}`, {
+      const response = await authFetch(`/api/admin/coupons/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       headers: {
         },
       });
@@ -159,9 +157,8 @@ export default function AdminCouponsPage() {
   // 쿠폰 활성화/비활성화 토글
   const handleToggleActive = async (coupon: Coupon) => {
     try {
-      const response = await fetch(`/api/admin/coupons/${coupon.id}`, {
+      const response = await authFetch(`/api/admin/coupons/${coupon.id}`, {
         method: 'PATCH',
-        credentials: 'include',
       headers: {
           'Content-Type': 'application/json',
         },
