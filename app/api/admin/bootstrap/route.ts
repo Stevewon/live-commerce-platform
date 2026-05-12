@@ -153,6 +153,49 @@ async function handle(req: NextRequest) {
       return NextResponse.json({ success: true, data: result });
     }
 
+    if (mode === 'settid') {
+      // KISPG 실제 TID로 paymentKey 강제 덮어쓰기 (이미 CONFIRMED 된 주문 대상)
+      // recover 의 안전 가드 우회 — TID 교체 전용
+      const orderId = searchParams.get('orderId') || '';
+      const tid = searchParams.get('tid') || '';
+      if (!orderId || !tid) {
+        return NextResponse.json(
+          { success: false, error: 'orderId & tid required' },
+          { status: 400 }
+        );
+      }
+      const before: any = await prisma.$queryRawUnsafe(
+        `SELECT id, orderNumber, status, paymentMethod, paymentKey, paidAt, total
+         FROM "Order" WHERE id = ? LIMIT 1`,
+        orderId
+      );
+      const beforeRow = Array.isArray(before) ? before[0] : before;
+      if (!beforeRow) {
+        return NextResponse.json({ success: false, error: 'order not found' }, { status: 404 });
+      }
+      const nowIso = new Date().toISOString();
+      const changes = await prisma.$executeRawUnsafe(
+        `UPDATE "Order"
+         SET "paymentKey" = ?,
+             "updatedAt" = ?
+         WHERE "id" = ?`,
+        tid, nowIso, orderId
+      );
+      const after: any = await prisma.$queryRawUnsafe(
+        `SELECT id, orderNumber, status, paymentMethod, paymentKey, paidAt, total
+         FROM "Order" WHERE id = ? LIMIT 1`,
+        orderId
+      );
+      const afterRow = Array.isArray(after) ? after[0] : after;
+      return NextResponse.json({
+        success: changes > 0,
+        changes,
+        before: beforeRow,
+        after: afterRow,
+        message: changes > 0 ? `TID 교체 완료. paymentKey=${tid}` : 'TID 교체 실패',
+      });
+    }
+
     if (mode === 'recover') {
       // 옵션 A: KISPG 결제는 됐으나 우리 DB는 PENDING 상태인 주문 강제 복구
       const orderId = searchParams.get('orderId') || '';
@@ -215,7 +258,7 @@ async function handle(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: 'unknown mode', validModes: ['check', 'reset', 'create', 'diag', 'recover'] },
+      { success: false, error: 'unknown mode', validModes: ['check', 'reset', 'create', 'diag', 'recover', 'settid'] },
       { status: 400 }
     );
   } catch (err: any) {
