@@ -418,3 +418,246 @@ export async function verifyAuthResult(params: {
   });
   return expectedEnc === params.encData;
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// [2026-05-12 옵션 1] KISPG 결제 내역 조회 API (§ 3.4)
+// 가맹점 연동 가이드 v1.1.11 18-19페이지 + § 7.1 해시 규칙 기반
+//
+// 사장님 결제사고(지나/hero zina 사례) 근본 패치:
+//   - KISPG return 핸들러 실패 시 paymentKey/tid 가 DB 에 저장 안 됨
+//   - DB 에 ordNo + 결제금액 은 있으므로 → KISPG 측에 직접 조회로 실제 tid/승인여부 회수
+//   - 어드민 콘솔 수동 확인 없이 자동 복구 가능
+//
+// Endpoint:
+//   운영: https://api.kispg.co.kr/v2/order
+//   개발: https://testapi.kispg.co.kr/v2/order
+// HTTP: POST / UTF-8 / application/json
+//
+// 요청: mid, tid OR ordNo (둘 다 주면 tid 우선), goodsAmt, ediDate, encData
+// encData (§ 7.1): Hex(SHA-256(mid + ediDate + goodsAmt + merchantKey))
+//   → 인증/결제 시 해시와 100% 동일 → generateEncData() 그대로 재사용
+//
+// 응답:
+//   resultCd, resultMsg, payMethod, tid, appDtm, appNo, ordNo, amt,
+//   cancelYN, trxStatus ('승인' | '취소' | '입금대기'), fnNm, ...
+//
+// trxStatus 가 결제 상태의 단일 진실 (부분취소도 '승인' → cancelData 별도 확인)
+// ─────────────────────────────────────────────────────────────────────────
+
+export function getKispgInquireUrl(): string {
+  return `${getKispgHost()}/v2/order`;
+}
+
+export interface KispgInquireParams {
+  mid?: string;
+  tid?: string;      // tid 또는 ordNo 중 1개 필수, 둘 다 주면 tid 우선
+  ordNo?: string;
+  goodsAmt: number;  // 결제 금액
+}
+
+export interface KispgInquireResult {
+  resultCd: string;
+  resultMsg?: string;
+  payMethod?: string;
+  tid?: string;
+  appDtm?: string;
+  appNo?: string;
+  ordNo?: string;
+  amt?: string;
+  cancelYN?: string;
+  trxStatus?: string;     // '승인' | '취소' | '입금대기'
+  fnNm?: string;          // 카드사명/은행명
+  cardNo?: string;
+  cardType?: string;
+  authType?: string;
+  cancelData?: string;    // 부분취소 내역 (JSON 문자열)
+  mbsReserved?: string;
+  vacntNo?: string;       // 가상계좌 번호
+  lmtDay?: string;        // 가상계좌 입금기한
+  // 원본 보존 (기타 모든 필드)
+  [key: string]: any;
+}
+
+/**
+ * KISPG `/v2/order` 결제 내역 조회 호출
+ *
+ * @returns
+ *   성공(거래 존재): { resultCd: '0000' 또는 카드 성공코드, tid, trxStatus, ... }
+ *   거래 없음/실패: throw Error (resultMsg 포함)
+ *
+ * @throws KISPG 방화벽 차단, HTTP 오류, JSON 파싱 실패, 비성공 resultCd
+ */
+export async function inquireKispgPayment(
+  params: KispgInquireParams
+): Promise<KispgInquireResult> {
+  if (!params.tid && !params.ordNo) {
+    throw new Error('inquireKispgPayment: tid 또는 ordNo 중 하나는 필수');
+  }
+
+  const mid = params.mid || KISPG_MID;
+  const ediDate = generateEdiDate();
+  // KISPG 는 정수 금액만 허용 (원 단위, 소수점 불가)
+  const goodsAmt = Math.round(params.goodsAmt).toString();
+  // § 7.1: encData = Hex(SHA-256(mid + ediDate + goodsAmt + merchantKey))
+  //  → 인증/결제 해시와 동일 (generateEncData 그대로 사용)
+  const encData = await generateEncData({ mid, ediDate, goodsAmt });
+
+  const inquireUrl = getKispgInquireUrl();
+  console.log(
+    '[KISPG Inquire] URL:', inquireUrl,
+    'mid:', mid,
+    'tid:', params.tid || '(none)',
+    'ordNo:', params.ordNo || '(none)',
+    'goodsAmt:', goodsAmt
+  );
+
+  // tid 가 있으면 tid 만, 없으면 ordNo 만 전송 (둘 다 보내면 tid 우선이지만 명시적으로 분기)
+  const bodyData: Record<string, string> = {
+    mid,
+    goodsAmt,
+    ediDate,
+    encData,
+    charset: 'utf-8',
+  };
+  if (params.tid) bodyData.tid = params.tid;
+  if (params.ordNo) bodyData.ordNo = params.ordNo;
+
+  // redirect: 'manual' — 방화벽 리다이렉트(firewall.html) 자동 추적 방지
+  const response = await fetch(inquireUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'User-Agent': 'QRLive-Payment/1.0',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(bodyData),
+    redirect: 'manual',
+  });
+
+  console.log('[KISPG Inquire] HTTP Status:', response.status, 'Type:', response.type);
+
+  // 3xx 리다이렉트 감지 = 방화벽 차단
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location') || '';
+    console.error('[KISPG Inquire] 방화벽 리다이렉트 감지! Location:', location);
+    throw new Error(`KISPG 방화벽 차단: 서버 IP가 KISPG에 등록되지 않았습니다. KISPG 고객센터(1599-3700)에 Cloudflare Workers IP 등록을 요청하세요.`);
+  }
+
+  const responseText = await response.text();
+  console.log('[KISPG Inquire] Response:', responseText.substring(0, 500));
+
+  // HTML 응답 감지 (KISPG 가 JSON 대신 HTML 반환)
+  if (
+    responseText.includes('firewall.html') ||
+    responseText.includes('비정상적인 접근') ||
+    responseText.includes('kisvan.co.kr') ||
+    responseText.includes('<!DOCTYPE')
+  ) {
+    console.error('[KISPG Inquire] HTML/방화벽 응답 감지. HTTP Status:', response.status);
+    throw new Error('KISPG 방화벽 차단: 서버 IP가 등록되지 않았습니다. KISPG 고객센터에 IP 등록을 요청하세요.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`KISPG 거래조회 HTTP 오류: ${response.status} - ${responseText.substring(0, 200)}`);
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(responseText);
+  } catch (e) {
+    console.error('[KISPG Inquire] JSON 파싱 실패:', responseText.substring(0, 500));
+    throw new Error('KISPG 거래조회 서버 응답 형식 오류');
+  }
+
+  console.log(
+    '[KISPG Inquire] resultCd:', data.resultCd,
+    'resultMsg:', data.resultMsg,
+    'tid:', data.tid,
+    'trxStatus:', data.trxStatus,
+    'cancelYN:', data.cancelYN
+  );
+
+  return data as KispgInquireResult;
+}
+
+/**
+ * 거래조회 결과로부터 paymentKey/status 도출용 헬퍼
+ *
+ * @returns
+ *   { kind: 'CONFIRMED', tid, appNo, payMethod, ... } — 정상 승인 (부분취소 포함, cancelYN!=='Y')
+ *   { kind: 'CANCELLED', ... }                      — 전체 취소 (cancelYN==='Y' 또는 trxStatus==='취소')
+ *   { kind: 'PENDING', ... }                        — 가상계좌 입금대기
+ *   { kind: 'UNKNOWN', resultCd, resultMsg }        — 거래 없음/조회 실패
+ */
+export function classifyInquireResult(r: KispgInquireResult): {
+  kind: 'CONFIRMED' | 'CANCELLED' | 'PENDING' | 'UNKNOWN';
+  tid?: string;
+  appNo?: string;
+  payMethod?: string;
+  amt?: string;
+  appDtm?: string;
+  trxStatus?: string;
+  cancelYN?: string;
+} {
+  const trx = (r.trxStatus || '').trim();
+  const cancelYN = (r.cancelYN || '').toUpperCase();
+  const tid = r.tid;
+
+  if (!tid) {
+    // tid 없으면 KISPG 측 거래 없음
+    return { kind: 'UNKNOWN' };
+  }
+
+  if (trx === '취소' || cancelYN === 'Y') {
+    return {
+      kind: 'CANCELLED',
+      tid,
+      appNo: r.appNo,
+      payMethod: r.payMethod,
+      amt: r.amt,
+      appDtm: r.appDtm,
+      trxStatus: trx,
+      cancelYN,
+    };
+  }
+
+  if (trx === '입금대기') {
+    return {
+      kind: 'PENDING',
+      tid,
+      payMethod: r.payMethod,
+      amt: r.amt,
+      trxStatus: trx,
+    };
+  }
+
+  if (trx === '승인') {
+    return {
+      kind: 'CONFIRMED',
+      tid,
+      appNo: r.appNo,
+      payMethod: r.payMethod,
+      amt: r.amt,
+      appDtm: r.appDtm,
+      trxStatus: trx,
+      cancelYN,
+    };
+  }
+
+  // trxStatus 가 비어있는데 tid 가 있으면 — 신용카드 인증만 끝나고 승인 미완료 등
+  // appNo 가 있으면 승인 완료로 간주 (보수적 폴백)
+  if (r.appNo) {
+    return {
+      kind: 'CONFIRMED',
+      tid,
+      appNo: r.appNo,
+      payMethod: r.payMethod,
+      amt: r.amt,
+      appDtm: r.appDtm,
+      trxStatus: trx || 'UNKNOWN',
+      cancelYN,
+    };
+  }
+
+  return { kind: 'UNKNOWN' };
+}

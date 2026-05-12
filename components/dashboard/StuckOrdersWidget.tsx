@@ -69,6 +69,51 @@ export default function StuckOrdersWidget() {
     return () => clearInterval(interval)
   }, [])
 
+  const handleAutoInquire = async (order: StuckOrder) => {
+    const confirmed = window.confirm(
+      `[${order.orderNumber}] KISPG 거래조회 API 를 호출하여 자동 복구를 시도합니다.\n\n` +
+      `주문자: ${order.customerName || '비회원'}\n` +
+      `금액: ₩${order.total.toLocaleString()}\n\n` +
+      `결과:\n` +
+      `- 승인 확인 시 → CONFIRMED + 실제 TID 자동 저장\n` +
+      `- 취소 확인 시 → CANCELLED 자동 동기화\n` +
+      `- 입금대기/UNKNOWN → 변경 없음 (상태만 표시)\n\n` +
+      `진행하시겠습니까?`
+    )
+    if (!confirmed) return
+
+    setBusyOrderId(order.id)
+    setActionMsg(null)
+    try {
+      const res = await fetch('/api/admin/stuck-orders/inquire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ orderId: order.id }),
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (res.ok && data?.success) {
+        const kind = data?.classified?.kind || 'UNKNOWN'
+        if (kind === 'CONFIRMED') {
+          setActionMsg(`✅ ${order.orderNumber} KISPG 승인 확인 → CONFIRMED 자동 동기화 완료 (TID: ${data?.kispg?.tid || '-'})`)
+        } else if (kind === 'CANCELLED') {
+          setActionMsg(`✅ ${order.orderNumber} KISPG 취소 확인 → CANCELLED 자동 동기화 완료`)
+        } else if (kind === 'PENDING') {
+          setActionMsg(`⏳ ${order.orderNumber} KISPG 응답: 입금대기 (PENDING) — 사용자 입금 전, 변경 없음`)
+        } else {
+          setActionMsg(`❓ ${order.orderNumber} KISPG 응답: UNKNOWN — KISPG 콘솔 직접 확인 필요 (trxStatus: ${data?.classified?.trxStatus || '-'})`)
+        }
+        await load()
+      } else {
+        setActionMsg(`❌ ${order.orderNumber} 자동조회 실패: ${data?.error || res.status}`)
+      }
+    } catch (e: any) {
+      setActionMsg(`❌ ${order.orderNumber} 예외: ${e?.message || String(e)}`)
+    } finally {
+      setBusyOrderId(null)
+    }
+  }
+
   const handleManualResolve = async (order: StuckOrder) => {
     const tid = window.prompt(
       `[${order.orderNumber}] KISPG 콘솔에서 확인한 실제 TID 를 입력해주세요\n` +
@@ -251,6 +296,14 @@ export default function StuckOrdersWidget() {
                   KISPG 콘솔 열기 ↗
                 </a>
                 <button
+                  onClick={() => handleAutoInquire(o)}
+                  disabled={busyOrderId === o.id}
+                  className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  title="KISPG 거래조회 API 로 실제 상태 확인 후 자동 복구 (TID 자동 저장)"
+                >
+                  {busyOrderId === o.id ? '처리 중...' : '🔍 KISPG 자동조회'}
+                </button>
+                <button
                   onClick={() => handleManualResolve(o)}
                   disabled={busyOrderId === o.id}
                   className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -264,7 +317,8 @@ export default function StuckOrdersWidget() {
       </div>
 
       <p className="mt-4 text-xs text-red-600 font-medium">
-        ※ KISPG 콘솔에서 해당 주문번호로 TID 확인 → "TID 입력 → 복구" 버튼 클릭 → paymentKey 덮어쓰기 + CONFIRMED 처리.
+        ※ <b>🔍 KISPG 자동조회</b>: KISPG 거래조회 API 를 호출하여 실제 상태(승인/취소/입금대기)를 확인하고 자동 동기화 (TID 자동 저장). 1차 권장. <br/>
+        ※ <b>TID 입력 → 복구</b>: 자동조회가 실패한 경우, KISPG 콘솔에서 직접 확인한 TID 를 수동 입력하여 paymentKey 덮어쓰기 + CONFIRMED 처리.
       </p>
     </div>
   )
