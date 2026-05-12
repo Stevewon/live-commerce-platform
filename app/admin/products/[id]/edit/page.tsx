@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import ProductForm from '@/components/admin/ProductForm'
 
@@ -54,9 +55,9 @@ export default function EditProductPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <p className="text-red-600 text-lg">{error}</p>
-          <a href="/admin/products" className="mt-4 inline-block text-blue-600 hover:underline">
+          <Link href="/admin/products" className="mt-4 inline-block text-blue-600 hover:underline">
             상품 목록으로 돌아가기
-          </a>
+          </Link>
         </div>
       </div>
     )

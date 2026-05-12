@@ -2,207 +2,310 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getWishlist, removeFromWishlist, clearWishlist, type WishlistItem } from '@/lib/utils/wishlist';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import ShopNavigation from '@/components/ShopNavigation';
+
+interface ServerWishlistItem {
+  id: string;
+  productId: string;
+  createdAt: string;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    price: number;
+    comparePrice?: number | null;
+    thumbnail?: string | null;
+    images?: string | null;
+    category?: { name: string; slug: string } | null;
+  };
+}
 
 export default function WishlistPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const { t } = useLanguage();
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
+
+  const [items, setItems] = useState<ServerWishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // 찜 목록 로드
+  // 인증 게이트
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace('/login?redirect=/wishlist');
+    }
+  }, [user, authLoading, router]);
+
+  // 서버에서 위시리스트 로드
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
     loadWishlist();
-    
-    // wishlist 업데이트 이벤트 리스너
-    const handleWishlistUpdate = () => {
-      loadWishlist();
-    };
-    
-    window.addEventListener('wishlistUpdated', handleWishlistUpdate);
-    
-    return () => {
-      window.removeEventListener('wishlistUpdated', handleWishlistUpdate);
-    };
-  }, []);
+  }, [user, authLoading]);
 
-  const loadWishlist = () => {
+  const loadWishlist = async () => {
     setIsLoading(true);
-    const items = getWishlist();
-    setWishlistItems(items);
-    setIsLoading(false);
-  };
-
-  const handleRemove = (itemId: string) => {
-    removeFromWishlist(itemId);
-  };
-
-  const handleClearAll = () => {
-    if (confirm(t.common.delete + '?')) {
-      clearWishlist();
+    setError('');
+    try {
+      const res = await fetch('/api/wishlist', { credentials: 'include' });
+      if (!res.ok) {
+        setError('찜 목록을 불러오지 못했습니다.');
+        setItems([]);
+        return;
+      }
+      const data = await res.json();
+      setItems(data.data || []);
+    } catch (err) {
+      console.error('위시리스트 로드 실패:', err);
+      setError('네트워크 오류로 찜 목록을 불러오지 못했습니다.');
+      setItems([]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const discount = (item: WishlistItem) =>
-    item.comparePrice
-      ? Math.round(((item.comparePrice - item.price) / item.comparePrice) * 100)
-      : 0;
+  const handleRemove = async (productId: string) => {
+    // 낙관적 UI 업데이트
+    const prev = items;
+    setItems(items.filter((it) => it.productId !== productId));
+    try {
+      const res = await fetch(`/api/wishlist?productId=${encodeURIComponent(productId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        // 실패 시 롤백
+        setItems(prev);
+        alert('찜 목록에서 제거하지 못했습니다.');
+      } else {
+        // 다른 페이지(네비/뱃지)에서 동기화하도록 이벤트 발행
+        try {
+          window.dispatchEvent(new Event('wishlistUpdated'));
+        } catch {}
+      }
+    } catch (err) {
+      console.error('위시리스트 삭제 실패:', err);
+      setItems(prev);
+      alert('네트워크 오류로 제거에 실패했습니다.');
+    }
+  };
 
-  if (isLoading) {
+  const handleClearAll = async () => {
+    if (items.length === 0) return;
+    if (!confirm('찜 목록을 모두 삭제하시겠습니까?')) return;
+    // 병렬 삭제
+    const prev = items;
+    setItems([]);
+    try {
+      await Promise.all(
+        prev.map((it) =>
+          fetch(`/api/wishlist?productId=${encodeURIComponent(it.productId)}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          })
+        )
+      );
+      try {
+        window.dispatchEvent(new Event('wishlistUpdated'));
+      } catch {}
+    } catch (err) {
+      console.error('위시리스트 전체 삭제 실패:', err);
+      // 실패 시 다시 로드
+      loadWishlist();
+    }
+  };
+
+  const getThumbnail = (item: ServerWishlistItem): string => {
+    const p = item.product || ({} as any);
+    if (p.thumbnail) return p.thumbnail;
+    if (p.images) {
+      try {
+        const imgs = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+        if (Array.isArray(imgs) && imgs.length > 0) return imgs[0];
+      } catch {}
+    }
+    return '';
+  };
+
+  const getDiscount = (item: ServerWishlistItem): number => {
+    const p = item.product;
+    if (!p?.comparePrice || !p.price) return 0;
+    return Math.round(((p.comparePrice - p.price) / p.comparePrice) * 100);
+  };
+
+  // 인증 로딩 중 또는 미인증 → 로딩 스피너 (리다이렉트 진행 중)
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400 text-xl">로딩 중...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 text-base">로딩 중...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      {/* 헤더 - 모바일 최적화 */}
-      <header className="bg-gray-800/50 backdrop-blur-md border-b border-gray-700 sticky top-0 z-50">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/products" className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-              QRLIVE
-            </Link>
-            <div className="flex items-center gap-3 sm:gap-6">
-              <Link href="/products" className="hidden sm:block text-gray-300 hover:text-white transition text-sm">
-                {t.nav.home}
-              </Link>
-              <Link href="/products" className="text-gray-300 hover:text-white transition text-xs sm:text-sm">
-                🛍️ {t.nav.products}
-              </Link>
-              <Link href="/wishlist" className="text-pink-400 font-semibold text-xs sm:text-sm">
-                💖 {t.wishlist.title}
-              </Link>
-              <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
-                <span className="text-xl sm:text-2xl">🛒</span>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50 pb-16 md:pb-0">
+      <ShopNavigation />
 
-      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* 페이지 제목 - 모바일 최적화 */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-7xl">
+        {/* 페이지 제목 */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2">💖 {t.wishlist.title}</h1>
-            <p className="text-gray-400 text-base sm:text-lg">
-              총 <span className="text-pink-400 font-bold">{wishlistItems.length}</span>개의 상품
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+              💖 {t.wishlist.title}
+            </h1>
+            <p className="text-gray-500 text-sm sm:text-base lg:text-lg">
+              총 <span className="text-pink-600 font-bold">{items.length}</span>개의 상품
             </p>
           </div>
-          {wishlistItems.length > 0 && (
+          {items.length > 0 && (
             <button
               onClick={handleClearAll}
-              className="px-4 sm:px-6 py-2 sm:py-3 bg-red-600/20 border border-red-500 text-red-400 rounded-xl hover:bg-red-600/30 transition font-semibold text-sm sm:text-base self-end sm:self-auto"
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-50 hover:border-red-400 transition font-semibold text-sm sm:text-base self-end sm:self-auto"
             >
               {t.common.delete}
             </button>
           )}
         </div>
 
-        {/* 찜 목록이 비어있을 때 */}
-        {wishlistItems.length === 0 && (
-          <div className="text-center py-16 sm:py-24">
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* 로딩 */}
+        {isLoading ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-3"></div>
+            <p className="text-gray-500">로딩 중...</p>
+          </div>
+        ) : items.length === 0 ? (
+          /* 비어있을 때 */
+          <div className="bg-white rounded-2xl text-center py-16 sm:py-24 border border-gray-200">
             <div className="text-6xl sm:text-8xl mb-4 sm:mb-6">💔</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3 sm:mb-4">{t.wishlist.empty}</h2>
-            <p className="text-gray-400 text-base sm:text-lg mb-6 sm:mb-8">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">
+              {t.wishlist.empty}
+            </h2>
+            <p className="text-gray-500 text-sm sm:text-base mb-6 sm:mb-8 px-4">
               {t.wishlist.goShopping}
             </p>
             <Link
               href="/products"
-              className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-bold text-base sm:text-lg transition-all transform hover:scale-105 shadow-lg"
+              className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-bold text-base sm:text-lg transition-all shadow-lg"
             >
               {t.wishlist.goShopping} →
             </Link>
           </div>
-        )}
-
-        {/* 찜 목록 그리드 */}
-        {wishlistItems.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {wishlistItems.map((item) => (
-              <div
-                key={item.id}
-                className="group bg-gray-800/50 rounded-2xl overflow-hidden border border-gray-700 hover:border-pink-500 transition-all duration-300 relative"
-              >
-                {/* 삭제 버튼 */}
-                <button
-                  onClick={() => handleRemove(item.id)}
-                  className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-red-600/80 backdrop-blur-sm flex items-center justify-center hover:bg-red-600 transition-all transform hover:scale-110"
-                  title="찜 목록에서 제거"
-                >
-                  <span className="text-white text-xl">✕</span>
-                </button>
-
-                <Link href={`/products/${item.slug}`} className="block">
-                  <div className="relative aspect-square overflow-hidden bg-gray-700">
-                    <img
-                      src={item.thumbnail}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                    {discount(item) > 0 && (
-                      <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                        {discount(item)}% OFF
-                      </div>
-                    )}
-                    <div className="absolute bottom-3 left-3 right-3">
-                      <div className="bg-black/70 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-xs">
-                        {new Date(item.addedAt).toLocaleDateString('ko-KR', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })} 찜함
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 sm:p-5">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className="bg-pink-500/20 text-pink-400 text-xs px-2 py-1 rounded">
-                        {item.category}
-                      </span>
-                      <span className="text-pink-400 text-base sm:text-lg">💖</span>
-                    </div>
-
-                    <h3 className="text-white font-bold text-lg mb-3 group-hover:text-pink-400 transition-colors line-clamp-2">
-                      {item.name}
-                    </h3>
-
-                    <div className="flex items-baseline gap-2 mb-3">
-                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-pink-400">₩{item.price.toLocaleString()}</p>
-                      {item.comparePrice && (
-                        <p className="text-xs sm:text-sm text-gray-500 line-through">₩{item.comparePrice.toLocaleString()}</p>
-                      )}
-                    </div>
-
+        ) : (
+          <>
+            {/* 찜 목록 그리드 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+              {items.map((item) => {
+                const p = item.product;
+                if (!p) return null;
+                const thumb = getThumbnail(item);
+                const discount = getDiscount(item);
+                return (
+                  <div
+                    key={item.id}
+                    className="group bg-white rounded-2xl overflow-hidden border border-gray-200 hover:border-pink-500 hover:shadow-lg transition-all duration-300 relative"
+                  >
+                    {/* 삭제 버튼 */}
                     <button
-                      className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 text-white rounded-xl font-semibold transition-all transform hover:scale-105"
+                      onClick={() => handleRemove(item.productId)}
+                      className="absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm border border-gray-200 flex items-center justify-center hover:bg-red-50 hover:border-red-400 transition-all shadow-sm"
+                      title="찜 목록에서 제거"
+                      aria-label="찜 목록에서 제거"
                     >
-                      {t.products.buyNow} →
+                      <span className="text-red-500 text-lg">✕</span>
                     </button>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* 쇼핑 계속하기 버튼 */}
-        {wishlistItems.length > 0 && (
-          <div className="text-center mt-12">
-            <Link
-              href="/products"
-              className="inline-block px-8 py-4 bg-gray-800/50 border-2 border-gray-700 hover:border-pink-500 text-white rounded-xl font-bold text-lg transition-all transform hover:scale-105"
-            >
-              {t.cart.continueShopping} 🛍️
-            </Link>
-          </div>
+                    <Link href={`/products/${p.slug}`} className="block">
+                      <div className="relative aspect-square overflow-hidden bg-gray-100">
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt={p.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement!.innerHTML =
+                                '<div class="w-full h-full flex items-center justify-center text-5xl">📦</div>';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-5xl">
+                            📦
+                          </div>
+                        )}
+                        {discount > 0 && (
+                          <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs sm:text-sm font-bold">
+                            {discount}% OFF
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-4 sm:p-5">
+                        {p.category?.name && (
+                          <div className="mb-2">
+                            <span className="bg-pink-50 text-pink-600 text-xs px-2 py-1 rounded">
+                              {p.category.name}
+                            </span>
+                          </div>
+                        )}
+
+                        <h3 className="text-gray-900 font-bold text-base sm:text-lg mb-2 sm:mb-3 group-hover:text-pink-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3.5rem]">
+                          {p.name}
+                        </h3>
+
+                        <div className="flex items-baseline gap-2 mb-3">
+                          <p className="text-lg sm:text-xl lg:text-2xl font-bold text-pink-600">
+                            ₩{p.price.toLocaleString()}
+                          </p>
+                          {p.comparePrice && p.comparePrice > p.price && (
+                            <p className="text-xs sm:text-sm text-gray-400 line-through">
+                              ₩{p.comparePrice.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-[11px] text-gray-400 mb-3">
+                          {new Date(item.createdAt).toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}{' '}
+                          찜함
+                        </div>
+
+                        <div className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-pink-500 to-purple-500 group-hover:from-pink-600 group-hover:to-purple-600 text-white rounded-xl font-semibold transition-all text-center text-sm sm:text-base">
+                          상품 보기 →
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 쇼핑 계속하기 버튼 */}
+            <div className="text-center mt-10 sm:mt-12">
+              <Link
+                href="/products"
+                className="inline-block px-6 sm:px-8 py-3 sm:py-4 bg-white border-2 border-gray-200 hover:border-pink-500 hover:shadow-md text-gray-700 hover:text-pink-600 rounded-xl font-bold text-base sm:text-lg transition-all"
+              >
+                {t.cart.continueShopping} 🛍️
+              </Link>
+            </div>
+          </>
         )}
       </div>
     </div>

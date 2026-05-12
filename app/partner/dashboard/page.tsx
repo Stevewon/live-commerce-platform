@@ -321,12 +321,12 @@ export default function PartnerDashboardPage() {
             <h3 className="font-medium">주문 관리</h3>
           </Link>
           
-          <Link href="/partner/settlement" className="card hover:shadow-md transition-shadow text-center">
+          <Link href="/partner/settlements" className="card hover:shadow-md transition-shadow text-center">
             <div className="text-4xl mb-2">💰</div>
             <h3 className="font-medium">정산 내역</h3>
           </Link>
           
-          <Link href="/partner/live" className="card hover:shadow-md transition-shadow text-center">
+          <Link href="/partner/lives" className="card hover:shadow-md transition-shadow text-center">
             <div className="text-4xl mb-2">📺</div>
             <h3 className="font-medium">라이브 관리</h3>
           </Link>
