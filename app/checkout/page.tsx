@@ -372,9 +372,9 @@ export default function CheckoutPage() {
           <span className="text-6xl block mb-4">🛒</span>
           <h1 className="text-2xl font-bold mb-4">장바구니가 비어있습니다</h1>
           <p className="text-gray-600 mb-6">상품을 담고 주문해주세요</p>
-          <a href="/products" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition">
+          <Link href="/products" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition">
             쇼핑하러 가기
-          </a>
+          </Link>
         </div>
       </div>
     );

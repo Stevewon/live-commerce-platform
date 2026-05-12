@@ -241,8 +241,8 @@ function PaymentFailContent() {
         <div className="mt-6 text-center">
           <p className="text-gray-500 text-sm">
             문의사항이 있으신가요?{' '}
-            <Link href="/support" className="text-blue-600 hover:text-blue-700 font-medium">
-              고객센터
+            <Link href="/orders/lookup" className="text-blue-600 hover:text-blue-700 font-medium">
+              주문 조회
             </Link>
           </p>
         </div>
