@@ -153,8 +153,69 @@ async function handle(req: NextRequest) {
       return NextResponse.json({ success: true, data: result });
     }
 
+    if (mode === 'recover') {
+      // 옵션 A: KISPG 결제는 됐으나 우리 DB는 PENDING 상태인 주문 강제 복구
+      const orderId = searchParams.get('orderId') || '';
+      const tid = searchParams.get('tid') || '';
+      if (!orderId) {
+        return NextResponse.json(
+          { success: false, error: 'orderId required' },
+          { status: 400 }
+        );
+      }
+      // 1) 사전 조회
+      const before: any = await prisma.$queryRawUnsafe(
+        `SELECT id, orderNumber, status, paymentMethod, paymentKey, total
+         FROM "Order" WHERE id = ? LIMIT 1`,
+        orderId
+      );
+      const beforeRow = Array.isArray(before) ? before[0] : before;
+      if (!beforeRow) {
+        return NextResponse.json({ success: false, error: 'order not found' }, { status: 404 });
+      }
+      // 안전 가드 — 이미 결제 완료된 주문은 건드리지 않음
+      if (beforeRow.status === 'CONFIRMED' || beforeRow.status === 'SHIPPING' || beforeRow.status === 'DELIVERED') {
+        return NextResponse.json({
+          success: false,
+          error: `이미 ${beforeRow.status} 상태 — 복구 불필요`,
+          before: beforeRow,
+        });
+      }
+      // 2) 복구 실행
+      const finalTid = tid || `MANUAL-RECOVERY-${Date.now()}`;
+      const nowIso = new Date().toISOString();
+      const changes = await prisma.$executeRawUnsafe(
+        `UPDATE "Order"
+         SET "status" = 'CONFIRMED',
+             "paymentMethod" = '신용카드',
+             "paymentKey" = ?,
+             "paidAt" = ?,
+             "updatedAt" = ?
+         WHERE "id" = ?`,
+        finalTid, nowIso, nowIso, orderId
+      );
+      // 3) 사후 검증
+      const after: any = await prisma.$queryRawUnsafe(
+        `SELECT id, orderNumber, status, paymentMethod, paymentKey, paidAt, total
+         FROM "Order" WHERE id = ? LIMIT 1`,
+        orderId
+      );
+      const afterRow = Array.isArray(after) ? after[0] : after;
+      return NextResponse.json({
+        success: changes > 0,
+        changes,
+        before: beforeRow,
+        after: afterRow,
+        usedTid: finalTid,
+        tidIsManual: !tid,
+        message: changes > 0
+          ? `복구 완료. 사용자 화면 결제완료로 정상화. TID=${finalTid}${!tid ? ' (임시 마커)' : ''}`
+          : '복구 실패',
+      });
+    }
+
     return NextResponse.json(
-      { success: false, error: 'unknown mode', validModes: ['check', 'reset', 'create', 'diag'] },
+      { success: false, error: 'unknown mode', validModes: ['check', 'reset', 'create', 'diag', 'recover'] },
       { status: 400 }
     );
   } catch (err: any) {
