@@ -40,9 +40,15 @@ export async function GET(request: NextRequest) {
     const ENTRY_MARKERS = ['결제대기', '결제창진입', '신용카드'];
     const placeholders = ENTRY_MARKERS.map(() => '?').join(',');
 
+    // ⚠️ Order 테이블 실제 컬럼:
+    //  - 회원: userId → User relation (name/email)
+    //  - 비회원: guestEmail, guestPhone
+    //  - 공통: shippingName, shippingPhone (배송지 = 사실상 주문자)
+    // → shippingName/shippingPhone 을 주 노출 필드로 사용 (회원/비회원 공통 보장)
+    // → 보조로 guestEmail, userId 노출 (User name lookup 은 별도 단계)
     const sql = `
       SELECT id, orderNumber, status, paymentMethod, paymentKey, total,
-             customerName, customerPhone, customerEmail, userId, createdAt
+             shippingName, shippingPhone, guestEmail, guestPhone, userId, createdAt
       FROM "Order"
       WHERE status = 'PENDING'
         AND paymentMethod IN (${placeholders})
@@ -59,19 +65,44 @@ export async function GET(request: NextRequest) {
       upperIso
     )) as any[];
 
+    // 회원 주문자명 추가 lookup (userId IN (...) 한 번에 조회)
+    const userIds = Array.from(
+      new Set(rows.map((r) => r.userId).filter((u): u is string => !!u))
+    );
+    const userMap = new Map<string, { name: string | null; email: string | null }>();
+    if (userIds.length > 0) {
+      try {
+        const userPlaceholders = userIds.map(() => '?').join(',');
+        const userRows = (await prisma.$queryRawUnsafe(
+          `SELECT id, name, email FROM "User" WHERE id IN (${userPlaceholders})`,
+          ...userIds
+        )) as any[];
+        for (const u of userRows) {
+          userMap.set(u.id, { name: u.name || null, email: u.email || null });
+        }
+      } catch (e: any) {
+        console.warn('[admin/stuck-orders] user lookup 실패(무시):', e?.message || e);
+      }
+    }
+
     const items = rows.map((o) => {
       const createdMs = typeof o.createdAt === 'string'
         ? Date.parse(o.createdAt)
         : (o.createdAt instanceof Date ? o.createdAt.getTime() : 0);
       const ageMinutes = createdMs > 0 ? Math.floor((now - createdMs) / 60000) : null;
+      const userInfo = o.userId ? userMap.get(o.userId) : null;
+      // 표시용 주문자: 회원이면 User.name, 비회원이면 shippingName
+      const displayName = userInfo?.name || o.shippingName || null;
+      const displayPhone = o.shippingPhone || o.guestPhone || null;
+      const displayEmail = userInfo?.email || o.guestEmail || null;
       return {
         id: o.id,
         orderNumber: o.orderNumber,
         paymentMethod: o.paymentMethod || null,
         total: Number(o.total) || 0,
-        customerName: o.customerName || null,
-        customerPhone: o.customerPhone || null,
-        customerEmail: o.customerEmail || null,
+        customerName: displayName,
+        customerPhone: displayPhone,
+        customerEmail: displayEmail,
         userId: o.userId || null,
         isGuest: !o.userId,
         createdAt: typeof o.createdAt === 'string' ? o.createdAt : new Date(createdMs).toISOString(),

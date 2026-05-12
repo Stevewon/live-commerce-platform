@@ -79,9 +79,10 @@ async function handleCron(req: NextRequest) {
     // - createdAt BETWEEN stuckLowerIso AND stuckUpperIso (30분 이전 ~ 5분 이전 사이)
     // - paymentKey IS NULL OR paymentKey = ''
     const placeholders = ENTRY_MARKERS.map(() => '?').join(',');
+    // ⚠️ Order 실제 컬럼: shippingName/shippingPhone(공통) + guestEmail/guestPhone(비회원) + userId
     const sql = `
       SELECT id, orderNumber, status, paymentMethod, paymentKey, total,
-             customerName, customerPhone, customerEmail, userId, createdAt
+             shippingName, shippingPhone, guestEmail, guestPhone, userId, createdAt
       FROM "Order"
       WHERE status = 'PENDING'
         AND paymentMethod IN (${placeholders})
@@ -108,6 +109,7 @@ async function handleCron(req: NextRequest) {
   const stuckCount = stuckOrders.length;
 
   // ─── 3) 결과 정형화 (어드민/알림 hook 에서 재사용 가능한 형태) ───
+  // 표시용 customerName/customerPhone 은 shippingName/shippingPhone(공통) 또는 guestPhone(비회원) 으로 도출
   const formatted = stuckOrders.map((o) => {
     const createdMs = typeof o.createdAt === 'string'
       ? Date.parse(o.createdAt)
@@ -118,8 +120,8 @@ async function handleCron(req: NextRequest) {
       orderNumber: o.orderNumber,
       paymentMethod: o.paymentMethod,
       total: Number(o.total) || 0,
-      customerName: o.customerName || null,
-      customerPhone: o.customerPhone || null,
+      customerName: o.shippingName || null,
+      customerPhone: o.shippingPhone || o.guestPhone || null,
       userId: o.userId || null,
       isGuest: !o.userId,
       createdAt: typeof o.createdAt === 'string' ? o.createdAt : new Date(createdMs).toISOString(),
