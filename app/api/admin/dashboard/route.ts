@@ -118,10 +118,14 @@ export async function GET(request: NextRequest) {
       partners,
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Admin Dashboard API error:', error)
     return NextResponse.json(
-      { error: '데이터를 불러오는 중 오류가 발생했습니다' },
+      {
+        error: '데이터를 불러오는 중 오류가 발생했습니다',
+        debugMessage: error?.message || String(error),
+        debugStack: (error?.stack || '').split('\n').slice(0, 5).join(' | '),
+      },
       { status: 500 }
     )
   }

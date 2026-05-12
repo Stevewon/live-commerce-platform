@@ -182,7 +182,11 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     console.error('차트 데이터 조회 오류:', error);
     return NextResponse.json(
-      { error: '차트 데이터를 불러올 수 없습니다' },
+      {
+        error: '차트 데이터를 불러올 수 없습니다',
+        debugMessage: error?.message || String(error),
+        debugStack: (error?.stack || '').split('\n').slice(0, 5).join(' | '),
+      },
       { status: 500 }
     );
   }

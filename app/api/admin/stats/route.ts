@@ -157,10 +157,15 @@ export async function GET(req: NextRequest) {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('관리자 통계 조회 실패:', error);
     return NextResponse.json(
-      { success: false, error: '통계 조회에 실패했습니다' },
+      {
+        success: false,
+        error: '통계 조회에 실패했습니다',
+        debugMessage: error?.message || String(error),
+        debugStack: (error?.stack || '').split('\n').slice(0, 5).join(' | '),
+      },
       { status: 500 }
     );
   }
