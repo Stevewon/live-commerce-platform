@@ -219,14 +219,60 @@ async function handleCron(req: NextRequest) {
         tid: classified.tid,
       });
     } else {
-      unknown++;
-      details.push({
-        orderNumber: order.orderNumber,
-        kind: 'UNKNOWN',
-        action: 'NO_CHANGE',
-        resultCd: inquireRes?.resultCd,
-        resultMsg: inquireRes?.resultMsg,
-      });
+      // UNKNOWN — KISPG 측에 거래 자체가 없음 (인증 전 이탈 / trxStatus 비어있음)
+      // 표준 쇼핑몰 SOP: 30분 이상 경과한 UNKNOWN 은 자동 CANCELLED 로 정리
+      //   → 양쪽 정합성 회복, 재고 hold 해제, 정산 집계 깨끗
+      //   → 사용자가 다시 결제 원하면 새 주문으로 진행 (같은 주문 재사용 X)
+      const THIRTY_MIN_MS = 30 * 60 * 1000;
+      const orderCreatedMs = new Date(order.createdAt).getTime();
+      const ageMs = Date.now() - orderCreatedMs;
+      const isOverThirtyMin = Number.isFinite(orderCreatedMs) && ageMs >= THIRTY_MIN_MS;
+
+      if (isOverThirtyMin && order.status !== 'CANCELLED') {
+        try {
+          const changes = await prisma.$executeRawUnsafe(
+            `UPDATE "Order"
+             SET status = ?, cancelledAt = ?, cancelReason = ?, updatedAt = ?
+             WHERE id = ?`,
+            'CANCELLED', nowIso, '결제 미완료 (KISPG 측 거래 없음, 자동 정리)', nowIso, order.id
+          );
+          resolved++;
+          console.log(
+            '[cron/auto-resolve-stuck-orders] ✅ UNKNOWN → 자동 CANCELLED (30분+ 경과):',
+            order.orderNumber, 'changes=', changes, 'ageMin=', Math.floor(ageMs / 60000)
+          );
+          details.push({
+            orderNumber: order.orderNumber,
+            kind: 'UNKNOWN',
+            action: 'AUTO_CANCELLED_30MIN',
+            ageMinutes: Math.floor(ageMs / 60000),
+            resultCd: inquireRes?.resultCd,
+            resultMsg: inquireRes?.resultMsg,
+          });
+        } catch (e: any) {
+          failed++;
+          console.error(
+            '[cron/auto-resolve-stuck-orders] UNKNOWN→CANCELLED UPDATE 실패:',
+            order.orderNumber, e?.message || e
+          );
+          details.push({
+            orderNumber: order.orderNumber,
+            kind: 'UNKNOWN',
+            action: 'AUTO_CANCEL_FAILED',
+            error: e?.message || String(e),
+          });
+        }
+      } else {
+        unknown++;
+        details.push({
+          orderNumber: order.orderNumber,
+          kind: 'UNKNOWN',
+          action: 'NO_CHANGE_UNDER_30MIN',
+          ageMinutes: Number.isFinite(orderCreatedMs) ? Math.floor(ageMs / 60000) : null,
+          resultCd: inquireRes?.resultCd,
+          resultMsg: inquireRes?.resultMsg,
+        });
+      }
     }
   }
 
