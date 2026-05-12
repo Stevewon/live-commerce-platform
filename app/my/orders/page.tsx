@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ReviewForm from '@/components/ReviewForm';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface OrderItem {
   id: string;
@@ -69,9 +70,7 @@ export default function OrdersPage() {
     setError('');
 
     try {
-      const response = await fetch('/api/orders', {
-        credentials: 'include'
-      });
+      const response = await authFetch('/api/orders');
 
       const data = await response.json();
 
@@ -107,12 +106,8 @@ export default function OrdersPage() {
     if (!confirm('정말로 이 주문을 취소하시겠습니까?')) return;
 
     try {
-      const response = await fetch(`/api/orders/${orderId}`, {
+      const response = await authFetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include',
         body: JSON.stringify({ status: 'CANCELLED' })
       });
 

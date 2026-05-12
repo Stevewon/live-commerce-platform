@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import {
@@ -60,7 +61,7 @@ export default function CartPage() {
     try {
       if (user) {
         // 회원: 서버 장바구니
-        const res = await fetch('/api/cart', { credentials: 'include' });
+        const res = await authFetch('/api/cart');
         if (res.ok) {
           const data = await res.json();
           const serverItems = (data.data || []).map((item: any) => ({
@@ -125,10 +126,8 @@ export default function CartPage() {
     setUpdatingId(item.id);
     try {
       if (user) {
-        const res = await fetch('/api/cart', {
+        const res = await authFetch('/api/cart', {
           method: 'PATCH',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ productId: item.productId, quantity: newQuantity }),
         });
         if (res.ok) {
@@ -153,9 +152,8 @@ export default function CartPage() {
     setUpdatingId(item.id);
     try {
       if (user) {
-        const res = await fetch(`/api/cart?productId=${item.productId}`, {
+        const res = await authFetch(`/api/cart?productId=${item.productId}`, {
           method: 'DELETE',
-          credentials: 'include',
         });
         if (res.ok) {
           setCartItems(prev => prev.filter(ci => ci.id !== item.id));
@@ -175,7 +173,7 @@ export default function CartPage() {
     if (!confirm(t.cart.clearCart + '?')) return;
     try {
       if (user) {
-        await fetch('/api/cart', { method: 'DELETE', credentials: 'include' });
+        await authFetch('/api/cart', { method: 'DELETE' });
       } else {
         clearGuestCart();
       }

@@ -4,6 +4,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface Stats {
   overview: {
@@ -49,7 +50,7 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/admin/stats', {
+      const response = await authFetch('/api/admin/stats', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

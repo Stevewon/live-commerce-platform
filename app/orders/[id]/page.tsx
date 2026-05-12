@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface OrderItem {
   id: string;
@@ -59,9 +60,7 @@ export default function OrderDetailPage() {
   const fetchOrder = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/orders/${params.id}`, {
-        credentials: 'include',
-      });
+      const response = await authFetch(`/api/orders/${params.id}`);
       
       if (response.status === 401) {
         router.push('/login');

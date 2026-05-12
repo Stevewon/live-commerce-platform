@@ -3,6 +3,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface Settlement {
   id: string
@@ -77,8 +78,7 @@ export default function AdminSettlementsPage() {
         params.append('status', statusFilter)
       }
 
-      const res = await fetch(`/api/admin/settlements?${params}`, {
-        credentials: 'include',
+      const res = await authFetch(`/api/admin/settlements?${params}`, {
       headers: {
         }
       })
@@ -96,8 +96,7 @@ export default function AdminSettlementsPage() {
 
   const handleViewDetail = async (settlement: Settlement) => {
     try {
-      const res = await fetch(`/api/admin/settlements/${settlement.id}`, {
-        credentials: 'include',
+      const res = await authFetch(`/api/admin/settlements/${settlement.id}`, {
       headers: {
         }
       })
@@ -117,9 +116,8 @@ export default function AdminSettlementsPage() {
     if (!confirm('이 정산을 승인하시겠습니까?')) return
 
     try {
-      const res = await fetch(`/api/admin/settlements/${id}`, {
+      const res = await authFetch(`/api/admin/settlements/${id}`, {
         method: 'PATCH',
-        credentials: 'include',
       headers: {
           'Content-Type': 'application/json'
         },
@@ -154,9 +152,8 @@ export default function AdminSettlementsPage() {
     }
 
     try {
-      const res = await fetch(`/api/admin/settlements/${selectedSettlement.id}`, {
+      const res = await authFetch(`/api/admin/settlements/${selectedSettlement.id}`, {
         method: 'PATCH',
-        credentials: 'include',
       headers: {
           'Content-Type': 'application/json'
         },

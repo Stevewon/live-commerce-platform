@@ -3,6 +3,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface Partner {
   id: string
@@ -64,8 +65,7 @@ export default function AdminPartnersPage() {
         limit: '20'
       })
 
-      const res = await fetch(`/api/admin/partners?${params}`, {
-        credentials: 'include',
+      const res = await authFetch(`/api/admin/partners?${params}`, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -88,9 +88,8 @@ export default function AdminPartnersPage() {
     if (!confirm(`파트너를 ${currentStatus ? '비활성화' : '활성화'}하시겠습니까?`)) return
 
     try {
-      const res = await fetch(`/api/admin/partners/${id}`, {
+      const res = await authFetch(`/api/admin/partners/${id}`, {
         method: 'PATCH',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -130,9 +129,8 @@ export default function AdminPartnersPage() {
     if (!selectedPartner) return
 
     try {
-      const res = await fetch(`/api/admin/partners/${selectedPartner.id}`, {
+      const res = await authFetch(`/api/admin/partners/${selectedPartner.id}`, {
         method: 'PATCH',
-        credentials: 'include',
       headers: {
           'Content-Type': 'application/json'
         },
@@ -157,9 +155,8 @@ export default function AdminPartnersPage() {
     if (!confirm('정말 이 파트너를 삭제하시겠습니까?\n(상품/주문이 있으면 비활성화만 됩니다)')) return
 
     try {
-      const res = await fetch(`/api/admin/partners/${id}`, {
+      const res = await authFetch(`/api/admin/partners/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
       headers: {
         }
       })

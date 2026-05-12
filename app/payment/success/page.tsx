@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { clearGuestCart } from '@/lib/utils/guestCart';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 function PaymentSuccessContent() {
   const router = useRouter();
@@ -22,13 +23,10 @@ function PaymentSuccessContent() {
   const appNo = searchParams.get('appNo');
 
   useEffect(() => {
-    // [2026-05-12 v1.0.15] 결제 대기 화면 폴링 마커 cleanup
-    //   PC 결제완료 도달 시 sessionStorage 마커 즉시 제거 → PaymentWaitingScreen 중복 발동 방지
+    // [2026-05-12 v1.0.16] /payment/waiting 폴링 마커 cleanup
+    //   결제 완료 도달 시 sessionStorage kispgFormData 정리 (잔류 방지)
     try {
-      sessionStorage.removeItem('pendingPaymentOrderId');
-      sessionStorage.removeItem('pendingPaymentOrderNumber');
-      sessionStorage.removeItem('pendingPaymentGuestToken');
-      sessionStorage.removeItem('pendingPaymentStartedAt');
+      sessionStorage.removeItem('kispgFormData');
     } catch {}
 
     if (!orderId) {
@@ -85,9 +83,8 @@ function PaymentSuccessContent() {
       if (guestToken) {
         clearGuestCart();
       } else {
-        await fetch('/api/cart', {
+        await authFetch('/api/cart', {
           method: 'DELETE',
-          credentials: 'include',
         }).catch(() => {});
       }
     } catch (error: any) {
@@ -112,10 +109,8 @@ function PaymentSuccessContent() {
     const attemptSync = async (attempt: number): Promise<boolean> => {
       try {
         setSyncStatus(attempt === 1 ? 'syncing' : 'retrying');
-        const res = await fetch('/api/payments/kispg/sync', {
+        const res = await authFetch('/api/payments/kispg/sync', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
           body: JSON.stringify(payload),
         });
 
@@ -161,8 +156,7 @@ function PaymentSuccessContent() {
         headers['x-guest-order-token'] = guestToken;
       }
 
-      const res = await fetch(`/api/orders/${orderId}`, {
-        credentials: 'include',
+      const res = await authFetch(`/api/orders/${orderId}`, {
         headers,
       });
       if (res.ok) {

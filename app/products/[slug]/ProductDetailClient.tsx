@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { authFetch } from '@/lib/auth/clientFetch';
 import { addToGuestCart } from '@/lib/utils/guestCart';
 import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
@@ -234,10 +235,8 @@ export default function ProductDetailClient() {
 
     try {
       if (user) {
-        const res = await fetch('/api/cart', {
+        const res = await authFetch('/api/cart', {
           method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             productId: product.id,
             variantId: selectedVariant?.id || null,

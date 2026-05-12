@@ -4,6 +4,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface UploadResult {
   row: number
@@ -40,8 +41,7 @@ export default function BulkInvoiceUploadPage() {
   const handleDownloadTemplate = async () => {
     setDownloadingTemplate(true)
     try {
-      const res = await fetch('/api/admin/orders/bulk/template', {
-        credentials: 'include',
+      const res = await authFetch('/api/admin/orders/bulk/template', {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => null)
@@ -100,9 +100,8 @@ export default function BulkInvoiceUploadPage() {
       const formData = new FormData()
       formData.append('file', selectedFile)
 
-      const res = await fetch('/api/admin/orders/bulk/upload', {
+      const res = await authFetch('/api/admin/orders/bulk/upload', {
         method: 'POST',
-        credentials: 'include',
         body: formData,
       })
 

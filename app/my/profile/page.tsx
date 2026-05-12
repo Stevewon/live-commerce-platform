@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 
 interface ProfileForm {
@@ -62,10 +63,8 @@ export default function ProfilePage() {
     setError('');
     setSuccess('');
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = await authFetch('/api/auth/me', {
         method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: editedProfile.name,
           email: editedProfile.email || null,

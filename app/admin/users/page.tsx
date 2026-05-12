@@ -3,8 +3,8 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-;
 import Link from 'next/link';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface User {
   id: string;
@@ -44,8 +44,7 @@ export default function AdminUsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/admin/users', {
-        credentials: 'include'
+      const response = await authFetch('/api/admin/users', {
       });
 
       if (response.ok) {
@@ -63,9 +62,8 @@ export default function AdminUsersPage() {
     if (!confirm('정말로 이 회원을 삭제하시겠습니까?')) return;
 
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const response = await authFetch(`/api/admin/users/${userId}`, {
         method: 'DELETE',
-        credentials: 'include'
       });
 
       if (response.ok) {
@@ -82,12 +80,11 @@ export default function AdminUsersPage() {
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const response = await authFetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({ role: newRole })
       });
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { authFetch } from '@/lib/auth/clientFetch';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import ShopNavigation from '@/components/ShopNavigation';
 
@@ -51,7 +52,7 @@ export default function WishlistPage() {
     setIsLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/wishlist', { credentials: 'include' });
+      const res = await authFetch('/api/wishlist');
       if (!res.ok) {
         setError('찜 목록을 불러오지 못했습니다.');
         setItems([]);
@@ -73,9 +74,8 @@ export default function WishlistPage() {
     const prev = items;
     setItems(items.filter((it) => it.productId !== productId));
     try {
-      const res = await fetch(`/api/wishlist?productId=${encodeURIComponent(productId)}`, {
+      const res = await authFetch(`/api/wishlist?productId=${encodeURIComponent(productId)}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
       if (!res.ok) {
         // 실패 시 롤백
@@ -103,9 +103,8 @@ export default function WishlistPage() {
     try {
       await Promise.all(
         prev.map((it) =>
-          fetch(`/api/wishlist?productId=${encodeURIComponent(it.productId)}`, {
+          authFetch(`/api/wishlist?productId=${encodeURIComponent(it.productId)}`, {
             method: 'DELETE',
-            credentials: 'include',
           })
         )
       );

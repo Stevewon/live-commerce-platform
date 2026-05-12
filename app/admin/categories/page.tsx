@@ -3,6 +3,7 @@ import { useAdminAuth } from '@/lib/hooks/useAdminAuth';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authFetch } from '@/lib/auth/clientFetch';
 
 interface Category {
   id: string;
@@ -29,7 +30,7 @@ export default function AdminCategoriesPage() {
   const fetchCategories = async () => {
     try {
       const token = localStorage.getItem('auth-token');
-      const res = await fetch('/api/categories', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await authFetch('/api/categories', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (data.success) setCategories(data.data || []);
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -42,7 +43,7 @@ export default function AdminCategoriesPage() {
     try {
       const token = localStorage.getItem('auth-token');
       const url = editId ? `/api/categories/${editId}` : '/api/categories';
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method: editId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ...form, slug }),
@@ -67,7 +68,7 @@ export default function AdminCategoriesPage() {
     if (!confirm('삭제하시겠습니까?')) return;
     try {
       const token = localStorage.getItem('auth-token');
-      await fetch(`/api/categories/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      await authFetch(`/api/categories/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
       fetchCategories();
     } catch (e) { console.error(e); }
   };

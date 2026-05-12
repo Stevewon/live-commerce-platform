@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
 import { useRouter } from 'next/navigation'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 // [2026-05-11 v2 PERF FIX] recharts 라이브러리 (419KB) 를 lazy-load
 // 대시보드 페이지 초기 로딩 시 차트 번들을 다운로드하지 않고,
@@ -97,22 +98,52 @@ export default function AdminDashboardPage() {
     }
   }, [user])
 
-  const loadDashboardData = async () => {
-    try {
-      const res = await fetch('/api/admin/dashboard', {
-        credentials: 'include'
-      })
+  // [v1.0.16 사고 #3] stale-while-revalidate 캐싱 — 30초 TTL sessionStorage
+  // 1) 캐시 hit + TTL 유효 → 즉시 표시 (체감 로딩 0ms) + 백그라운드 refresh
+  // 2) 캐시 hit + stale → stale 표시 + 백그라운드 refresh
+  // 3) 캐시 miss → 정상 fetch
+  const CACHE_KEY = 'admin-dashboard-cache-v1'
+  const CACHE_TTL_MS = 30000
 
+  const loadDashboardData = async () => {
+    // 1단계: 캐시 hydration (즉시 표시 → 체감 로딩 단축)
+    let hadCache = false
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = window.sessionStorage.getItem(CACHE_KEY)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (parsed?.data && Number.isFinite(parsed?.ts)) {
+            setStats(parsed.data.stats)
+            setRecentOrders(parsed.data.recentOrders || [])
+            setPartners(parsed.data.partners || [])
+            setLoading(false) // 캐시 표시 즉시 로딩 해제
+            hadCache = true
+          }
+        }
+      }
+    } catch {}
+
+    // 2단계: 백그라운드 fresh fetch
+    try {
+      const res = await authFetch('/api/admin/dashboard')
       if (!res.ok) throw new Error('데이터 로드 실패')
 
       const data = await res.json()
       setStats(data.stats)
       setRecentOrders(data.recentOrders)
       setPartners(data.partners)
+
+      // 캐시 저장
+      try {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
+        }
+      } catch {}
     } catch (err) {
       console.error('Dashboard data load error:', err)
     } finally {
-      setLoading(false)
+      if (!hadCache) setLoading(false)
     }
   }
 
