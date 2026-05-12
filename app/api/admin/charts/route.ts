@@ -136,11 +136,13 @@ export async function GET(req: NextRequest) {
         })
       : [];
 
+    // [NULL-SAFE] product.category 가 null/undefined 인 경우 안전 처리
+    // raw SQL 결과의 productId 가 D1 wrapper relation include 결과와 매칭 안 되는 경우 대비
     const categorySales: Record<string, { revenue: number; count: number }> = {};
-    categoryStats.forEach((stat) => {
-      const product = products.find((p) => p.id === stat.productId);
+    categoryStats.forEach((stat: any) => {
+      const product = products.find((p: any) => p.id === stat.productId);
       if (product) {
-        const catName = product.category.name;
+        const catName = product.category?.name || '미분류';
         const revenue = (stat._sum.price || 0) * (stat._sum.quantity || 0);
         if (!categorySales[catName]) {
           categorySales[catName] = { revenue: 0, count: 0 };
