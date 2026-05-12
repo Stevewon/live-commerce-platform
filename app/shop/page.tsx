@@ -367,6 +367,10 @@ export default function ShopPage() {
                   src={product.thumbnail}
                   alt={product.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-5xl">📦</div>';
+                  }}
                 />
                 {/* 찜하기 버튼 */}
                 <button

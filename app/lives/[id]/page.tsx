@@ -228,6 +228,10 @@ export default function LiveViewPage() {
                     src={live.partner.logo}
                     alt={live.partner.storeName}
                     className="w-12 h-12 rounded-full"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.parentElement!.innerHTML = '<div class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xl">🏪</div>';
+                    }}
                   />
                 )}
                 <div>
@@ -252,6 +256,10 @@ export default function LiveViewPage() {
                         src={product.thumbnail}
                         alt={product.name}
                         className="w-full aspect-square object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.innerHTML = '<div class="w-full aspect-square flex items-center justify-center text-4xl bg-gray-700">📦</div>';
+                        }}
                       />
                       <div className="p-3">
                         <p className="text-white text-sm font-medium line-clamp-2">

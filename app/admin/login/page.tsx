@@ -42,6 +42,7 @@ export default function AdminLoginPage() {
               src="/logos/qrlive-logo.png" 
               alt="QRLIVE Logo" 
               className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">

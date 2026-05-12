@@ -87,7 +87,15 @@ export default function MyReviewsPage() {
             <div key={review.id} className="bg-white border rounded-lg p-4 shadow-sm">
               <div className="flex items-start gap-4">
                 {review.product?.thumbnail && (
-                  <img src={review.product.thumbnail} alt={review.product.name} className="w-16 h-16 rounded object-cover" />
+                  <img
+                    src={review.product.thumbnail}
+                    alt={review.product.name}
+                    className="w-16 h-16 rounded object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.parentElement!.innerHTML = '<div class="w-16 h-16 rounded bg-gray-100 flex items-center justify-center text-2xl">📦</div>';
+                    }}
+                  />
                 )}
                 <div className="flex-1">
                   <Link href={`/products/${review.product?.slug}`} className="font-medium hover:text-blue-600">

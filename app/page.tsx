@@ -166,6 +166,9 @@ export default function HomePage() {
                 src="/logos/qrlive-logo.png" 
                 alt="QRLIVE Logo" 
                 className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
               />
               <span className="text-white text-lg sm:text-xl font-bold hidden xs:inline">QRLIVE</span>
             </Link>
@@ -381,6 +384,16 @@ export default function HomePage() {
                         src={platform.logo} 
                         alt={`${platform.name} 로고`}
                         className="max-h-8 sm:max-h-10 lg:max-h-14 max-w-full object-contain transform group-hover:scale-110 transition-transform duration-300"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent && !parent.querySelector('.img-fallback')) {
+                            const fallback = document.createElement('div');
+                            fallback.className = 'img-fallback text-3xl sm:text-4xl lg:text-5xl';
+                            fallback.textContent = '🔗';
+                            parent.appendChild(fallback);
+                          }
+                        }}
                       />
                     ) : (
                       <div className="text-3xl sm:text-4xl lg:text-5xl transform group-hover:scale-110 transition-transform">
@@ -580,6 +593,9 @@ export default function HomePage() {
                   src="/logos/qrlive-logo.png" 
                   alt="QRLIVE Logo" 
                   className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
                 <span className="text-white text-lg sm:text-xl font-bold">QRLIVE</span>
               </div>

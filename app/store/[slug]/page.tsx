@@ -123,7 +123,15 @@ export default function StorePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex items-center gap-6">
             {store.logo ? (
-              <img src={store.logo} alt={store.storeName} className="w-24 h-24 rounded-2xl object-cover border-4 border-white/30 shadow-xl" />
+              <img
+                src={store.logo}
+                alt={store.storeName}
+                className="w-24 h-24 rounded-2xl object-cover border-4 border-white/30 shadow-xl"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.parentElement!.innerHTML = '<div class="w-24 h-24 rounded-2xl bg-white/20 flex items-center justify-center text-4xl border-4 border-white/30 shadow-xl">🏪</div>';
+                }}
+              />
             ) : (
               <div className="w-24 h-24 rounded-2xl bg-white/20 flex items-center justify-center text-4xl border-4 border-white/30 shadow-xl">
                 🏪
@@ -202,6 +210,10 @@ export default function StorePage() {
                         src={product.thumbnail}
                         alt={product.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-4xl text-gray-300">📷</div>';
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-4xl text-gray-300">
