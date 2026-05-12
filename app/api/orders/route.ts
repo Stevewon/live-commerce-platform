@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
       shippingAddress,
       shippingZipCode,
       shippingMemo,
-      paymentMethod = 'CARD',
+      paymentMethod = '결제대기',
       shippingFee = 3000,
       couponCode,
       // 비회원 전용 필드
