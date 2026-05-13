@@ -32,6 +32,7 @@ interface Order {
   partner: {
     storeName: string;
   } | null;
+  // ★ [2026-05-13 v1.0.19 HOTFIX] items / product 옵셔널 처리 (D1 wrapper select 모드 누락 + 상품 삭제 케이스)
   items: {
     id: string;
     quantity: number;
@@ -39,8 +40,8 @@ interface Order {
     product: {
       name: string;
       price: number;
-    };
-  }[];
+    } | null;
+  }[] | null | undefined;
 }
 
 interface Pagination {
@@ -687,22 +688,33 @@ export default function AdminOrdersPage() {
                   주문 상품
                 </h4>
                 <div className="space-y-3">
-                  {selectedOrder.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="bg-white rounded-xl p-5 flex justify-between items-center border-2 border-purple-100 hover:border-purple-300 transition-all"
-                    >
-                      <div>
-                        <div className="font-black text-gray-900 text-lg">{item.product.name}</div>
-                        <div className="text-sm text-gray-600 font-bold mt-1">
-                          {formatCurrency(item.price)} × {item.quantity}개
+                  {/* ★ [2026-05-13 v1.0.19 HOTFIX] 증상 #4 (어드민 주문 클릭 오류) 방어 패치 ★
+                       1) selectedOrder.items 가 undefined/null 인 경우 빈 배열로 기본화
+                          → D1 wrapper 가 select 모드에서 관계 누락하는 사례 방어
+                       2) item.product 가 null 인 경우 (상품 삭제됨) name/price 옵셔널 체이닝
+                          → 과거 주문 중 상품이 삭제된 케이스에서 TypeError 차단 */}
+                  {(selectedOrder.items || []).length === 0 ? (
+                    <div className="bg-white rounded-xl p-5 text-center text-gray-500 font-bold">
+                      주문 상품 정보가 없습니다
+                    </div>
+                  ) : (
+                    (selectedOrder.items || []).map((item) => (
+                      <div
+                        key={item?.id || Math.random().toString(36)}
+                        className="bg-white rounded-xl p-5 flex justify-between items-center border-2 border-purple-100 hover:border-purple-300 transition-all"
+                      >
+                        <div>
+                          <div className="font-black text-gray-900 text-lg">{item?.product?.name || '상품 정보 없음'}</div>
+                          <div className="text-sm text-gray-600 font-bold mt-1">
+                            {formatCurrency(item?.price || 0)} × {item?.quantity || 0}개
+                          </div>
+                        </div>
+                        <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
+                          {formatCurrency((item?.price || 0) * (item?.quantity || 0))}
                         </div>
                       </div>
-                      <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">
-                        {formatCurrency(item.price * item.quantity)}
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 

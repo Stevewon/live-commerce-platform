@@ -149,9 +149,22 @@ export async function GET(req: NextRequest) {
     ]);
 
     // user.name 이 null 일 수 있으므로 nickname 대체
+    // ★ [2026-05-13 v1.0.19 HOTFIX] 증상 #4 (어드민 주문 클릭 오류) 백엔드 방어
+    //   D1 wrapper 가 select 모드에서 items 관계 누락하거나 product=null 인 케이스 정규화
+    //   → 클라이언트 selectedOrder.items.map(item.product.name) 접근 시 TypeError 차단
     for (const order of orders as any[]) {
       if (order.user) {
         order.user.name = order.user.name || order.user.nickname || '미설정';
+      }
+      // items 가 undefined/null 이면 빈 배열로 보장
+      if (!Array.isArray(order.items)) {
+        order.items = [];
+      }
+      // 각 item.product 가 null 인 경우 안전 fallback 객체 주입
+      for (const item of order.items) {
+        if (!item.product) {
+          item.product = { name: '상품 정보 없음', price: item.price || 0 };
+        }
       }
     }
 
