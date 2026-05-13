@@ -76,10 +76,42 @@ export async function GET(req: NextRequest) {
     }
 
     // 주문 목록 조회
+    // ★ [2026-05-13 v1.0.18 HOTFIX] 증상 2 (어드민 TID/결제일시 미표시) 추측 방어 패치 ★
+    //  1) D1 wrapper 가 일부 환경에서 include 만으로 paymentKey/paidAt/paymentMethod 누락하는 사례 제보
+    //     → 명시적 select 추가로 모든 컬럼 강제 반환 보장 (어드민 화면 표시용 필드 누락 0)
+    //  2) 응답 Cache-Control: no-store → 사장님 PC 브라우저/CDN 캐시 stale 차단
+    //     → 결제 직후 어드민 새로고침 시 즉시 최신 paymentKey/paidAt 노출 보장
+    //  ※ Prisma 의 select 와 include 는 동시 사용 가능하나 D1 wrapper 호환 위해 select 단독 사용
     const [orders, total] = await Promise.all([
       prisma.order.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          orderNumber: true,
+          total: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          // ★ 증상 2 핵심 필드 — 절대 누락 금지
+          paymentMethod: true,
+          paymentKey: true,
+          paidAt: true,
+          refundAmount: true,
+          refundedAt: true,
+          cancelledAt: true,
+          // 배송/연락처
+          shippingName: true,
+          shippingPhone: true,
+          shippingAddress: true,
+          trackingCompany: true,
+          trackingNumber: true,
+          // 비회원 정보
+          guestEmail: true,
+          guestPhone: true,
+          guestOrderToken: true,
+          // 관계 (회원/파트너/아이템)
+          userId: true,
+          partnerId: true,
           user: {
             select: {
               name: true,
@@ -93,7 +125,11 @@ export async function GET(req: NextRequest) {
             },
           },
           items: {
-            include: {
+            select: {
+              id: true,
+              quantity: true,
+              price: true,
+              productId: true,
               product: {
                 select: {
                   name: true,
@@ -119,15 +155,27 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      orders,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        orders,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    });
+      {
+        // ★ [2026-05-13 v1.0.18 HOTFIX] 사장님 PC 브라우저/CDN 캐시 stale 차단
+        //  - 어드민 주문목록은 결제 직후 즉시 최신 상태 표시 필요
+        //  - private = 브라우저 캐시 OK 이나 CDN 캐시 금지
+        //  - no-store = 어떤 캐시도 저장 금지
+        //  - max-age=0, must-revalidate = 매 요청 검증
+        headers: {
+          'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('Admin orders list error:', error);
     return NextResponse.json({ error: '주문 목록 조회 실패' }, { status: 500 });
