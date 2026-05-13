@@ -47,6 +47,13 @@ function PaymentSuccessContent() {
 
   useEffect(() => {
     // ★ [HOTFIX v1.0.17] useEffect 전체 try-catch — 어떤 throw 도 global error.tsx 로 전파 금지
+    // ★ [HOTFIX v1.0.18 2026-05-13] 증상 1 (PC 결제완료 메세지 안뜸) 추측 방어 패치:
+    //   - 기존: orderId 없으면 즉시 fatalError → "주문 정보가 없습니다" 안내 화면 노출
+    //   - 문제: KISPG return 핸들러가 일부 경로(이미 결제 완료 / 시스템 에러 후 재확인 / GET redirect)
+    //           에서 orderNumber/tid 는 정상 전달되나 orderId 가 누락되는 케이스 보고 가능성
+    //           → 사장님 입장에서는 "결제는 됐는데 완료 메세지 안 뜸"으로 인식
+    //   - 패치: orderId/tid/orderNumber 셋 다 없을 때만 fatalError, 하나라도 있으면 완료 화면 표시
+    //          (tid 또는 orderNumber 만 있어도 KISPG 결제 정상 완료로 판단)
     try {
       // sessionStorage cleanup (브라우저 환경 가드)
       if (typeof window !== 'undefined') {
@@ -55,24 +62,28 @@ function PaymentSuccessContent() {
         } catch {}
       }
 
-      if (!orderId) {
-        // orderId 없으면 fallback UI 표시 (alert/router.push 제거 → hydration 안전)
+      // ★ v1.0.18: fatalError 조건 완화 — orderId/tid/orderNumber 모두 없을 때만
+      if (!orderId && !tid && !orderNumber) {
         setFatalError('주문 정보가 없습니다');
         setIsLoading(false);
         return;
       }
 
-      // KISPG 결제: tid 또는 orderNumber 있으면 URL 파라미터 기반 즉시 표시
+      // KISPG 결제: tid 또는 orderNumber 있으면 URL 파라미터 기반 즉시 표시 (orderId 없어도 OK)
       if (tid || orderNumber) {
         handleKispgSuccess().catch((e) => {
           console.error('[Success] handleKispgSuccess unhandled:', e);
           setIsLoading(false);
         });
-      } else {
+      } else if (orderId) {
+        // orderId 만 있고 tid/orderNumber 없는 경우 → DB 직접 조회
         fetchOrderInfo().catch((e) => {
           console.error('[Success] fetchOrderInfo unhandled:', e);
           setIsLoading(false);
         });
+      } else {
+        // 도달 불가능한 분기 (위에서 모두 걸러짐) — 안전망
+        setIsLoading(false);
       }
     } catch (e) {
       console.error('[Success] useEffect 예외 차단:', e);
