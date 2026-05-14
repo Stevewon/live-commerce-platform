@@ -5,29 +5,31 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 /**
- * [2026-05-12 v1.0.16] 결제 대기 전용 페이지 — 폴링 아키텍처 재설계
+ * [2026-05-13 v1.0.20] PC iframe / 모바일 페이지이동 디바이스 분기 (KISPG 공식 가이드 준수)
  *
- * 배경 (v1.0.15 폴링 화면 실패 사고):
- *   - v1.0.15 에서 PaymentWaitingScreen 을 checkout 페이지에 마운트했으나,
- *     form.submit() 후 페이지 전체가 KISPG 결제창으로 전환되며 checkout DOM 통째로 unmount
- *     → PaymentWaitingScreen 영구 사라짐 → 사장님 PC 결제완료 미표시 사고 재발
+ * 사고 배경 (증상 #3 — 사장님 PC 결제창 "확인" 무반응 사고):
+ *   - v1.0.16~v1.0.19 까지 PC/모바일 모두 form.target='_self' 페이지 이동 방식 사용
+ *   - KIS정보통신 PG운영실 공식 회신 (2026-05-13):
+ *     "PC: iframe 방식 / 모바일: 페이지 이동 방식" — 우리는 PC 도 모바일 방식으로 진행함
+ *   - 결과: PC 결제 다이얼로그 "확인" 버튼 클릭 시 postMessage 수신자 없음 → 무반응
  *
- * 해결 (v1.0.16):
- *   - 결제 시작 → /payment/waiting 페이지로 먼저 이동 → KISPG form 자동 submit
- *   - KISPG 결제창에서 returnUrl 정상이면: /payment/success 또는 /payment/fail 로 이동
- *   - KISPG 결제창에서 returnUrl 안 와도: /payment/waiting 페이지는 그대로 유지
- *     (PC 브라우저는 결제창 완료 후 자체 페이지가 살아있음)
- *   - 5초 간격 폴링 → 5회(25초) 이후 escalate=1 → KISPG /v2/order 자동 호출
- *   - 5분(60회) 타임아웃 → 주문내역 안내
+ * 해결 (v1.0.20 — KISPG 공식 paySample.jsp 구조 준수):
+ *   1) 디바이스 판별: User-Agent 모바일 키워드 OR viewport width < 768px → 모바일 모드
+ *   2) PC 모드:
+ *      - mask + window + iframe(name="pay_frame") DOM 생성
+ *      - form.target = 'pay_frame' 로 KISPG /v2/auth 호출
+ *      - window.addEventListener('message', returnData) 로 KISPG 인증결과 수신
+ *      - resultCode '0000' → 동적 form 생성 → returnUrl 로 POST submit (페이지 이동)
+ *      - resultCode 'XXXX' 또는 사용자 취소 → mask/iframe hide
+ *   3) 모바일 모드 (기존 v1.0.16 유지):
+ *      - form.target = '_self' 페이지 이동 방식
  *
- * 모바일 영향 0건:
- *   - 모바일은 KISPG returnUrl 정상 → success/fail 로 즉시 이동 → waiting 페이지 unmount
- *   - 폴링은 PC 브라우저에서 결제창 닫힌 후 살아있는 시점에만 동작
+ * 폴링/타임아웃 로직은 v1.0.16 그대로 유지 (5초 간격, 5분 타임아웃, escalate=1)
  *
  * URL 파라미터:
  *   - orderId (필수): 결제 대기 중인 주문 ID
  *   - orderNumber (선택): 표시용 주문번호
- *   - guestToken (선택): 비회원 주문 토큰 (success 페이지로 redirect 시 전달)
+ *   - guestToken (선택): 비회원 주문 토큰
  *   - autoSubmit (선택): 'kispg' 이면 sessionStorage.kispgFormData 로 form 자동 submit
  */
 
@@ -53,7 +55,11 @@ function PaymentWaitingContent() {
   const stoppedRef = useRef(false);
   const submittedRef = useRef(false);
 
-  // KISPG form 자동 submit (autoSubmit=kispg)
+  // ★ [2026-05-13 v1.0.20] PC iframe 모달 표시 상태
+  const [showPcModal, setShowPcModal] = useState(false);
+  const [isPcMode, setIsPcMode] = useState(false);
+
+  // KISPG form 자동 submit (autoSubmit=kispg) — PC/모바일 분기
   useEffect(() => {
     if (autoSubmit !== 'kispg' || submittedRef.current) return;
     submittedRef.current = true;
@@ -70,12 +76,32 @@ function PaymentWaitingContent() {
         return;
       }
 
+      // ★ [v1.0.20] 디바이스 판별 — KISPG 공식 가이드 준수
+      //   - User-Agent 모바일 키워드 OR viewport width < 768px → 모바일 모드
+      //   - 그 외 → PC 모드 (iframe 방식)
+      const ua = navigator.userAgent || '';
+      const isMobileUA = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|Windows Phone|Opera Mini|IEMobile/i.test(ua);
+      const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 768;
+      const isMobile = isMobileUA || isSmallScreen;
+      const pcMode = !isMobile;
+      setIsPcMode(pcMode);
+
+      console.log('[PaymentWaiting v1.0.20] 디바이스 판별:', {
+        ua: ua.substring(0, 80),
+        isMobileUA,
+        isSmallScreen,
+        viewportWidth: typeof window !== 'undefined' ? window.innerWidth : -1,
+        finalMode: pcMode ? 'PC(iframe)' : 'MOBILE(self)',
+      });
+
       const form = document.createElement('form');
       form.method = 'POST';
       form.action = payload.authUrl;
       form.acceptCharset = 'utf-8';
       form.style.display = 'none';
-      form.target = '_self';
+
+      // ★ [v1.0.20 핵심] PC는 iframe 이름으로 target 지정 / 모바일은 _self
+      form.target = pcMode ? 'kispg_pay_frame' : '_self';
 
       Object.entries(payload.formData).forEach(([key, value]) => {
         const input = document.createElement('input');
@@ -92,18 +118,96 @@ function PaymentWaitingContent() {
         sessionStorage.removeItem('kispgFormData');
       } catch {}
 
-      // 약간의 딜레이 후 submit (모바일 form submit 지연 방지)
-      setTimeout(() => {
-        try {
-          form.submit();
-        } catch (e) {
-          console.error('[PaymentWaiting] form.submit() 실패:', e);
-        }
-      }, 100);
+      // PC 모드: iframe 모달 표시 후 submit
+      // 모바일 모드: 즉시 페이지 이동 submit
+      if (pcMode) {
+        setShowPcModal(true);
+        // iframe DOM 마운트 후 submit (React 렌더 사이클 대기)
+        setTimeout(() => {
+          try {
+            form.submit();
+          } catch (e) {
+            console.error('[PaymentWaiting] PC iframe form.submit() 실패:', e);
+          }
+        }, 200);
+      } else {
+        // 모바일: 기존 100ms 딜레이 후 페이지 이동
+        setTimeout(() => {
+          try {
+            form.submit();
+          } catch (e) {
+            console.error('[PaymentWaiting] 모바일 form.submit() 실패:', e);
+          }
+        }, 100);
+      }
     } catch (e) {
       console.error('[PaymentWaiting] 자동 submit 처리 실패:', e);
     }
   }, [autoSubmit]);
+
+  // ★ [2026-05-13 v1.0.20] KISPG postMessage 리스너 (PC iframe 결제창 ↔ 부모창 통신)
+  //   KISPG 공식 paySample.jsp 의 returnData 함수 구조 그대로 준수
+  //   - resultCode '0000' → 동적 form 생성하여 returnUrl 로 POST submit (페이지 이동)
+  //   - resultCode 'XXXX' → 인증 실패 alert 후 iframe 닫기
+  //   - 빈 객체/취소 → iframe 닫기 (사용자 X 클릭)
+  useEffect(() => {
+    if (!isPcMode) return;
+
+    const returnData = (e: MessageEvent) => {
+      try {
+        if (!e?.data) return;
+        const data: any = e.data;
+        console.log('[PaymentWaiting v1.0.20] KISPG postMessage 수신:', JSON.stringify(data));
+
+        // resultCode 있는 경우만 처리 (KISPG 공식 스펙)
+        if (data && typeof data === 'object' && data.resultCode !== undefined) {
+          if (data.resultCode === '0000' && data.data) {
+            // 인증 성공 → returnUrl 로 POST submit
+            const raw = sessionStorage.getItem('kispgFormDataReturnUrl');
+            // payload 에서 returnUrl 추출 못한 경우 우리 기본 return 경로 사용
+            let returnUrl = raw || `${window.location.origin}/api/payments/kispg/return`;
+            // 동적 form 생성 (KISPG 공식 receive_result 구조)
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = returnUrl;
+            form.acceptCharset = 'utf-8';
+            form.style.display = 'none';
+            form.target = '_self';
+            Object.entries(data.data).forEach(([key, value]) => {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = String(value);
+              form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            setShowPcModal(false);
+            form.submit();
+          } else {
+            // 인증 실패 — 사용자에게 알림 + iframe 닫기
+            const resData: any = data.data || {};
+            const resultCd = resData.resultCd || data.resultCode || '';
+            const resultMsg = resData.resultMsg || '결제가 취소되었거나 실패했습니다';
+            console.warn('[PaymentWaiting v1.0.20] KISPG 인증 실패:', resultCd, resultMsg);
+            setShowPcModal(false);
+            // 실패 alert 는 다음 tick 에 (모달 닫힘 후)
+            setTimeout(() => {
+              try {
+                alert(`[${resultCd}] ${resultMsg}`);
+              } catch {}
+            }, 100);
+          }
+        }
+      } catch (err) {
+        console.error('[PaymentWaiting v1.0.20] postMessage 처리 실패:', err);
+      }
+    };
+
+    window.addEventListener('message', returnData, false);
+    return () => {
+      window.removeEventListener('message', returnData, false);
+    };
+  }, [isPcMode]);
 
   const stopPolling = useCallback(() => {
     stoppedRef.current = true;
@@ -309,6 +413,54 @@ function PaymentWaitingContent() {
         )}
       </div>
       <style>{`@keyframes qrlive-spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* ★ [2026-05-13 v1.0.20] PC iframe 결제창 모달 — KISPG 공식 paySample.jsp 구조 준수
+            - PC 디바이스 + autoSubmit=kispg 일 때만 표시
+            - mask (검은 반투명 배경) + window (전체 화면) + iframe(name="kispg_pay_frame")
+            - form.target = 'kispg_pay_frame' 으로 KISPG /v2/auth 호출
+            - KISPG → parent.postMessage 로 인증결과 회신 → useEffect 의 returnData 리스너가 처리 */}
+      {isPcMode && showPcModal && (
+        <>
+          <div
+            style={{
+              position: 'fixed',
+              zIndex: 9000,
+              backgroundColor: '#000',
+              opacity: 0.6,
+              left: 0,
+              top: 0,
+              width: '100%',
+              height: '100%',
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              zIndex: 10000,
+            }}
+          >
+            <iframe
+              id="kispg_pay_frame"
+              name="kispg_pay_frame"
+              src="about:blank"
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                background: 'white',
+              }}
+              marginWidth={0}
+              marginHeight={0}
+              frameBorder={0}
+              scrolling="no"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
