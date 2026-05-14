@@ -590,9 +590,45 @@ export async function GET(req: NextRequest) {
       prisma.order.count({ where: { userId } })
     ]);
 
+    // ★ [v1.0.21 HOTFIX] D1 select 모드 nested relation null-safety 정규화
+    // /my-orders 페이지 진입 시 item.product null → TypeError → 전역 error boundary 발동 방지
+    for (const order of orders as any[]) {
+      if (!Array.isArray(order.items)) {
+        order.items = [];
+      }
+      for (const item of order.items) {
+        if (!item.product) {
+          item.product = {
+            id: item.productId || '',
+            name: '상품 정보 없음',
+            slug: '',
+            thumbnail: '',
+            category: { name: '' }
+          };
+        } else {
+          item.product.name = item.product.name || '상품 정보 없음';
+          item.product.slug = item.product.slug || '';
+          item.product.thumbnail = item.product.thumbnail || '';
+          if (!item.product.category) {
+            item.product.category = { name: '' };
+          }
+        }
+      }
+      // 숫자 필드 null 방어
+      order.total = order.total ?? 0;
+      order.subtotal = order.subtotal ?? 0;
+      order.shippingFee = order.shippingFee ?? 0;
+      order.discount = order.discount ?? 0;
+      // 문자열 필드 null 방어 (frontend가 .toLocaleString / .toUpperCase 등 호출)
+      order.status = order.status || 'PENDING';
+      order.orderNumber = order.orderNumber || '';
+      order.createdAt = order.createdAt || new Date().toISOString();
+    }
+
     return NextResponse.json({
       success: true,
       data: orders,
+      orders, // 일부 클라이언트 코드가 data.orders 로 접근 — 호환 키 추가
       pagination: {
         total,
         page,

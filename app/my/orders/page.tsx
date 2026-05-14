@@ -401,7 +401,7 @@ export default function OrdersPage() {
                     <div className="text-right">
                       <div className="text-sm text-gray-400 mb-1">총 결제금액</div>
                       <div className="text-2xl font-bold text-blue-400">
-                        ₩{order.total.toLocaleString()}
+                        ₩{(Number(order.total) || 0).toLocaleString()}
                       </div>
                     </div>
                   </div>
