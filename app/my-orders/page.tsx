@@ -17,7 +17,7 @@ interface OrderItem {
     name: string;
     thumbnail: string;
     slug: string;
-  };
+  } | null;
 }
 
 interface Order {
@@ -31,7 +31,7 @@ interface Order {
   createdAt: string;
   trackingCompany: string | null;
   trackingNumber: string | null;
-  items: OrderItem[];
+  items: OrderItem[] | null | undefined;
 }
 
 export default function MyOrdersPage() {
@@ -54,8 +54,23 @@ export default function MyOrdersPage() {
     try {
       const res = await authFetch('/api/orders');
       if (res.ok) {
-        const data = await res.json();
-        setOrders(data.orders || data.data || []);
+        const data = await res.json().catch(() => null);
+        const list = (data?.orders || data?.data || []) as any[];
+        // ★ [v1.0.21 HOTFIX] 프론트 2차 방어 — 백엔드 정규화 누락 대비
+        const normalized: Order[] = (Array.isArray(list) ? list : []).map((o: any) => ({
+          id: o?.id || '',
+          orderNumber: o?.orderNumber || '',
+          status: o?.status || 'PENDING',
+          subtotal: Number(o?.subtotal) || 0,
+          shippingFee: Number(o?.shippingFee) || 0,
+          discount: Number(o?.discount) || 0,
+          total: Number(o?.total) || 0,
+          createdAt: o?.createdAt || new Date().toISOString(),
+          trackingCompany: o?.trackingCompany ?? null,
+          trackingNumber: o?.trackingNumber ?? null,
+          items: Array.isArray(o?.items) ? o.items : [],
+        }));
+        setOrders(normalized);
       }
     } catch (err) {
       console.error('주문 목록 조회 실패:', err);
@@ -84,7 +99,7 @@ export default function MyOrdersPage() {
 
   const filteredOrders = statusFilter === 'ALL'
     ? orders
-    : orders.filter(o => o.status === statusFilter);
+    : orders.filter(o => (o.status || '') === statusFilter);
 
   const statusTabs = [
     { value: 'ALL', label: '전체' },
@@ -128,7 +143,7 @@ export default function MyOrdersPage() {
               {tab.label}
               {tab.value !== 'ALL' && (
                 <span className="ml-1 text-xs opacity-70">
-                  ({orders.filter(o => tab.value === 'CANCELLED' ? (o.status === 'CANCELLED' || o.status === 'REFUNDED') : o.status === tab.value).length})
+                  ({orders.filter(o => tab.value === 'CANCELLED' ? ((o.status || '') === 'CANCELLED' || (o.status || '') === 'REFUNDED') : (o.status || '') === tab.value).length})
                 </span>
               )}
             </button>
@@ -150,17 +165,26 @@ export default function MyOrdersPage() {
             {filteredOrders.map(order => {
               const statusInfo = ORDER_STATUS_MAP[order.status] || ORDER_STATUS_MAP.PENDING;
               const canCancel = order.status === 'PENDING' || order.status === 'CONFIRMED';
+              const safeItems = Array.isArray(order.items) ? order.items : [];
+              const safeCreatedAt = (() => {
+                try {
+                  const d = new Date(order.createdAt);
+                  return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('ko-KR');
+                } catch {
+                  return '-';
+                }
+              })();
 
               return (
-                <div key={order.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div key={order.id || Math.random().toString(36)} className="bg-white rounded-xl shadow-sm overflow-hidden">
                   {/* Order header */}
                   <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-gray-50 border-b">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-gray-500">
-                        {new Date(order.createdAt).toLocaleDateString('ko-KR')}
+                        {safeCreatedAt}
                       </span>
                       <span className="text-xs text-gray-400">|</span>
-                      <span className="text-sm font-mono text-gray-500">{order.orderNumber}</span>
+                      <span className="text-sm font-mono text-gray-500">{order.orderNumber || '-'}</span>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusInfo.color} ${statusInfo.bgColor}`}>
                       {statusInfo.label}
@@ -169,27 +193,47 @@ export default function MyOrdersPage() {
 
                   {/* Order items */}
                   <div className="px-4 sm:px-6 py-4">
-                    {order.items.map(item => (
-                      <div key={item.id} className="flex gap-4 py-2">
-                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                          <img
-                            src={item.product.thumbnail}
-                            alt={item.product.name}
-                            className="w-full h-full object-cover"
-                            onError={e => {
-                              e.currentTarget.style.display = 'none';
-                              e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">📦</div>';
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <Link href={`/products/${item.product.slug}`} className="text-sm font-medium text-gray-900 hover:text-blue-600 line-clamp-1">
-                            {item.product.name}
-                          </Link>
-                          <p className="text-sm text-gray-500">₩{item.price.toLocaleString()} x {item.quantity}개</p>
-                        </div>
-                      </div>
-                    ))}
+                    {safeItems.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-gray-500">주문 상품 정보가 없습니다</div>
+                    ) : (
+                      safeItems.map(item => {
+                        const product = item?.product || null;
+                        const productName = product?.name || '상품 정보 없음';
+                        const productSlug = product?.slug || '';
+                        const productThumb = product?.thumbnail || '';
+                        const itemPrice = Number(item?.price) || 0;
+                        const itemQty = Number(item?.quantity) || 0;
+                        return (
+                          <div key={item?.id || Math.random().toString(36)} className="flex gap-4 py-2">
+                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                              {productThumb ? (
+                                <img
+                                  src={productThumb}
+                                  alt={productName}
+                                  className="w-full h-full object-cover"
+                                  onError={e => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-2xl">📦</div>';
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              {productSlug ? (
+                                <Link href={`/products/${productSlug}`} className="text-sm font-medium text-gray-900 hover:text-blue-600 line-clamp-1">
+                                  {productName}
+                                </Link>
+                              ) : (
+                                <span className="text-sm font-medium text-gray-900 line-clamp-1">{productName}</span>
+                              )}
+                              <p className="text-sm text-gray-500">₩{itemPrice.toLocaleString()} x {itemQty}개</p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
 
                   {/* Tracking info */}
@@ -217,7 +261,7 @@ export default function MyOrdersPage() {
                   <div className="px-4 sm:px-6 py-3 border-t flex items-center justify-between">
                     <div>
                       <span className="text-sm text-gray-500">총 결제금액</span>
-                      <span className="ml-2 text-lg font-bold text-gray-900">₩{order.total.toLocaleString()}</span>
+                      <span className="ml-2 text-lg font-bold text-gray-900">₩{(Number(order.total) || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex gap-2">
                       <Link

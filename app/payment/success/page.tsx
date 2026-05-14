@@ -175,6 +175,10 @@ function PaymentSuccessContent() {
     const MAX_ATTEMPTS = 3;
     const RETRY_DELAY_MS = 3000;
 
+    // ★ [v1.0.21] 재시도해도 절대 성공 못 하는 응답(401/404/400 등 4xx) → 즉시 중단
+    // 5xx 또는 network 예외만 재시도 (3회) — 불필요한 콘솔 에러 노이즈 + 9초 지연 제거
+    let fatalStop = false;
+
     const attemptSync = async (attempt: number): Promise<boolean> => {
       try {
         setSyncStatus(attempt === 1 ? 'syncing' : 'retrying');
@@ -185,6 +189,10 @@ function PaymentSuccessContent() {
 
         if (!res.ok) {
           console.error(`[sync] HTTP ${res.status} — attempt ${attempt}/${MAX_ATTEMPTS}`);
+          // 4xx: 클라이언트 측 명확한 실패 — 재시도 의미 없음, 즉시 중단
+          if (res.status >= 400 && res.status < 500) {
+            fatalStop = true;
+          }
           return false;
         }
 
@@ -207,6 +215,12 @@ function PaymentSuccessContent() {
     for (let i = 1; i <= MAX_ATTEMPTS; i++) {
       const ok = await attemptSync(i);
       if (ok) return;
+      // ★ [v1.0.21] 4xx 응답이면 재시도 즉시 중단 (불필요한 9초 지연 + 콘솔 노이즈 제거)
+      if (fatalStop) {
+        console.warn(`[sync] 4xx 응답 — 재시도 중단 (attempt ${i}/${MAX_ATTEMPTS})`);
+        setSyncStatus('failed');
+        return;
+      }
       if (i < MAX_ATTEMPTS) {
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       }
