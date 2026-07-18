@@ -144,6 +144,9 @@ export default function AdminDashboard() {
           <Link href="/admin/orders" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
             주문 관리
           </Link>
+          <Link href="/admin/balance-requests" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+            💳 충전 신청
+          </Link>
           <Link href="/admin/partners" className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
             파트너 관리
           </Link>

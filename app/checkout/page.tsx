@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// KISPG 결제 연동 (키스정보통신)
+// [v1.0.22] KISPG PG 중단 → KRW/QKEY 잔액 결제로 전환
 import ShopNavigation from '@/components/ShopNavigation';
 import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
 import AddressSearch from '@/components/AddressSearch';
@@ -60,6 +60,11 @@ export default function CheckoutPage() {
   // 쿠폰
   const [appliedCoupon, setAppliedCoupon] = useState<CouponData | null>(null);
 
+  // [v1.0.22] 잔액 결제 (KRW / QKEY)
+  const [paymentMethod, setPaymentMethod] = useState<'KRW_BALANCE' | 'QKEY_BALANCE'>('KRW_BALANCE');
+  const [balance, setBalance] = useState<{ krwBalance: number; qkeyBalance: number } | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+
   // 파트너 스토어 경유 정보
   const [storePartnerId, setStorePartnerId] = useState<string | null>(null);
   const [storeSlug, setStoreSlug] = useState<string | null>(null);
@@ -88,6 +93,24 @@ export default function CheckoutPage() {
       })
       .catch(() => {});
   }, []);
+
+  // [v1.0.22] 로그인 사용자 잔액 로드 (KRW / QKEY)
+  useEffect(() => {
+    if (authLoading || !user) return;
+    setBalanceLoading(true);
+    authFetch('/api/my/balance')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setBalance({
+            krwBalance: Number(data.data.krwBalance) || 0,
+            qkeyBalance: Number(data.data.qkeyBalance) || 0,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setBalanceLoading(false));
+  }, [user, authLoading]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -210,8 +233,22 @@ export default function CheckoutPage() {
     setShippingAddress(data.address);
   };
 
+  // [v1.0.22] QKEY 환율: 1 QKEY = 10원
+  const QKEY_RATE = 10;
+  const requiredQkey = Math.ceil(finalAmount / QKEY_RATE);
+  const krwEnough = !!balance && balance.krwBalance >= finalAmount;
+  const qkeyEnough = !!balance && balance.qkeyBalance >= requiredQkey;
+  const selectedEnough = paymentMethod === 'KRW_BALANCE' ? krwEnough : qkeyEnough;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // [v1.0.22] 잔액 결제는 회원 전용
+    if (isGuest || !user) {
+      alert('잔액 결제는 로그인 후 이용 가능합니다. 로그인 후 잔액을 충전해주세요.');
+      router.push('/login?redirect=/checkout');
+      return;
+    }
 
     if (!shippingName || !shippingPhone || !shippingAddress) {
       alert('배송 정보를 모두 입력해주세요.');
@@ -219,6 +256,15 @@ export default function CheckoutPage() {
     }
     if (cartItems.length === 0) {
       alert('장바구니가 비어있습니다.');
+      return;
+    }
+
+    // [v1.0.22] 잔액 부족 사전 차단 (서버에서도 재검증됨)
+    if (!selectedEnough) {
+      const label = paymentMethod === 'KRW_BALANCE' ? 'KRW 잔액' : 'QKEY 잔액';
+      if (confirm(`${label}이 부족합니다. 충전 페이지로 이동할까요?`)) {
+        router.push('/my/balance');
+      }
       return;
     }
     if (isGuest) {
@@ -251,10 +297,8 @@ export default function CheckoutPage() {
         shippingAddress: fullAddress,
         shippingZipCode,
         shippingMemo: finalMemo,
-        // [2026-05-11 v4 진단] 결제수단 단계별 마커:
-        //   '결제대기' (주문생성 시점, 여기) → '결제창진입' (KISPG 요청) → '신용카드' (return 핸들러 도달)
-        //   admin 에 어느 값이 보이느냐로 결제 흐름이 어디서 끊겼는지 즉시 진단 가능
-        paymentMethod: '결제대기',
+        // [v1.0.22] 잔액 결제수단: KRW_BALANCE | QKEY_BALANCE
+        paymentMethod,
         shippingFee,
       };
 
@@ -275,24 +319,37 @@ export default function CheckoutPage() {
         orderData.guestPhone = guestPhone || shippingPhone;
       }
 
+      // [v1.0.22] 주문 생성 = 잔액 즉시 차감 + 즉시 CONFIRMED (PG 없음)
       const res = await authFetch('/api/orders', {
         method: 'POST',
         body: JSON.stringify(orderData),
       });
 
+      const result = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || '주문 생성 실패');
+        // 402: 잔액 부족 → 충전 페이지 유도
+        if (res.status === 402 || result.code === 'INSUFFICIENT_BALANCE') {
+          if (confirm((result.error || '잔액이 부족합니다.') + '\n\n충전 페이지로 이동할까요?')) {
+            router.push('/my/balance');
+          }
+          return;
+        }
+        // 401: 로그인 필요
+        if (res.status === 401 || result.code === 'AUTH_REQUIRED') {
+          alert(result.error || '로그인이 필요합니다.');
+          router.push('/login?redirect=/checkout');
+          return;
+        }
+        throw new Error(result.error || '주문 생성 실패');
       }
 
-      const result = await res.json();
       const order = result.data;
-      const guestOrderToken = result.guestOrderToken;
 
-      if (guestOrderToken) {
-        localStorage.setItem('guestOrderToken', guestOrderToken);
-        localStorage.setItem('guestOrderNumber', order.orderNumber);
-      }
+      // 회원 장바구니 비우기 (bestselling: 서버 카트 clear 는 주문 생성 시 별도 처리 안 되므로 방어)
+      try {
+        clearGuestCart();
+      } catch {}
 
       // 파트너 스토어 경유 정보 정리
       try {
@@ -300,54 +357,15 @@ export default function CheckoutPage() {
         sessionStorage.removeItem('checkout_storeSlug');
       } catch {}
 
-      // KISPG 결제창 호출 (서버에서 JSON 반환 → 클라이언트에서 동적 form 생성 후 submit)
-      const kispgRes = await authFetch('/api/payments/kispg/request', {
-        method: 'POST',
-        body: JSON.stringify({ orderId: order.id }),
-      });
-
-      if (!kispgRes.ok) {
-        const errData = await kispgRes.json().catch(() => ({}));
-        throw new Error(errData.error || '결제 요청에 실패했습니다.');
-      }
-
-      const kispgData = await kispgRes.json();
-      if (!kispgData.success || !kispgData.authUrl || !kispgData.formData) {
-        throw new Error(kispgData.error || '결제 데이터를 가져오지 못했습니다.');
-      }
-
-      // [2026-05-12 v1.0.16] 폴링 화면 아키텍처 재설계 — /payment/waiting 별도 페이지로 분리
-      //   기존 (v1.0.15): checkout 페이지에 PaymentWaitingScreen 마운트 → form.submit() 으로
-      //                  checkout DOM 통째로 unmount → 폴링 영구 사라짐 (사고 재발 원인)
-      //   개선 (v1.0.16): /payment/waiting 페이지로 이동 → 그 페이지에서 KISPG form 자동 submit
-      //                  → 결제창 닫혀도 waiting 페이지가 살아있어 폴링 정상 동작
-      //   모바일: returnUrl 정상 도달 → success/fail 로 즉시 이동 → waiting 페이지 unmount
-      //   PC: returnUrl 안 와도 waiting 페이지에서 폴링이 KISPG /v2/order 자동 호출
-
-      // KISPG form data 를 sessionStorage 에 임시 저장 (waiting 페이지에서 자동 submit)
-      try {
-        sessionStorage.setItem('kispgFormData', JSON.stringify({
-          authUrl: kispgData.authUrl,
-          formData: kispgData.formData,
-        }));
-      } catch (e) {
-        console.error('kispgFormData 저장 실패:', e);
-      }
-
-      // /payment/waiting 페이지로 이동 (autoSubmit=kispg 로 form 자동 submit 트리거)
-      const waitingUrl = new URL('/payment/waiting', window.location.origin);
-      waitingUrl.searchParams.set('orderId', order.id);
-      if (order.orderNumber) waitingUrl.searchParams.set('orderNumber', order.orderNumber);
-      if (guestOrderToken) waitingUrl.searchParams.set('guestToken', guestOrderToken);
-      waitingUrl.searchParams.set('autoSubmit', 'kispg');
-
-      window.location.replace(waitingUrl.toString());
-      return; // 결제 페이지로 이동 중이므로 여기서 종료
+      // 주문 성공 페이지로 이동 (잔액 결제는 즉시 확정)
+      const successUrl = new URL('/orders/success', window.location.origin);
+      if (order?.id) successUrl.searchParams.set('orderId', order.id);
+      if (order?.orderNumber) successUrl.searchParams.set('orderNumber', order.orderNumber);
+      window.location.replace(successUrl.toString());
+      return;
     } catch (error: any) {
       console.error('주문 실패:', error);
-      if (error.message !== 'PAY_PROCESS_CANCELED' && error.message !== 'KISPG_REDIRECT') {
-        alert(error.message || '주문 처리 중 오류가 발생했습니다.');
-      }
+      alert(error.message || '주문 처리 중 오류가 발생했습니다.');
     } finally {
       setSubmitting(false);
     }
@@ -638,9 +656,66 @@ export default function CheckoutPage() {
                   </div>
                 </div>
 
+                {/* [v1.0.22] 잔액 결제수단 선택 */}
+                {!isGuest && user ? (
+                  <div className="pt-2 space-y-2">
+                    <p className="text-sm font-semibold text-gray-800">결제 수단</p>
+
+                    {/* KRW 잔액 */}
+                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition ${paymentMethod === 'KRW_BALANCE' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          checked={paymentMethod === 'KRW_BALANCE'}
+                          onChange={() => setPaymentMethod('KRW_BALANCE')}
+                          className="accent-blue-600"
+                        />
+                        <span className="text-sm font-medium text-gray-900">KRW 잔액</span>
+                      </div>
+                      <span className={`text-sm font-semibold ${krwEnough ? 'text-gray-700' : 'text-red-500'}`}>
+                        {balanceLoading ? '조회 중...' : `₩${(balance?.krwBalance ?? 0).toLocaleString()}`}
+                      </span>
+                    </label>
+
+                    {/* QKEY 잔액 */}
+                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition ${paymentMethod === 'QKEY_BALANCE' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          checked={paymentMethod === 'QKEY_BALANCE'}
+                          onChange={() => setPaymentMethod('QKEY_BALANCE')}
+                          className="accent-blue-600"
+                        />
+                        <span className="text-sm font-medium text-gray-900">QKEY 잔액</span>
+                      </div>
+                      <span className={`text-sm font-semibold ${qkeyEnough ? 'text-gray-700' : 'text-red-500'}`}>
+                        {balanceLoading ? '조회 중...' : `${(balance?.qkeyBalance ?? 0).toLocaleString()} QKEY`}
+                      </span>
+                    </label>
+
+                    {paymentMethod === 'QKEY_BALANCE' && (
+                      <p className="text-xs text-gray-500">필요 QKEY: {requiredQkey.toLocaleString()} QKEY (1 QKEY = 10원)</p>
+                    )}
+
+                    {!selectedEnough && !balanceLoading && (
+                      <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg p-2">
+                        <span className="text-xs text-red-600 font-medium">잔액이 부족합니다</span>
+                        <Link href="/my/balance" className="text-xs font-semibold text-blue-600 underline">충전하기</Link>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="pt-2 bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-700">
+                    잔액 결제는 로그인 후 이용 가능합니다.{' '}
+                    <Link href="/login?redirect=/checkout" className="font-semibold underline">로그인</Link>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={submitting || (isGuest && (!agreeTerms || !agreePrivacy))}
+                  disabled={submitting || isGuest || !user || balanceLoading}
                   className="w-full py-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
                 >
                   {submitting ? (
@@ -648,21 +723,21 @@ export default function CheckoutPage() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                       결제 처리 중...
                     </span>
+                  ) : !selectedEnough && !isGuest && user && !balanceLoading ? (
+                    '잔액 충전 필요'
                   ) : (
                     `₩${finalAmount.toLocaleString()} 결제하기`
                   )}
                 </button>
 
                 <div className="pt-4 border-t text-xs text-gray-500 space-y-1">
-                  <p>결제는 KISPG(키스정보통신)를 통해 안전하게 처리됩니다</p>
+                  <p>KRW 잔액 또는 QKEY 잔액으로 결제됩니다 (1 QKEY = 10원)</p>
+                  <p>결제 즉시 주문이 확정됩니다</p>
                   <p>주문 후 2-3일 이내 배송</p>
                   <p>교환/반품 가능 (7일 이내)</p>
-                  {isGuest && (
-                    <>
-                      <p className="text-orange-600 font-medium mt-2">비회원 주문은 주문번호와 연락처로 조회 가능합니다</p>
-                      <p className="text-orange-600 font-medium">회원가입 시 더 많은 혜택을 누리실 수 있습니다</p>
-                    </>
-                  )}
+                  <Link href="/my/balance" className="inline-block text-blue-600 font-medium underline mt-1">
+                    잔액 충전 / 내역 보기 →
+                  </Link>
                 </div>
               </div>
             </div>
