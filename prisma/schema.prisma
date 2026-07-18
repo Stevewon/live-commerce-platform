@@ -51,6 +51,12 @@ model User {
   // Securet QR 주소 (닉네임/비밀번호 찾기용) - nullable for existing users
   securetQrUrl  String?   // https://securet.kr/securet.php?key=idcard&nick=...&token=...
   
+  // [v1.0.22] 잔액 결제 시스템 (KISPG PG 대체)
+  // KRW: 원 단위 정수 (예: 12345 = 12,345원)
+  // QKEY: 개 단위 정수 (예: 1000 = 1,000 QKEY; 1 QKEY = 10원 환율)
+  krwBalance    Int       @default(0)
+  qkeyBalance   Int       @default(0)
+  
   // NextAuth fields (social login - optional)
   emailVerified DateTime?
   image         String?
@@ -68,6 +74,69 @@ model User {
   chatMessages  LiveChat[]
   accounts      Account[]
   sessions      Session[]
+  balanceRequests BalanceRequest[]
+  balanceLedgers  BalanceLedger[]
+}
+
+// [v1.0.22] 잔액 충전 신청 (사용자 → 관리자 승인 → 잔액 반영)
+model BalanceRequest {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // 신청 종류
+  type          String    // 'KRW_DEPOSIT' (무통장입금) | 'QKEY_DEPOSIT' (쿠키송금)
+  amount        Int       // KRW: 원 / QKEY: 개
+  
+  // 무통장입금 필드
+  depositorName String?   // 입금자명 (KRW_DEPOSIT 필수)
+  
+  // QKEY 송금 필드
+  txHash        String?   // 트랜잭션 해시 (QKEY_DEPOSIT 필수)
+  senderAddress String?   // 사용자 지갑 주소 (선택)
+  
+  // 상태
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  
+  // 관리자 처리 정보
+  adminNote     String?   // 거부 사유 등 관리자 메모
+  approvedBy    String?   // 승인한 관리자 userId
+  approvedAt    DateTime?
+  rejectedAt    DateTime?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// [v1.0.22] 잔액 증감 이력 (사용자 마이페이지 노출용, 감사 로그)
+model BalanceLedger {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  currency        String    // 'KRW' | 'QKEY'
+  amount          Int       // 양수=충전/환불, 음수=차감/사용
+  balanceAfter    Int       // 이 이력 반영 후 잔액 (감사용)
+  
+  // 사용자 노출 안전 문구만 (사장님 영구룰 준수)
+  reason          String    // 예: '무통장입금 충전', 'QKEY 충전', '주문 결제', '주문 취소 환불'
+  
+  // 연관 참조 (nullable)
+  relatedOrderId       String?   // 주문 결제/환불 시
+  relatedRequestId     String?   // 충전 승인 시 BalanceRequest.id
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([currency])
+  @@index([createdAt])
+  @@index([relatedOrderId])
+  @@index([relatedRequestId])
 }
 
 // NextAuth Account 테이블 (소셜 로그인 연동)

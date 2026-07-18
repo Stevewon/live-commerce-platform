@@ -4,6 +4,8 @@ import { getPrisma } from '@/lib/prisma';
 import { orderConfirmationEmail, sendEmail } from '@/lib/email'
 import { orderConfirmationSMS, sendSMS } from '@/lib/sms'
 import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
+// [v1.0.22] 잔액 결제 시스템 통합
+import { getD1, krwToQkey, QKEY_TO_KRW, newId } from '@/lib/balance';
 // Cloudflare Workers compatible crypto
 
 // ─── 휴대전화번호 정규화 (KR) ───
@@ -164,13 +166,33 @@ export async function POST(req: NextRequest) {
       shippingAddress,
       shippingZipCode,
       shippingMemo,
-      paymentMethod = '결제대기',
+      paymentMethod: rawPaymentMethod = 'KRW_BALANCE',
       shippingFee = 3000,
       couponCode,
       // 비회원 전용 필드
       guestEmail,
       guestPhone,
     } = body;
+
+    // [v1.0.22] 결제수단 검증 — KRW 잔액 또는 QKEY 잔액만 허용, PG 계열 완전 차단
+    const ALLOWED_METHODS = ['KRW_BALANCE', 'QKEY_BALANCE'] as const;
+    type PaymentMethod = typeof ALLOWED_METHODS[number];
+
+    const paymentMethod: PaymentMethod = ALLOWED_METHODS.includes(rawPaymentMethod as any)
+      ? (rawPaymentMethod as PaymentMethod)
+      : 'KRW_BALANCE';
+
+    // 잔액 결제는 회원만 사용 가능 (비회원 지원 안 함)
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '잔액 결제는 로그인 후 이용 가능합니다. 로그인 후 잔액을 충전해주세요.',
+          code: 'AUTH_REQUIRED',
+        },
+        { status: 401 }
+      );
+    }
 
     // 유효성 검사
     if (!items || items.length === 0) {
@@ -183,14 +205,6 @@ export async function POST(req: NextRequest) {
     if (!shippingName || !shippingPhone || !shippingAddress) {
       return NextResponse.json(
         { success: false, error: '배송 정보를 입력해주세요' },
-        { status: 400 }
-      );
-    }
-
-    // 비회원 주문인 경우 이메일 또는 전화번호 필수
-    if (!userId && !guestEmail && !guestPhone) {
-      return NextResponse.json(
-        { success: false, error: '비회원 주문 시 이메일 또는 전화번호가 필요합니다' },
         { status: 400 }
       );
     }
@@ -322,6 +336,53 @@ export async function POST(req: NextRequest) {
       guestOrderToken = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // [v1.0.22] 잔액 사전 확인 (트랜잭션 진입 전 빠른 실패)
+    // 실제 차감은 트랜잭션 안에서 다시 원자적으로 수행
+    const d1 = await getD1();
+    const userRow: any = await d1
+      .prepare(`SELECT "krwBalance","qkeyBalance" FROM "User" WHERE "id" = ? LIMIT 1`)
+      .bind(userId)
+      .first();
+    if (!userRow) {
+      return NextResponse.json(
+        { success: false, error: '사용자 정보를 찾을 수 없습니다' },
+        { status: 404 }
+      );
+    }
+    const currentKrw = Number(userRow.krwBalance) || 0;
+    const currentQkey = Number(userRow.qkeyBalance) || 0;
+
+    // 필요 금액 (KRW 기준 total)
+    if (paymentMethod === 'KRW_BALANCE') {
+      if (currentKrw < total) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `KRW 잔액이 부족합니다 (현재: ${currentKrw.toLocaleString()}원, 필요: ${total.toLocaleString()}원)`,
+            code: 'INSUFFICIENT_BALANCE',
+            balance: { krw: currentKrw, qkey: currentQkey },
+            required: { krw: total, qkey: krwToQkey(total) },
+          },
+          { status: 402 } // Payment Required
+        );
+      }
+    } else {
+      // QKEY_BALANCE: total(KRW) 을 QKEY 로 환산 (올림하여 사용자 손해 방지)
+      const requiredQkey = Math.ceil(total / QKEY_TO_KRW);
+      if (currentQkey < requiredQkey) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `QKEY 잔액이 부족합니다 (현재: ${currentQkey.toLocaleString()} QKEY, 필요: ${requiredQkey.toLocaleString()} QKEY)`,
+            code: 'INSUFFICIENT_BALANCE',
+            balance: { krw: currentKrw, qkey: currentQkey },
+            required: { krw: total, qkey: requiredQkey },
+          },
+          { status: 402 }
+        );
+      }
+    }
+
     // 주문 생성 (트랜잭션)
     const order = await prisma.$transaction(async (tx) => {
       // Build order data - only include non-null/undefined fields for D1 compatibility
@@ -334,16 +395,16 @@ export async function POST(req: NextRequest) {
         shippingName,
         shippingPhone,
         shippingAddress,
-        paymentMethod,
-        status: 'PENDING',
+        paymentMethod, // 'KRW_BALANCE' | 'QKEY_BALANCE'
+        // [v1.0.22] 잔액 결제는 즉시 확정 (PG 없음, 승인 대기 없음)
+        status: 'CONFIRMED',
+        paidAt: new Date().toISOString(),
         items: {
           create: validatedItems
         }
       };
       // Only add optional fields if they have actual values
       if (userId) orderData.userId = userId;
-      if (guestEmail) orderData.guestEmail = guestEmail;
-      if (guestPhone || shippingPhone) orderData.guestPhone = guestPhone || shippingPhone;
       if (guestOrderToken) orderData.guestOrderToken = guestOrderToken;
       if (shippingZipCode) orderData.shippingZipCode = shippingZipCode;
       if (shippingMemo) orderData.shippingMemo = shippingMemo;
@@ -372,6 +433,52 @@ export async function POST(req: NextRequest) {
           }
         }
       });
+
+      // [v1.0.22] 잔액 원자 차감 + BalanceLedger 기록 (트랜잭션 내부 raw)
+      // ── Prisma $transaction(tx) 컨텍스트 안에서 직접 raw 실행하여 원자성 보장.
+      //    (lib/balance.adjustBalance 는 별도 D1 바인딩이라 이 트랜잭션과 무관 → 여기서는 tx 사용)
+      {
+        const isKrw = paymentMethod === 'KRW_BALANCE';
+        const column = isKrw ? 'krwBalance' : 'qkeyBalance';
+        const currency = isKrw ? 'KRW' : 'QKEY';
+        // 차감 금액: KRW 는 total 그대로, QKEY 는 올림 환산 (사전 확인과 동일 규칙)
+        const debitAmount = isKrw ? total : Math.ceil(total / QKEY_TO_KRW);
+
+        // 1) 현재 잔액 재조회 (트랜잭션 내부 최신값) — 동시성 대비 재확인
+        const balRows: any = await tx.$queryRawUnsafe(
+          `SELECT "${column}" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
+          userId
+        );
+        const balRow = Array.isArray(balRows) ? balRows[0] : balRows;
+        const curBal = Number(balRow?.bal) || 0;
+        const afterBal = curBal - debitAmount;
+        if (afterBal < 0) {
+          // 트랜잭션 롤백 유도 (동시 주문으로 잔액이 그 사이 소진된 경우)
+          throw new Error('INSUFFICIENT_BALANCE_TX');
+        }
+
+        // 2) User 잔액 차감
+        await tx.$executeRawUnsafe(
+          `UPDATE "User" SET "${column}" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
+          afterBal,
+          userId
+        );
+
+        // 3) BalanceLedger 기록 (사용자 노출 안전 문구만)
+        const ledgerId = newId();
+        await tx.$executeRawUnsafe(
+          `INSERT INTO "BalanceLedger"
+             ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+           VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+          ledgerId,
+          userId,
+          currency,
+          -debitAmount,
+          afterBal,
+          '주문 결제',
+          newOrder.id
+        );
+      }
 
       // 재고 차감 (batch update - N+1 쿼리 제거)
       // 같은 productId가 items에 여러 번 나올 수 있으므로 productId별로 합산
@@ -425,6 +532,17 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Create order error:', error);
+    // [v1.0.22] 동시 주문으로 트랜잭션 내부 잔액 부족 → 402 로 변환
+    if (error?.message === 'INSUFFICIENT_BALANCE_TX') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '잔액이 부족합니다. 잔액을 다시 확인해주세요.',
+          code: 'INSUFFICIENT_BALANCE',
+        },
+        { status: 402 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: error.message || '주문 처리 중 오류가 발생했습니다' },
       { status: 500 }
