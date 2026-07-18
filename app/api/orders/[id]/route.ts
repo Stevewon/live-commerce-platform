@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
-import { cancelKispgPayment, normalizeKispgPayMethod } from '@/lib/kispg';
+// [v1.0.22] KISPG PG 취소 제거 → 잔액 환불로 전환
+import { QKEY_TO_KRW, newId } from '@/lib/balance';
 
 // 주문 상세 조회 (GET) — 회원(token) + 비회원(guestOrderToken) 지원
 export async function GET(
@@ -123,72 +124,91 @@ export async function PATCH(
 
     // 주문 상태 업데이트
     const updateData: any = { status }
+    const isCancelling = status === 'CANCELLED'
+    if (isCancelling) updateData.cancelledAt = new Date().toISOString()
 
-    // 취소 시 KISPG 결제 취소 및 재고 복구
-    if (status === 'CANCELLED') {
-      updateData.cancelledAt = new Date().toISOString()
-      
-      // KISPG 실결제 취소 (paymentKey에 KISPG tid 저장)
-      if (order.paymentKey) {
-        try {
-          await cancelKispgPayment({
-            payMethod: normalizeKispgPayMethod(order.paymentMethod),
-            tid: order.paymentKey,
-            canAmt: order.total,
-            canId: userId,
-            canNm: '고객',
-            canMsg: '고객 요청에 의한 주문 취소',
-          })
-          updateData.refundAmount = order.total
-          updateData.refundedAt = new Date().toISOString()
-        } catch (pgError: any) {
-          console.error('KISPG payment cancel failed:', pgError.message)
-          // PG 취소 실패해도 주문 취소는 진행 (수동 환불 필요)
-        }
-      }
-    }
+    // [v1.0.22] 재고 복구 + 잔액 환불 + 상태 변경을 하나의 트랜잭션으로 원자 처리
+    let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY'; amount?: number } = { refunded: false };
 
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: updateData,
-      include: {
-        items: {
-          include: {
-            product: true
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // 1) 잔액 환불 (KRW_BALANCE / QKEY_BALANCE 결제 & 미환불 주문만, 멱등)
+      if (isCancelling) {
+        const method = order.paymentMethod || '';
+        const isKrw = method === 'KRW_BALANCE';
+        const isQkey = method === 'QKEY_BALANCE';
+        if ((isKrw || isQkey) && order.userId && !order.refundedAt) {
+          const currency: 'KRW' | 'QKEY' = isKrw ? 'KRW' : 'QKEY';
+          const column = isKrw ? 'krwBalance' : 'qkeyBalance';
+          const refundAmount = isKrw ? order.total : Math.ceil(order.total / QKEY_TO_KRW);
+          if (refundAmount > 0) {
+            const balRows: any = await tx.$queryRawUnsafe(
+              `SELECT "${column}" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
+              order.userId
+            );
+            const balRow = Array.isArray(balRows) ? balRows[0] : balRows;
+            const afterBal = (Number(balRow?.bal) || 0) + refundAmount;
+            await tx.$executeRawUnsafe(
+              `UPDATE "User" SET "${column}" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
+              afterBal, order.userId
+            );
+            await tx.$executeRawUnsafe(
+              `INSERT INTO "BalanceLedger"
+                 ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+               VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+              newId(), order.userId, currency, refundAmount, afterBal, '주문 취소 환불', order.id
+            );
+            updateData.refundAmount = order.total;
+            updateData.refundedAt = new Date().toISOString();
+            refundResult = { refunded: true, currency, amount: refundAmount };
           }
         }
       }
-    })
 
-    // 취소 시 재고 복구 (batch CASE WHEN — N+1 제거)
-    if (status === 'CANCELLED' && updatedOrder.items.length > 0) {
-      const stockIncrementMap = new Map<string, number>();
-      for (const item of updatedOrder.items) {
-        const qty = Number(item.quantity);
-        if (!item.productId || !Number.isFinite(qty) || qty <= 0) continue;
-        stockIncrementMap.set(
-          item.productId,
-          (stockIncrementMap.get(item.productId) || 0) + qty
-        );
-      }
-      if (stockIncrementMap.size > 0) {
-        const productIds = Array.from(stockIncrementMap.keys());
-        const caseParts: string[] = [];
-        const params: any[] = [];
-        for (const [pid, qty] of stockIncrementMap.entries()) {
-          caseParts.push(`WHEN ? THEN stock + ?`);
-          params.push(pid, qty);
+      // 2) 상태 변경
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: updateData,
+        include: { items: { include: { product: true } } },
+      });
+
+      // 3) 취소 시 재고 복구 (batch CASE WHEN — N+1 제거)
+      if (isCancelling && updated.items.length > 0) {
+        const stockIncrementMap = new Map<string, number>();
+        for (const item of updated.items) {
+          const qty = Number(item.quantity);
+          if (!item.productId || !Number.isFinite(qty) || qty <= 0) continue;
+          stockIncrementMap.set(item.productId, (stockIncrementMap.get(item.productId) || 0) + qty);
         }
-        const placeholders = productIds.map(() => '?').join(',');
-        const sql = `UPDATE "Product" SET stock = CASE id ${caseParts.join(' ')} ELSE stock END, "updatedAt" = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`;
-        await prisma.$executeRawUnsafe(sql, ...params, ...productIds);
+        if (stockIncrementMap.size > 0) {
+          const productIds = Array.from(stockIncrementMap.keys());
+          const caseParts: string[] = [];
+          const params: any[] = [];
+          for (const [pid, qty] of stockIncrementMap.entries()) {
+            caseParts.push(`WHEN ? THEN stock + ?`);
+            params.push(pid, qty);
+          }
+          const placeholders = productIds.map(() => '?').join(',');
+          const sql = `UPDATE "Product" SET stock = CASE id ${caseParts.join(' ')} ELSE stock END, "updatedAt" = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`;
+          await tx.$executeRawUnsafe(sql, ...params, ...productIds);
+        }
       }
+
+      return updated;
+    });
+
+    let message = status === 'CANCELLED' ? '주문이 취소되었습니다' : '주문 상태가 변경되었습니다';
+    if (refundResult.refunded) {
+      const amtLabel = refundResult.currency === 'KRW'
+        ? `₩${(refundResult.amount || 0).toLocaleString()}`
+        : `${(refundResult.amount || 0).toLocaleString()} QKEY`;
+      message = `주문이 취소되고 ${amtLabel}이(가) 환불되었습니다`;
     }
 
     return NextResponse.json({
       success: true,
       order: updatedOrder,
-      message: status === 'CANCELLED' ? '주문이 취소되었습니다' : '주문 상태가 변경되었습니다'
+      refund: refundResult.refunded ? { currency: refundResult.currency, amount: refundResult.amount } : null,
+      message,
     })
   } catch (error: any) {
     console.error('Update order error:', error)

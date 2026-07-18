@@ -74,6 +74,13 @@ export default function ShopNavigation() {
                 >
                   {t.nav.orderHistory}
                 </Link>
+                <Link
+                  href="/my/balance"
+                  prefetch={false}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/my/balance')}`}
+                >
+                  💰 잔액
+                </Link>
               </>
             )}
             {!user && (
@@ -196,6 +203,22 @@ export default function ShopNavigation() {
                   className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/my-orders')}`}
                 >
                   {t.nav.orderHistory}
+                </Link>
+                <Link
+                  href="/my/balance"
+                  prefetch={false}
+                  onClick={() => setMenuOpen(false)}
+                  className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/my/balance')}`}
+                >
+                  💰 잔액 / 충전
+                </Link>
+                <Link
+                  href="/my"
+                  prefetch={false}
+                  onClick={() => setMenuOpen(false)}
+                  className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/my')}`}
+                >
+                  👤 마이페이지
                 </Link>
                 {user.role === 'ADMIN' && (
                   <Link href="/admin" onClick={() => setMenuOpen(false)} className="block px-3 py-2.5 rounded-md text-sm font-medium text-purple-600 hover:bg-purple-50">
