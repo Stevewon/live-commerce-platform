@@ -46,3 +46,4 @@ core
 .open-next
 .dev.vars
 .wrangler/
+tsconfig.tsbuildinfo
