@@ -1,14 +1,14 @@
 -- ============================================================================
--- v1.0.22 KISPG PG 중단 + QKEY/현금 잔액 결제 시스템 도입 D1 마이그레이션
+-- v1.0.22 KISPG PG 중단 + QKEY/현금 잔액 결제 시스템 도입 D1 마이그레이션 (멱등 구간)
 -- 실행: npx wrangler d1 execute qrlive-production --remote --file=scripts/v1_0_22_balance_migration.sql
+-- ----------------------------------------------------------------------------
+-- ⚠️ 실행 순서:
+--    1) scripts/v1_0_22_add_balance_columns.sql  (User 잔액 컬럼 추가 — 최초 1회)
+--    2) scripts/v1_0_22_balance_migration.sql    (이 파일 — 여러 번 실행해도 안전)
+--    이 파일의 모든 문장은 IF NOT EXISTS / 조건부 UPDATE 로 멱등(idempotent)합니다.
 -- ============================================================================
 
--- 1) User 테이블에 잔액 컬럼 추가 (이미 있으면 스킵)
---    KRW: 원화 정수, QKEY: 쿠키 정수 (1 QKEY = 10원)
-ALTER TABLE "User" ADD COLUMN "krwBalance" INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE "User" ADD COLUMN "qkeyBalance" INTEGER NOT NULL DEFAULT 0;
-
--- 2) 충전 신청 테이블
+-- 1) 충전 신청 테이블
 CREATE TABLE IF NOT EXISTS "BalanceRequest" (
   "id"            TEXT PRIMARY KEY,
   "userId"        TEXT NOT NULL,
@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS "BalanceRequest_status_idx"    ON "BalanceRequest"("s
 CREATE INDEX IF NOT EXISTS "BalanceRequest_type_idx"      ON "BalanceRequest"("type");
 CREATE INDEX IF NOT EXISTS "BalanceRequest_createdAt_idx" ON "BalanceRequest"("createdAt");
 
--- 3) 잔액 증감 이력 테이블 (감사 로그)
+-- 2) 잔액 증감 이력 테이블 (감사 로그)
 CREATE TABLE IF NOT EXISTS "BalanceLedger" (
   "id"                TEXT PRIMARY KEY,
   "userId"            TEXT NOT NULL,
@@ -52,9 +52,10 @@ CREATE INDEX IF NOT EXISTS "BalanceLedger_createdAt_idx"        ON "BalanceLedge
 CREATE INDEX IF NOT EXISTS "BalanceLedger_relatedOrderId_idx"   ON "BalanceLedger"("relatedOrderId");
 CREATE INDEX IF NOT EXISTS "BalanceLedger_relatedRequestId_idx" ON "BalanceLedger"("relatedRequestId");
 
--- 4) 기존 KISPG PENDING 주문 일괄 자동 CANCELLED 처리 (사장님 확정)
+-- 3) 기존 KISPG PENDING 주문 일괄 자동 CANCELLED 처리 (사장님 확정)
 --    - status='PENDING' 이고 paymentMethod 가 KISPG 관련(카드/결제대기/신용카드 등)인 주문
 --    - v1.0.22 배포 이후 신규 주문은 KRW/QKEY 잔액 결제만 가능하므로 잔존 PENDING 은 무의미
+--    - 이미 auto-cancel 처리된 주문은 제외(LIKE '%v1.0.22 auto-cancel%')하여 멱등 보장
 UPDATE "Order"
 SET
   "status" = 'CANCELLED',
@@ -62,6 +63,7 @@ SET
   "updatedAt" = CURRENT_TIMESTAMP
 WHERE
   "status" = 'PENDING'
+  AND ("paymentMethod" IS NULL OR "paymentMethod" NOT LIKE '%v1.0.22 auto-cancel%')
   AND (
     "paymentMethod" IS NULL
     OR "paymentMethod" = ''
