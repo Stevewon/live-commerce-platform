@@ -29,8 +29,11 @@ export default function MyPage() {
   const [wishlistCount, setWishlistCount] = useState(0);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  // [v1.0.22] 잔액
-  const [balance, setBalance] = useState<{ krwBalance: number; qkeyBalance: number } | null>(null);
+  // [v1.0.22] 잔액 + QTA 적립
+  const [balance, setBalance] = useState<{ krwBalance: number; qkeyBalance: number; qtaBalance: number } | null>(null);
+  // 퀀타리움 지갑주소
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // 인증 게이트 - 로그인 안 한 사용자는 로그인 페이지로 리다이렉트
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function MyPage() {
         setWishlistCount(items.length);
       }
 
-      // [v1.0.22] 잔액 조회
+      // [v1.0.22] 잔액 조회 (KRW/QKEY/QTA + 퀀타리움 지갑주소)
       const balanceRes = await authFetch('/api/my/balance');
       if (balanceRes.ok) {
         const data = await balanceRes.json();
@@ -75,7 +78,11 @@ export default function MyPage() {
           setBalance({
             krwBalance: Number(data.data.krwBalance) || 0,
             qkeyBalance: Number(data.data.qkeyBalance) || 0,
+            qtaBalance: Number(data.data.qtaBalance) || 0,
           });
+          if (data.data.quantariumWallet) {
+            setWalletAddress(String(data.data.quantariumWallet));
+          }
         }
       }
     } catch (error) {
@@ -116,6 +123,30 @@ export default function MyPage() {
       ko: 'ko-KR', en: 'en-US', vi: 'vi-VN', th: 'th-TH', ja: 'ja-JP', zh: 'zh-CN',
     };
     return localeMap[locale] || 'ko-KR';
+  };
+
+  // 퀀타리움 지갑주소 복사
+  const handleCopyWallet = async () => {
+    if (!walletAddress) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(walletAddress);
+      } else {
+        // 폴백: 임시 input 사용
+        const el = document.createElement('textarea');
+        el.value = walletAddress;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('지갑주소 복사 실패:', e);
+    }
   };
 
   // 인증 로딩 중 또는 인증 안된 상태 → 로딩 스피너 (리다이렉트 진행 중)
@@ -159,7 +190,7 @@ export default function MyPage() {
               충전 / 내역 →
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
               <div className="text-xs sm:text-sm text-blue-100 mb-1">KRW 잔액</div>
               <div className="text-2xl sm:text-3xl font-bold">
@@ -175,7 +206,59 @@ export default function MyPage() {
                 <div className="text-xs text-blue-100 mt-0.5">≈ ₩{((balance?.qkeyBalance ?? 0) * 10).toLocaleString()}</div>
               )}
             </div>
+            <div>
+              <div className="text-xs sm:text-sm text-blue-100 mb-1">🎁 QTA 적립</div>
+              <div className="text-2xl sm:text-3xl font-bold">
+                {isLoading ? '...' : `${(balance?.qtaBalance ?? 0).toLocaleString()} QTA`}
+              </div>
+              {!isLoading && (
+                <div className="text-xs text-blue-100 mt-0.5">≈ ₩{((balance?.qtaBalance ?? 0) * 100).toLocaleString()}</div>
+              )}
+            </div>
           </div>
+          <div className="mt-4 pt-3 border-t border-white/20 text-xs text-blue-100">
+            구매금액의 5%가 QTA로 적립됩니다 (100원 = 1 QTA)
+          </div>
+        </div>
+
+        {/* 퀀타리움 지갑주소 (항상 표시 + 복사) */}
+        <div className="mb-6 sm:mb-8 bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-5 sm:p-7 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl sm:text-2xl">🔐</span>
+            <h2 className="text-base sm:text-lg font-bold text-gray-900">퀀타리움 지갑주소</h2>
+          </div>
+          {walletAddress ? (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex-1 min-w-0 bg-gray-50 border border-gray-200 rounded-lg px-3 sm:px-4 py-3 font-mono text-xs sm:text-sm text-gray-800 break-all">
+                {walletAddress}
+              </div>
+              <button
+                onClick={handleCopyWallet}
+                className={`flex-shrink-0 inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 rounded-lg font-semibold text-sm transition ${
+                  copied
+                    ? 'bg-green-600 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+                title="지갑주소 복사"
+              >
+                {copied ? (
+                  <>
+                    <span>✓</span>
+                    <span>복사됨</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📋</span>
+                    <span>복사</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">
+              {isLoading ? '불러오는 중...' : '등록된 지갑주소가 없습니다.'}
+            </div>
+          )}
         </div>
 
         {/* Dashboard Cards */}

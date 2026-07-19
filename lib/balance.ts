@@ -14,6 +14,13 @@
 export const QKEY_TO_KRW = 10; // 1 QKEY = 10 원
 export const KRW_TO_QKEY = 1 / QKEY_TO_KRW;
 
+// ─── QTA 적립 상수 (사장님 확정 룰) ───
+// - 구매 금액의 5% 를 QTA 로 적립
+// - 100원 = 1 QTA 환산
+// - 예: 20,000원 구매 → 5% = 1,000원 → ÷100 = 10 QTA
+export const QTA_TO_KRW = 100; // 1 QTA = 100 원
+export const QTA_ACCRUAL_RATE = 0.05; // 구매 금액의 5% 적립
+
 // ─── 금액 변환 유틸 ───
 
 /** KRW → QKEY 환산 (내림) */
@@ -26,6 +33,24 @@ export function krwToQkey(krw: number): number {
 export function qkeyToKrw(qkey: number): number {
   if (!Number.isFinite(qkey)) return 0;
   return Math.floor(qkey * QKEY_TO_KRW);
+}
+
+/**
+ * 구매 금액(KRW)으로부터 적립될 QTA 계산
+ * - 구매금액 × 5% → 적립원(KRW)
+ * - 적립원 ÷ 100 → QTA (내림)
+ * 예: 20,000 × 0.05 = 1,000 → 1,000 / 100 = 10 QTA
+ */
+export function qtaFromKrw(krw: number): number {
+  if (!Number.isFinite(krw) || krw <= 0) return 0;
+  const rewardKrw = krw * QTA_ACCRUAL_RATE;
+  return Math.floor(rewardKrw / QTA_TO_KRW);
+}
+
+/** QTA → KRW 환산 */
+export function qtaToKrw(qta: number): number {
+  if (!Number.isFinite(qta)) return 0;
+  return Math.floor(qta * QTA_TO_KRW);
 }
 
 // ─── 회사 정보 상수 (프론트 표시용) ───
@@ -54,7 +79,7 @@ export function newId(): string {
 
 // ─── 잔액 원자 차감/증감 (D1 native) ───
 
-export type Currency = 'KRW' | 'QKEY';
+export type Currency = 'KRW' | 'QKEY' | 'QTA';
 
 /**
  * 잔액 원자 조정 + BalanceLedger 기록
@@ -84,10 +109,11 @@ export async function adjustBalance(
 ): Promise<{ newBalance: number; ledgerId: string }> {
   if (!userId) throw new Error('userId가 필요합니다');
   if (!Number.isFinite(delta) || delta === 0) throw new Error('delta가 유효하지 않습니다');
-  if (!['KRW', 'QKEY'].includes(currency)) throw new Error('currency가 유효하지 않습니다');
+  if (!['KRW', 'QKEY', 'QTA'].includes(currency)) throw new Error('currency가 유효하지 않습니다');
   if (!reason || reason.trim().length === 0) throw new Error('reason이 필요합니다');
 
-  const column = currency === 'KRW' ? 'krwBalance' : 'qkeyBalance';
+  const column =
+    currency === 'KRW' ? 'krwBalance' : currency === 'QKEY' ? 'qkeyBalance' : 'qtaBalance';
 
   // 1) 현재 잔액 조회
   const userRow = await db
@@ -101,7 +127,8 @@ export async function adjustBalance(
   const newBalance = currentBalance + delta;
 
   if (newBalance < 0) {
-    const shortName = currency === 'KRW' ? 'KRW 잔액' : 'QKEY 잔액';
+    const shortName =
+      currency === 'KRW' ? 'KRW 잔액' : currency === 'QKEY' ? 'QKEY 잔액' : 'QTA 적립';
     throw new Error(`${shortName}이 부족합니다 (현재: ${currentBalance.toLocaleString()}, 필요: ${(-delta).toLocaleString()})`);
   }
 
@@ -131,18 +158,34 @@ export async function adjustBalance(
 export async function getUserBalance(
   db: any,
   userId: string
-): Promise<{ krwBalance: number; qkeyBalance: number }> {
-  const row = await db
-    .prepare(`SELECT "krwBalance", "qkeyBalance" FROM "User" WHERE "id" = ? LIMIT 1`)
-    .bind(userId)
-    .first();
+): Promise<{ krwBalance: number; qkeyBalance: number; qtaBalance: number }> {
+  // qtaBalance 컬럼이 아직 없을 수 있으므로 안전하게 조회 (없으면 0)
+  try {
+    const row = await db
+      .prepare(`SELECT "krwBalance", "qkeyBalance", "qtaBalance" FROM "User" WHERE "id" = ? LIMIT 1`)
+      .bind(userId)
+      .first();
 
-  if (!row) return { krwBalance: 0, qkeyBalance: 0 };
+    if (!row) return { krwBalance: 0, qkeyBalance: 0, qtaBalance: 0 };
 
-  return {
-    krwBalance: Number(row.krwBalance) || 0,
-    qkeyBalance: Number(row.qkeyBalance) || 0,
-  };
+    return {
+      krwBalance: Number(row.krwBalance) || 0,
+      qkeyBalance: Number(row.qkeyBalance) || 0,
+      qtaBalance: Number(row.qtaBalance) || 0,
+    };
+  } catch {
+    // qtaBalance 컬럼 부재 등 → KRW/QKEY 만 조회하고 QTA=0
+    const row = await db
+      .prepare(`SELECT "krwBalance", "qkeyBalance" FROM "User" WHERE "id" = ? LIMIT 1`)
+      .bind(userId)
+      .first();
+    if (!row) return { krwBalance: 0, qkeyBalance: 0, qtaBalance: 0 };
+    return {
+      krwBalance: Number(row.krwBalance) || 0,
+      qkeyBalance: Number(row.qkeyBalance) || 0,
+      qtaBalance: 0,
+    };
+  }
 }
 
 /**
@@ -152,4 +195,43 @@ export async function getD1(): Promise<any> {
   const { getCloudflareContext } = await import('@opennextjs/cloudflare');
   const ctx = await getCloudflareContext();
   return (ctx.env as any).DB;
+}
+
+// ─── QTA 컬럼 자동 보정 (셀프 힐링 마이그레이션) ───
+// 프로덕션 D1 에 별도 마이그레이션 스텝이 없으므로, QTA 적립 관련
+// 최초 접근 시 qtaBalance 컬럼이 없으면 자동으로 추가한다. (멱등)
+// - 이미 컬럼이 있으면 "duplicate column name" 에러가 나며, 이는 무시한다.
+let _qtaColumnEnsured = false;
+
+/**
+ * User.qtaBalance 컬럼이 존재하도록 보장 (없으면 ALTER TABLE 로 추가).
+ * D1 바인딩(db)을 인자로 받는다. 프로세스 당 1회만 실제 시도.
+ */
+export async function ensureQtaColumn(db: any): Promise<void> {
+  if (_qtaColumnEnsured) return;
+  if (!db) return;
+  try {
+    // 컬럼 존재 여부 확인
+    const cols: any = await db.prepare(`PRAGMA table_info("User")`).all();
+    const rows: any[] = cols?.results || cols || [];
+    const hasQta = Array.isArray(rows) && rows.some((r) => r && r.name === 'qtaBalance');
+    if (!hasQta) {
+      try {
+        await db
+          .prepare(`ALTER TABLE "User" ADD COLUMN "qtaBalance" INTEGER NOT NULL DEFAULT 0`)
+          .run();
+      } catch (e: any) {
+        // 이미 존재하는 경우(duplicate column) 등은 무시
+        const msg = String(e?.message || e || '');
+        if (!/duplicate column|already exists/i.test(msg)) {
+          // 다른 에러는 로그만 남기고 진행 (적립 실패해도 주문은 성립되어야 함)
+          console.warn('[ensureQtaColumn] ALTER 실패(무시):', msg);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[ensureQtaColumn] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
+  } finally {
+    _qtaColumnEnsured = true;
+  }
 }

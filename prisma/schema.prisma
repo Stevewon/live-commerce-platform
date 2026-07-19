@@ -57,6 +57,10 @@ model User {
   // QKEY: 개 단위 정수 (예: 1000 = 1,000 QKEY; 1 QKEY = 10원 환율)
   krwBalance    Int       @default(0)
   qkeyBalance   Int       @default(0)
+
+  // QTA 적립 포인트 (구매 금액의 5% 적립, 100원 = 1 QTA)
+  // 개 단위 정수 (예: 10 = 10 QTA)
+  qtaBalance    Int       @default(0)
   
   // NextAuth fields (social login - optional)
   emailVerified DateTime?
@@ -120,12 +124,12 @@ model BalanceLedger {
   userId          String
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  currency        String    // 'KRW' | 'QKEY'
-  amount          Int       // 양수=충전/환불, 음수=차감/사용
+  currency        String    // 'KRW' | 'QKEY' | 'QTA'
+  amount          Int       // 양수=충전/환불/적립, 음수=차감/사용/적립취소
   balanceAfter    Int       // 이 이력 반영 후 잔액 (감사용)
   
   // 사용자 노출 안전 문구만 (사장님 영구룰 준수)
-  reason          String    // 예: '무통장입금 충전', 'QKEY 충전', '주문 결제', '주문 취소 환불'
+  reason          String    // 예: '무통장입금 충전', 'QKEY 충전', '주문 결제', '주문 취소 환불', '구매 적립', '구매 적립 취소'
   
   // 연관 참조 (nullable)
   relatedOrderId       String?   // 주문 결제/환불 시

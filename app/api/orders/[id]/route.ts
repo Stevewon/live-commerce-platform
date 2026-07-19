@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
 // [v1.0.22] KISPG PG 취소 제거 → 잔액 환불로 전환
-import { QKEY_TO_KRW, newId } from '@/lib/balance';
+import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
 
 // 주문 상세 조회 (GET) — 회원(token) + 비회원(guestOrderToken) 지원
 export async function GET(
@@ -127,6 +127,11 @@ export async function PATCH(
     const isCancelling = status === 'CANCELLED'
     if (isCancelling) updateData.cancelledAt = new Date().toISOString()
 
+    // QTA 적립 컬럼 자동 보정 (멱등)
+    if (isCancelling) {
+      try { await ensureQtaColumn(await getD1()); } catch { /* 무시 */ }
+    }
+
     // [v1.0.22] 재고 복구 + 잔액 환불 + 상태 변경을 하나의 트랜잭션으로 원자 처리
     let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY'; amount?: number } = { refunded: false };
 
@@ -162,6 +167,53 @@ export async function PATCH(
             refundResult = { refunded: true, currency, amount: refundAmount };
           }
         }
+      }
+
+      // 1-2) [QTA 적립 회수] 취소 시 이 주문으로 적립됐던 QTA 자동 회수 (멱등)
+      //  ── 적립분(양수) 합계 - 이미 회수한 분(음수) 합계 = 남은 회수 대상.
+      //     남은 회수 대상이 양수일 때만 회수하며, 사용자 QTA 잔액이 음수가 되지 않도록 가드.
+      //     회수 실패가 취소/환불 처리를 막지 않도록 방어적으로 처리.
+      if (isCancelling && order.userId) {
+       try {
+        const qtaSumRows: any = await tx.$queryRawUnsafe(
+          `SELECT
+             COALESCE(SUM(CASE WHEN "amount" > 0 THEN "amount" ELSE 0 END), 0) AS earned,
+             COALESCE(SUM(CASE WHEN "amount" < 0 THEN -"amount" ELSE 0 END), 0) AS reversed
+           FROM "BalanceLedger"
+           WHERE "relatedOrderId" = ? AND "currency" = 'QTA'`,
+          order.id
+        );
+        const qtaSumRow = Array.isArray(qtaSumRows) ? qtaSumRows[0] : qtaSumRows;
+        const earnedQta = Number(qtaSumRow?.earned) || 0;
+        const reversedQta = Number(qtaSumRow?.reversed) || 0;
+        const recoverTarget = earnedQta - reversedQta; // 아직 회수 안 된 적립분
+
+        if (recoverTarget > 0) {
+          const qtaBalRows: any = await tx.$queryRawUnsafe(
+            `SELECT "qtaBalance" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
+            order.userId
+          );
+          const qtaBalRow = Array.isArray(qtaBalRows) ? qtaBalRows[0] : qtaBalRows;
+          const curQta = Number(qtaBalRow?.bal) || 0;
+          // 잔액이 부족하면 있는 만큼만 회수 (음수 방지)
+          const recoverAmount = Math.min(recoverTarget, curQta);
+          if (recoverAmount > 0) {
+            const afterQta = curQta - recoverAmount;
+            await tx.$executeRawUnsafe(
+              `UPDATE "User" SET "qtaBalance" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
+              afterQta, order.userId
+            );
+            await tx.$executeRawUnsafe(
+              `INSERT INTO "BalanceLedger"
+                 ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+               VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+              newId(), order.userId, 'QTA', -recoverAmount, afterQta, '구매 적립 취소', order.id
+            );
+          }
+        }
+       } catch (qtaErr: any) {
+         console.warn('[QTA 적립 회수 실패(무시)]', String(qtaErr?.message || qtaErr || ''));
+       }
       }
 
       // 2) 상태 변경

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 // [v1.0.22] KISPG PG 취소 제거 → 잔액 환불로 전환
-import { QKEY_TO_KRW, newId } from '@/lib/balance';
+import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
 
 // [v1.0.22] 주문 취소/환불 시 결제했던 잔액을 원자적으로 환불 (중복 방지)
 // - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE 인 주문만 환불
@@ -60,6 +60,53 @@ async function refundOrderBalance(
   );
 
   return { refunded: true, currency, amount: refundAmount };
+}
+
+// [QTA 적립 회수] 취소/환불 시 해당 주문으로 적립된 QTA 를 자동 회수 (멱등)
+// - 적립분(양수) 합계 - 이미 회수한 분(음수) 합계 = 남은 회수 대상
+// - 사용자 QTA 잔액이 음수가 되지 않도록 가드
+async function recoverOrderQta(
+  tx: any,
+  order: { id: string; userId: string | null },
+): Promise<{ recovered: boolean; amount?: number }> {
+  if (!order.userId) return { recovered: false };
+
+  const qtaSumRows: any = await tx.$queryRawUnsafe(
+    `SELECT
+       COALESCE(SUM(CASE WHEN "amount" > 0 THEN "amount" ELSE 0 END), 0) AS earned,
+       COALESCE(SUM(CASE WHEN "amount" < 0 THEN -"amount" ELSE 0 END), 0) AS reversed
+     FROM "BalanceLedger"
+     WHERE "relatedOrderId" = ? AND "currency" = 'QTA'`,
+    order.id
+  );
+  const qtaSumRow = Array.isArray(qtaSumRows) ? qtaSumRows[0] : qtaSumRows;
+  const earnedQta = Number(qtaSumRow?.earned) || 0;
+  const reversedQta = Number(qtaSumRow?.reversed) || 0;
+  const recoverTarget = earnedQta - reversedQta;
+  if (recoverTarget <= 0) return { recovered: false };
+
+  const qtaBalRows: any = await tx.$queryRawUnsafe(
+    `SELECT "qtaBalance" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
+    order.userId
+  );
+  const qtaBalRow = Array.isArray(qtaBalRows) ? qtaBalRows[0] : qtaBalRows;
+  const curQta = Number(qtaBalRow?.bal) || 0;
+  const recoverAmount = Math.min(recoverTarget, curQta); // 음수 방지
+  if (recoverAmount <= 0) return { recovered: false };
+
+  const afterQta = curQta - recoverAmount;
+  await tx.$executeRawUnsafe(
+    `UPDATE "User" SET "qtaBalance" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
+    afterQta, order.userId
+  );
+  await tx.$executeRawUnsafe(
+    `INSERT INTO "BalanceLedger"
+       ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+    newId(), order.userId, 'QTA', -recoverAmount, afterQta, '구매 적립 취소', order.id
+  );
+
+  return { recovered: true, amount: recoverAmount };
 }
 
 
@@ -151,6 +198,11 @@ export async function PATCH(
 
     if (isCancelling) updateData.cancelledAt = new Date().toISOString();
 
+    // QTA 적립 컬럼 자동 보정 (멱등)
+    if (isCancelling || isRefunding) {
+      try { await ensureQtaColumn(await getD1()); } catch { /* 무시 */ }
+    }
+
     // [v1.0.22] 재고 복구 + 잔액 환불 + 상태 변경을 하나의 트랜잭션으로 원자 처리
     let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY'; amount?: number } = { refunded: false };
 
@@ -185,6 +237,13 @@ export async function PATCH(
         if (refundResult.refunded) {
           updateData.refundedAt = new Date().toISOString();
           updateData.refundAmount = order.total; // KRW 기준 환불 금액 기록
+        }
+
+        // [QTA 적립 회수] 취소/환불 시 적립됐던 QTA 자동 회수 (멱등, 잔액결제 여부 무관)
+        try {
+          await recoverOrderQta(tx, { id: order.id, userId: order.userId });
+        } catch (qtaErr: any) {
+          console.warn('[QTA 적립 회수 실패(무시)]', String(qtaErr?.message || qtaErr || ''));
         }
       }
 
