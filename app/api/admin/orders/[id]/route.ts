@@ -1,7 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import { cancelKispgPayment, normalizeKispgPayMethod } from '@/lib/kispg';
+// [v1.0.22] KISPG PG 취소 제거 → 잔액 환불로 전환
+import { QKEY_TO_KRW, newId } from '@/lib/balance';
+
+// [v1.0.22] 주문 취소/환불 시 결제했던 잔액을 원자적으로 환불 (중복 방지)
+// - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE 인 주문만 환불
+// - order.refundedAt 이 이미 있으면 재환불하지 않음 (멱등)
+// - Prisma 트랜잭션 tx 컨텍스트 내부에서 raw 로 처리하여 원자성 보장
+async function refundOrderBalance(
+  tx: any,
+  order: { id: string; userId: string | null; paymentMethod: string | null; total: number; refundedAt: any },
+  reason: string
+): Promise<{ refunded: boolean; currency?: 'KRW' | 'QKEY'; amount?: number }> {
+  const method = order.paymentMethod || '';
+  const isKrw = method === 'KRW_BALANCE';
+  const isQkey = method === 'QKEY_BALANCE';
+
+  // 잔액 결제가 아니거나, 회원이 아니거나, 이미 환불된 경우 → 스킵
+  if ((!isKrw && !isQkey) || !order.userId || order.refundedAt) {
+    return { refunded: false };
+  }
+
+  const currency: 'KRW' | 'QKEY' = isKrw ? 'KRW' : 'QKEY';
+  const column = isKrw ? 'krwBalance' : 'qkeyBalance';
+  // 결제 시 차감 규칙과 동일하게 환불 (QKEY 는 올림 환산)
+  const refundAmount = isKrw ? order.total : Math.ceil(order.total / QKEY_TO_KRW);
+  if (refundAmount <= 0) return { refunded: false };
+
+  // 현재 잔액 조회
+  const balRows: any = await tx.$queryRawUnsafe(
+    `SELECT "${column}" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
+    order.userId
+  );
+  const balRow = Array.isArray(balRows) ? balRows[0] : balRows;
+  const curBal = Number(balRow?.bal) || 0;
+  const afterBal = curBal + refundAmount;
+
+  // 잔액 증액
+  await tx.$executeRawUnsafe(
+    `UPDATE "User" SET "${column}" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
+    afterBal,
+    order.userId
+  );
+
+  // 이력 기록 (사용자 노출 안전 문구만)
+  const ledgerId = newId();
+  await tx.$executeRawUnsafe(
+    `INSERT INTO "BalanceLedger"
+       ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+    ledgerId,
+    order.userId,
+    currency,
+    refundAmount, // 양수 = 환불
+    afterBal,
+    reason,
+    order.id
+  );
+
+  return { refunded: true, currency, amount: refundAmount };
+}
 
 
 
@@ -69,20 +128,6 @@ export async function PATCH(
       return NextResponse.json({ error: '주문을 찾을 수 없습니다' }, { status: 404 });
     }
 
-    // 취소 시 재고 복구 (batch CASE WHEN — N+1 제거)
-    if (status === 'CANCELLED' && order.status !== 'CANCELLED' && order.items.length > 0) {
-      const stockMap = new Map<string, number>();
-      for (const item of order.items) {
-        stockMap.set(item.productId, (stockMap.get(item.productId) || 0) + item.quantity);
-      }
-      const ids = Array.from(stockMap.keys());
-      const caseParts = ids.map(pid => `WHEN '${pid}' THEN stock + ${stockMap.get(pid)}`).join(' ');
-      const inList = ids.map(pid => `'${pid}'`).join(',');
-      await prisma.$executeRawUnsafe(
-        `UPDATE Product SET stock = CASE id ${caseParts} ELSE stock END, updatedAt = datetime('now') WHERE id IN (${inList})`
-      );
-    }
-
     // 업데이트 데이터 구성
     const updateData: any = { status };
 
@@ -97,107 +142,77 @@ export async function PATCH(
     if (status === 'DELIVERED' && order.status !== 'DELIVERED') {
       updateData.deliveredAt = new Date().toISOString();
     }
-    if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
-      updateData.cancelledAt = new Date().toISOString();
-      
-      // KISPG 실결제 취소 - paymentKey 또는 수동 입력한 TID 사용
-      const tidForCancel = order.paymentKey || body.manualTid;
-      if (tidForCancel) {
-        // paymentKey가 없었던 주문에 수동 TID를 입력한 경우 저장
-        if (!order.paymentKey && body.manualTid) {
-          updateData.paymentKey = body.manualTid;
+
+    // [v1.0.22] 취소/환불 판단
+    const isCancelling = status === 'CANCELLED' && order.status !== 'CANCELLED';
+    const isRefunding = status === 'REFUNDED' && order.status !== 'REFUNDED';
+    const willRestock = isCancelling; // 취소 시에만 재고 복구
+    const refundReason = isCancelling ? '주문 취소 환불' : '주문 환불';
+
+    if (isCancelling) updateData.cancelledAt = new Date().toISOString();
+
+    // [v1.0.22] 재고 복구 + 잔액 환불 + 상태 변경을 하나의 트랜잭션으로 원자 처리
+    let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY'; amount?: number } = { refunded: false };
+
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // 1) 취소 시 재고 복구 (batch CASE WHEN — N+1 제거)
+      if (willRestock && order.items.length > 0) {
+        const stockMap = new Map<string, number>();
+        for (const item of order.items) {
+          stockMap.set(item.productId, (stockMap.get(item.productId) || 0) + item.quantity);
         }
-        try {
-          await cancelKispgPayment({
-            payMethod: normalizeKispgPayMethod(order.paymentMethod),
-            tid: tidForCancel,
-            canAmt: order.total,
-            canId: 'admin',
-            canNm: '관리자',
-            canMsg: body.cancelReason || '관리자에 의한 주문 취소',
-          });
-          updateData.refundAmount = order.total;
+        const ids = Array.from(stockMap.keys());
+        const caseParts = ids.map(pid => `WHEN '${pid}' THEN stock + ${stockMap.get(pid)}`).join(' ');
+        const inList = ids.map(pid => `'${pid}'`).join(',');
+        await tx.$executeRawUnsafe(
+          `UPDATE "Product" SET stock = CASE id ${caseParts} ELSE stock END, "updatedAt" = CURRENT_TIMESTAMP WHERE id IN (${inList})`
+        );
+      }
+
+      // 2) 잔액 환불 (KRW_BALANCE / QKEY_BALANCE 결제 & 미환불 주문만)
+      if (isCancelling || isRefunding) {
+        refundResult = await refundOrderBalance(
+          tx,
+          {
+            id: order.id,
+            userId: order.userId,
+            paymentMethod: order.paymentMethod,
+            total: order.total,
+            refundedAt: order.refundedAt,
+          },
+          refundReason
+        );
+        if (refundResult.refunded) {
           updateData.refundedAt = new Date().toISOString();
-        } catch (pgError: any) {
-          console.error('KISPG payment cancel failed (admin):', pgError.message);
-          // PG 취소 실패 시 에러 메시지 포함하여 반환 (주문 취소는 진행)
-          updateData._pgCancelError = pgError.message;
+          updateData.refundAmount = order.total; // KRW 기준 환불 금액 기록
         }
       }
-    }
 
-    // REFUNDED 상태 처리
-    if (status === 'REFUNDED' && order.status !== 'REFUNDED') {
-      updateData.refundedAt = new Date().toISOString();
-      
-      // KISPG 실결제 취소 (환불) - paymentKey 또는 수동 TID 사용
-      const tidForRefund = order.paymentKey || body.manualTid;
-      if (tidForRefund) {
-        if (!order.paymentKey && body.manualTid) {
-          updateData.paymentKey = body.manualTid;
-        }
-        try {
-          await cancelKispgPayment({
-            payMethod: normalizeKispgPayMethod(order.paymentMethod),
-            tid: tidForRefund,
-            canAmt: order.total,
-            canId: 'admin',
-            canNm: '관리자',
-            canMsg: body.cancelReason || '관리자에 의한 환불 처리',
-          });
-          updateData.refundAmount = order.total;
-        } catch (pgError: any) {
-          console.error('KISPG payment refund failed (admin):', pgError.message);
-          updateData._pgCancelError = pgError.message;
-        }
-      }
-    }
-
-    // PG 에러 메시지 추출 후 updateData에서 제거
-    const pgCancelError = updateData._pgCancelError;
-    delete updateData._pgCancelError;
-
-    // 주문 상태 업데이트
-    const updatedOrder = await prisma.order.update({
-      where: { id },
-      data: updateData,
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
+      // 3) 주문 상태 업데이트
+      return await tx.order.update({
+        where: { id },
+        data: updateData,
+        include: {
+          user: { select: { name: true, email: true } },
+          partner: { select: { storeName: true } },
+          items: { include: { product: { select: { name: true, price: true } } } },
         },
-        partner: {
-          select: {
-            storeName: true,
-          },
-        },
-        items: {
-          include: {
-            product: {
-              select: {
-                name: true,
-                price: true,
-              },
-            },
-          },
-        },
-      },
+      });
     });
 
     const responseData: any = {
       success: true,
       order: updatedOrder,
     };
-    
-    // PG 취소 결과에 따른 메시지
-    if (pgCancelError) {
-      responseData.message = '주문 상태가 변경되었습니다';
-      responseData.warning = `카드 결제 취소 API 응답 오류: ${pgCancelError}. 카드사에서 실제 취소가 되었는지 KISPG 관리자 페이지에서 확인해주세요.`;
-    } else if ((status === 'CANCELLED' || status === 'REFUNDED') && (order.paymentKey || body.manualTid)) {
-      responseData.message = '주문 취소 및 카드 결제 취소가 완료되었습니다';
-      responseData.pgCancelSuccess = true;
+
+    if (refundResult.refunded) {
+      const amtLabel = refundResult.currency === 'KRW'
+        ? `₩${(refundResult.amount || 0).toLocaleString()}`
+        : `${(refundResult.amount || 0).toLocaleString()} QKEY`;
+      responseData.message = `주문 ${isCancelling ? '취소' : '환불'} 및 잔액 환불(${amtLabel})이 완료되었습니다`;
+      responseData.refund = { currency: refundResult.currency, amount: refundResult.amount };
+    } else if ((isCancelling || isRefunding) && order.refundedAt) {
+      responseData.message = '주문 상태가 변경되었습니다 (이미 환불 처리된 주문)';
     } else {
       responseData.message = '주문 상태가 변경되었습니다';
     }

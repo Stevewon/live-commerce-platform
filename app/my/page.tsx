@@ -29,6 +29,8 @@ export default function MyPage() {
   const [wishlistCount, setWishlistCount] = useState(0);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // [v1.0.22] 잔액
+  const [balance, setBalance] = useState<{ krwBalance: number; qkeyBalance: number } | null>(null);
 
   // 인증 게이트 - 로그인 안 한 사용자는 로그인 페이지로 리다이렉트
   useEffect(() => {
@@ -63,6 +65,18 @@ export default function MyPage() {
         const data = await wishlistRes.json();
         const items = data.data || [];
         setWishlistCount(items.length);
+      }
+
+      // [v1.0.22] 잔액 조회
+      const balanceRes = await authFetch('/api/my/balance');
+      if (balanceRes.ok) {
+        const data = await balanceRes.json();
+        if (data.success && data.data) {
+          setBalance({
+            krwBalance: Number(data.data.krwBalance) || 0,
+            qkeyBalance: Number(data.data.qkeyBalance) || 0,
+          });
+        }
       }
     } catch (error) {
       console.error('마이페이지 데이터 로드 실패:', error);
@@ -129,6 +143,39 @@ export default function MyPage() {
           <p className="text-gray-500 text-sm sm:text-base lg:text-lg">
             {user.name || user.nickname || ''}{t.myPage.subtitle ? ` · ${t.myPage.subtitle}` : ''}
           </p>
+        </div>
+
+        {/* [v1.0.22] 잔액 배너 */}
+        <div className="mb-6 sm:mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl sm:rounded-2xl p-5 sm:p-7 text-white shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl sm:text-3xl">💰</span>
+              <h2 className="text-lg sm:text-xl font-bold">내 잔액</h2>
+            </div>
+            <Link
+              href="/my/balance"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs sm:text-sm font-semibold transition backdrop-blur"
+            >
+              충전 / 내역 →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs sm:text-sm text-blue-100 mb-1">KRW 잔액</div>
+              <div className="text-2xl sm:text-3xl font-bold">
+                {isLoading ? '...' : `₩${(balance?.krwBalance ?? 0).toLocaleString()}`}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm text-blue-100 mb-1">QKEY 잔액</div>
+              <div className="text-2xl sm:text-3xl font-bold">
+                {isLoading ? '...' : `${(balance?.qkeyBalance ?? 0).toLocaleString()} QKEY`}
+              </div>
+              {!isLoading && (
+                <div className="text-xs text-blue-100 mt-0.5">≈ ₩{((balance?.qkeyBalance ?? 0) * 10).toLocaleString()}</div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Dashboard Cards */}
