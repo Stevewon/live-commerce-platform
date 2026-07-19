@@ -49,12 +49,9 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await authFetch('/api/admin/stats', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // [2026-07-19 FIX] 잘못된 'token' 키 + Bearer null 로 authFetch 자동 토큰 첨부가 무력화되던 버그 제거.
+      // authFetch 가 auth-token + 쿠키를 자동 처리한다.
+      const response = await authFetch('/api/admin/stats');
 
       const result = await response.json();
       if (result.success) {

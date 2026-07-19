@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { authFetch } from '@/lib/auth/clientFetch'
 
 interface ImageUploadProps {
   currentImage?: string | null
@@ -43,16 +44,12 @@ export default function ImageUpload({ currentImage, onUploadSuccess, onUploadErr
     // 업로드
     try {
       setUploading(true)
-      const token = localStorage.getItem('token')
-      
+      // [2026-07-19 FIX] 잘못된 'token' 키 → 표준 authFetch 사용(auth-token + 쿠키). FormData 는 authFetch 가 Content-Type 자동 처리.
       const formData = new FormData()
       formData.append('file', file)
 
-      const res = await fetch('/api/upload/image', {
+      const res = await authFetch('/api/upload/image', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
         body: formData
       })
 

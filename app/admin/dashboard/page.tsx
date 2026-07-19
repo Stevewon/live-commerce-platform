@@ -228,6 +228,14 @@ export default function AdminDashboardPage() {
               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-2xl shadow-2xl ring-4 ring-white/20 hover:scale-110 transition-transform cursor-pointer">
                 {user?.name?.charAt(0)}
               </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-red-500/80 backdrop-blur-lg rounded-xl px-5 py-3 border border-white/20 hover:border-red-400 text-white font-bold transition-all"
+                title="로그아웃"
+              >
+                <span className="text-xl">🚪</span>
+                <span>로그아웃</span>
+              </button>
             </div>
           </div>
         </div>
