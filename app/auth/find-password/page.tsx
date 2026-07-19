@@ -8,7 +8,7 @@ import LanguageSelector from '@/components/LanguageSelector';
 export default function FindPasswordPage() {
   const { t } = useLanguage();
   const [formData, setFormData] = useState({
-    securetQrUrl: '',
+    quantariumWallet: '',
     newPassword: '',
     confirmPassword: '',
   });
@@ -21,7 +21,7 @@ export default function FindPasswordPage() {
     setError('');
     setSuccess(false);
 
-    if (!formData.securetQrUrl || !formData.newPassword || !formData.confirmPassword) {
+    if (!formData.quantariumWallet || !formData.newPassword || !formData.confirmPassword) {
       setError(t.findPassword.errorAllFields);
       return;
     }
@@ -45,7 +45,7 @@ export default function FindPasswordPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          securetQrUrl: formData.securetQrUrl,
+          quantariumWallet: formData.quantariumWallet,
           newPassword: formData.newPassword,
         }),
       });
@@ -59,7 +59,7 @@ export default function FindPasswordPage() {
       if (data.success) {
         setSuccess(true);
         setFormData({
-          securetQrUrl: '',
+          quantariumWallet: '',
           newPassword: '',
           confirmPassword: '',
         });
@@ -108,24 +108,24 @@ export default function FindPasswordPage() {
           )}
 
           <div className="space-y-4">
-            {/* Securet QR URL */}
+            {/* 퀀타리움 지갑주소 */}
             <div>
-              <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                {t.findPassword.securetQrUrl}
+              <label htmlFor="quantariumWallet" className="block text-sm font-medium text-gray-700 mb-1">
+                {t.findPassword.walletAddress}
               </label>
               <input
-                id="securetQrUrl"
-                name="securetQrUrl"
+                id="quantariumWallet"
+                name="quantariumWallet"
                 type="text"
                 autoComplete="off"
                 required
-                placeholder="https://securet.kr/securet.php?key=idcard&nick=..."
+                placeholder="0x..."
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={formData.securetQrUrl}
-                onChange={(e) => setFormData({ ...formData, securetQrUrl: e.target.value })}
+                value={formData.quantariumWallet}
+                onChange={(e) => setFormData({ ...formData, quantariumWallet: e.target.value })}
               />
               <p className="mt-1 text-xs text-gray-500">
-                {t.findPassword.securetQrUrlHelp}
+                {t.findPassword.walletAddressHelp}
               </p>
             </div>
 

@@ -12,7 +12,7 @@ export default function RegisterPage() {
   const { register: authRegister } = useAuth();
   const { t } = useLanguage();
   const [formData, setFormData] = useState({
-    securetQrUrl: '',
+    quantariumWallet: '',
     nickname: '',
     password: '',
     confirmPassword: '',
@@ -21,10 +21,9 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Validate Securet QR URL format
-  const validateSecuretUrl = (url: string): boolean => {
-    const pattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick=.+&token=.+&voip=.+&os=.+$/;
-    return pattern.test(url);
+  // Validate Quantarium wallet address format (0x + 40 hex)
+  const validateWallet = (address: string): boolean => {
+    return /^0x[a-fA-F0-9]{40}$/.test((address || '').trim());
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,12 +31,12 @@ export default function RegisterPage() {
     setError('');
 
     // Validation
-    if (!formData.securetQrUrl || !formData.nickname || !formData.password || !formData.confirmPassword) {
+    if (!formData.quantariumWallet || !formData.nickname || !formData.password || !formData.confirmPassword) {
       setError(t.register.errorAllFields);
       return;
     }
 
-    if (!validateSecuretUrl(formData.securetQrUrl)) {
+    if (!validateWallet(formData.quantariumWallet)) {
       setError(t.register.errorInvalidQr);
       return;
     }
@@ -63,7 +62,7 @@ export default function RegisterPage() {
       await authRegister({
         nickname: formData.nickname,
         password: formData.password,
-        securetQrUrl: formData.securetQrUrl,
+        quantariumWallet: formData.quantariumWallet,
         name: formData.nickname,
         role: 'CUSTOMER',
       });
@@ -102,26 +101,26 @@ export default function RegisterPage() {
           )}
 
           <div className="space-y-4">
-            {/* Securet QR URL */}
+            {/* Quantarium Wallet Address */}
             <div>
-              <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                {t.register.securetQrUrl} *
+              <label htmlFor="quantariumWallet" className="block text-sm font-medium text-gray-700 mb-1">
+                {t.register.walletAddress} *
               </label>
               <input
-                id="securetQrUrl"
-                name="securetQrUrl"
+                id="quantariumWallet"
+                name="quantariumWallet"
                 type="text"
                 required
                 autoComplete="off"
                 data-lpignore="true"
                 data-form-type="other"
-                placeholder=""
+                placeholder="0x..."
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={formData.securetQrUrl}
-                onChange={(e) => setFormData({ ...formData, securetQrUrl: e.target.value })}
+                value={formData.quantariumWallet}
+                onChange={(e) => setFormData({ ...formData, quantariumWallet: e.target.value })}
               />
               <p className="mt-1 text-xs text-gray-500">
-                {t.register.securetQrUrlHelp}
+                {t.register.walletAddressHelp}
               </p>
             </div>
 

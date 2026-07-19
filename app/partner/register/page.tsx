@@ -9,7 +9,7 @@ export default function PartnerRegisterPage() {
   const router = useRouter()
   const { register: authRegister } = useAuth()
   const [formData, setFormData] = useState({
-    securetQrUrl: '',
+    quantariumWallet: '',
     nickname: '',
     email: '',
     password: '',
@@ -46,10 +46,9 @@ export default function PartnerRegisterPage() {
     }
   }
 
-  // Securet QR URL 형식 검증
-  const validateSecuretUrl = (url: string): boolean => {
-    const pattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick=.+&token=.+&voip=.+&os=.+$/
-    return pattern.test(url)
+  // 퀀타리움 지갑주소 형식 검증 (0x + 40 hex)
+  const validateWallet = (address: string): boolean => {
+    return /^0x[a-fA-F0-9]{40}$/.test((address || '').trim())
   }
 
   // 이메일 형식 검증
@@ -65,14 +64,14 @@ export default function PartnerRegisterPage() {
     setError('')
 
     // 유효성 검사
-    if (!formData.securetQrUrl) {
-      setError('시큐릿 QR 주소를 입력해주세요.')
+    if (!formData.quantariumWallet) {
+      setError('퀀타리움 지갑주소를 입력해주세요.')
       setLoading(false)
       return
     }
 
-    if (!validateSecuretUrl(formData.securetQrUrl)) {
-      setError('올바른 시큐릿 QR 주소 형식이 아닙니다.\n형식: https://securet.kr/securet.php?key=idcard&nick=...&token=...&voip=...&os=...')
+    if (!validateWallet(formData.quantariumWallet)) {
+      setError('올바른 퀀타리움 지갑주소 형식이 아닙니다. (0x로 시작하는 42자리 주소)')
       setLoading(false)
       return
     }
@@ -118,7 +117,7 @@ export default function PartnerRegisterPage() {
       await authRegister({
         nickname: formData.nickname,
         password: formData.password,
-        securetQrUrl: formData.securetQrUrl,
+        quantariumWallet: formData.quantariumWallet,
         email: formData.email || undefined,
         name: formData.name || formData.nickname,
         phone: formData.phone || undefined,
@@ -216,21 +215,21 @@ export default function PartnerRegisterPage() {
               </h2>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">시큐릿 QR 주소 *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">퀀타리움 지갑주소 *</label>
                 <input
                   type="text"
-                  name="securetQrUrl"
+                  name="quantariumWallet"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                  value={formData.securetQrUrl}
+                  value={formData.quantariumWallet}
                   onChange={handleChange}
                   autoComplete="off"
                   data-lpignore="true"
                   data-form-type="other"
-                  placeholder=""
+                  placeholder="0x..."
                   required
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  시큐릿 메신저의 QR 주소를 입력해주세요
+                  퀀타리움 지갑주소(0x…)를 입력해주세요
                 </p>
               </div>
 

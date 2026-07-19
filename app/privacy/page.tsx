@@ -48,12 +48,12 @@ export default function PrivacyPage() {
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2 font-medium">일반 회원가입</td>
-                    <td className="border border-gray-300 px-4 py-2">닉네임, 비밀번호, 시큐릿 QR 인증 정보</td>
+                    <td className="border border-gray-300 px-4 py-2">닉네임, 비밀번호, 퀀타리움 지갑주소</td>
                     <td className="border border-gray-300 px-4 py-2">이메일, 전화번호, 이름</td>
                   </tr>
                   <tr className="bg-gray-50">
                     <td className="border border-gray-300 px-4 py-2 font-medium">파트너 가입</td>
-                    <td className="border border-gray-300 px-4 py-2">닉네임, 비밀번호, 시큐릿 QR 인증 정보, 이름, 연락처, 상점 이름</td>
+                    <td className="border border-gray-300 px-4 py-2">닉네임, 비밀번호, 퀀타리움 지갑주소, 이름, 연락처, 상점 이름</td>
                     <td className="border border-gray-300 px-4 py-2">이메일, 상점 소개, SNS 채널 URL</td>
                   </tr>
                   <tr>
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
             <h3 className="text-base font-semibold text-gray-800 mt-4 mb-2">2. 수집 방법</h3>
             <ul className="list-disc pl-5 space-y-1">
               <li>회원가입 및 서비스 이용 과정에서 이용자가 직접 입력</li>
-              <li>시큐릿(Securet) 메신저를 통한 본인 인증</li>
+              <li>퀀타리움(Quantarium) 지갑주소를 통한 본인 확인</li>
               <li>서비스 이용 과정에서 자동으로 생성 및 수집 (쿠키, 접속 로그 등)</li>
               <li>토스페이먼츠 등 결제 대행 서비스를 통한 결제 정보</li>
             </ul>
@@ -201,8 +201,8 @@ export default function PrivacyPage() {
                     <td className="border border-gray-300 px-4 py-2">서비스 인프라 운영, 콘텐츠 전송, 보안 서비스</td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-300 px-4 py-2">시큐릿(Securet)</td>
-                    <td className="border border-gray-300 px-4 py-2">본인 인증 서비스</td>
+                    <td className="border border-gray-300 px-4 py-2">퀀타리움(Quantarium)</td>
+                    <td className="border border-gray-300 px-4 py-2">지갑주소 기반 본인 확인 서비스</td>
                   </tr>
                 </tbody>
               </table>
@@ -246,7 +246,7 @@ export default function PrivacyPage() {
               <li><strong>접근 권한 관리:</strong> 개인정보에 대한 접근 권한을 최소한의 인원으로 제한하고 있습니다.</li>
               <li><strong>보안 인프라:</strong> Cloudflare를 통한 DDoS 방어, WAF(웹 애플리케이션 방화벽) 등 보안 서비스를 적용하고 있습니다.</li>
               <li><strong>인증 보안:</strong> JWT(JSON Web Token) 기반 인증 및 HTTP-Only 쿠키를 사용하여 토큰 탈취를 방지합니다.</li>
-              <li><strong>시큐릿 인증:</strong> 시큐릿 메신저 기반의 2차 본인 인증을 통해 계정 보안을 강화합니다.</li>
+              <li><strong>퀀타리움 지갑 인증:</strong> 퀀타리움 지갑주소 기반의 2차 본인 확인을 통해 계정 보안을 강화합니다.</li>
             </ul>
           </section>
 

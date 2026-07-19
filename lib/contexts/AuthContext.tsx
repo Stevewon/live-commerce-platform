@@ -27,7 +27,7 @@ interface AuthContextType {
 interface RegisterData {
   nickname: string  // Required now
   password: string
-  securetQrUrl: string  // Required now
+  quantariumWallet: string  // 퀀타리움 지갑주소 (0x 지갑주소) - Required
   name?: string
   email?: string  // Optional
   phone?: string

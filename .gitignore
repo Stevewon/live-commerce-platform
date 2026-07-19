@@ -47,3 +47,6 @@ core
 .dev.vars
 .wrangler/
 tsconfig.tsbuildinfo
+
+# DB export snapshots (contain live user data, never commit)
+db-export.json

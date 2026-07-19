@@ -10,6 +10,7 @@ import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from
 import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
 import { authFetch } from '@/lib/auth/clientFetch';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface CartItem {
   id: string;
@@ -37,6 +38,7 @@ interface CouponData {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,15 +74,15 @@ export default function CheckoutPage() {
   // 동적 배송비 설정
   const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
 
-  // 배송 메모 프리셋
+  // 배송 메모 프리셋 (value = 직접입력 여부 판별용 키, label = 다국어 표시)
   const MEMO_PRESETS = [
-    '직접 입력',
-    '문 앞에 놓아주세요',
-    '경비실에 맡겨주세요',
-    '배송 전 전화 부탁드립니다',
-    '부재 시 경비실에 맡겨주세요',
+    { key: 'direct', label: t.checkout.memoDirect },
+    { key: 'door', label: t.checkout.memoDoor },
+    { key: 'security', label: t.checkout.memoSecurity },
+    { key: 'callBefore', label: t.checkout.memoCallBefore },
+    { key: 'absentSecurity', label: t.checkout.memoAbsentSecurity },
   ];
-  const [memoPreset, setMemoPreset] = useState('직접 입력');
+  const [memoPreset, setMemoPreset] = useState('direct');
 
   // 배송비 설정 로드
   useEffect(() => {
@@ -245,35 +247,35 @@ export default function CheckoutPage() {
 
     // [v1.0.22] 잔액 결제는 회원 전용
     if (isGuest || !user) {
-      alert('잔액 결제는 로그인 후 이용 가능합니다. 로그인 후 잔액을 충전해주세요.');
+      alert(t.checkout.balanceLoginAlert);
       router.push('/login?redirect=/checkout');
       return;
     }
 
     if (!shippingName || !shippingPhone || !shippingAddress) {
-      alert('배송 정보를 모두 입력해주세요.');
+      alert(t.checkout.fillShipping);
       return;
     }
     if (cartItems.length === 0) {
-      alert('장바구니가 비어있습니다.');
+      alert(t.checkout.cartEmpty);
       return;
     }
 
     // [v1.0.22] 잔액 부족 사전 차단 (서버에서도 재검증됨)
     if (!selectedEnough) {
-      const label = paymentMethod === 'KRW_BALANCE' ? 'KRW 잔액' : 'QKEY 잔액';
-      if (confirm(`${label}이 부족합니다. 충전 페이지로 이동할까요?`)) {
+      const label = paymentMethod === 'KRW_BALANCE' ? t.checkout.krwBalance : t.checkout.qkeyBalance;
+      if (confirm(`${label}${t.checkout.insufficientConfirm}`)) {
         router.push('/my/balance');
       }
       return;
     }
     if (isGuest) {
       if (!guestEmail && !guestPhone) {
-        alert('비회원 주문 시 이메일 또는 연락처를 입력해주세요.');
+        alert(t.checkout.guestContactRequired);
         return;
       }
       if (!agreeTerms || !agreePrivacy) {
-        alert('이용약관 및 개인정보 수집에 동의해주세요.');
+        alert(t.checkout.agreeRequired);
         return;
       }
     }
@@ -284,7 +286,9 @@ export default function CheckoutPage() {
         ? `${shippingAddress} ${shippingAddressDetail}`
         : shippingAddress;
 
-      const finalMemo = memoPreset !== '직접 입력' ? memoPreset : shippingMemo;
+      const finalMemo = memoPreset !== 'direct'
+        ? (MEMO_PRESETS.find(m => m.key === memoPreset)?.label || shippingMemo)
+        : shippingMemo;
 
       const orderData: any = {
         items: cartItems.map(item => ({
@@ -330,18 +334,18 @@ export default function CheckoutPage() {
       if (!res.ok) {
         // 402: 잔액 부족 → 충전 페이지 유도
         if (res.status === 402 || result.code === 'INSUFFICIENT_BALANCE') {
-          if (confirm((result.error || '잔액이 부족합니다.') + '\n\n충전 페이지로 이동할까요?')) {
+          if (confirm((result.error || t.checkout.insufficientBalance) + '\n\n' + t.checkout.insufficientMoveConfirm)) {
             router.push('/my/balance');
           }
           return;
         }
         // 401: 로그인 필요
         if (res.status === 401 || result.code === 'AUTH_REQUIRED') {
-          alert(result.error || '로그인이 필요합니다.');
+          alert(result.error || t.checkout.loginRequired);
           router.push('/login?redirect=/checkout');
           return;
         }
-        throw new Error(result.error || '주문 생성 실패');
+        throw new Error(result.error || t.checkout.orderError);
       }
 
       const order = result.data;
@@ -364,8 +368,8 @@ export default function CheckoutPage() {
       window.location.replace(successUrl.toString());
       return;
     } catch (error: any) {
-      console.error('주문 실패:', error);
-      alert(error.message || '주문 처리 중 오류가 발생했습니다.');
+      console.error('order failed:', error);
+      alert(error.message || t.checkout.orderError);
     } finally {
       setSubmitting(false);
     }
@@ -376,7 +380,7 @@ export default function CheckoutPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">주문 정보를 불러오는 중...</p>
+          <p className="text-gray-600">{t.checkout.loadingOrder}</p>
         </div>
       </div>
     );
@@ -387,10 +391,10 @@ export default function CheckoutPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <span className="text-6xl block mb-4">🛒</span>
-          <h1 className="text-2xl font-bold mb-4">장바구니가 비어있습니다</h1>
-          <p className="text-gray-600 mb-6">상품을 담고 주문해주세요</p>
+          <h1 className="text-2xl font-bold mb-4">{t.checkout.emptyCart}</h1>
+          <p className="text-gray-600 mb-6">{t.checkout.emptyCartDesc}</p>
           <Link href="/products" className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition">
-            쇼핑하러 가기
+            {t.checkout.goShopping}
           </Link>
         </div>
       </div>
@@ -402,10 +406,10 @@ export default function CheckoutPage() {
       <ShopNavigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div className="flex items-center gap-3 mb-4 sm:mb-8">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">주문/결제</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">{t.checkout.title}</h1>
           {isGuest && (
             <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-bold">
-              비회원 주문
+              {t.checkout.guestOrder}
             </span>
           )}
         </div>
@@ -415,10 +419,10 @@ export default function CheckoutPage() {
           <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
             <span className="text-2xl">🏪</span>
             <div>
-              <p className="text-sm font-medium text-blue-700">파트너 스토어를 통한 주문입니다</p>
+              <p className="text-sm font-medium text-blue-700">{t.checkout.guestOrderVia}</p>
               {storeSlug && (
                 <Link href={`/store/${storeSlug}`} className="text-xs text-blue-500 hover:underline">
-                  스토어로 돌아가기
+                  {t.checkout.backToStore}
                 </Link>
               )}
             </div>
@@ -435,12 +439,12 @@ export default function CheckoutPage() {
                   <div className="flex items-start gap-3">
                     <span className="text-2xl flex-shrink-0">ℹ️</span>
                     <div>
-                      <h3 className="font-bold text-blue-900 mb-1">비회원 주문 안내</h3>
+                      <h3 className="font-bold text-blue-900 mb-1">{t.checkout.guestOrderNotice}</h3>
                       <p className="text-sm text-blue-700 mb-3">
-                        로그인 없이 주문 가능합니다. 주문 조회를 위해 이메일 또는 연락처를 입력해주세요.
+                        {t.checkout.guestOrderDesc}
                       </p>
                       <Link href="/login" className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-700">
-                        회원 로그인하기 →
+                        {t.checkout.memberLogin} →
                       </Link>
                     </div>
                   </div>
@@ -451,12 +455,12 @@ export default function CheckoutPage() {
               {isGuest && (
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                   <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                    <span>👤</span> 주문자 정보
+                    <span>👤</span> {t.checkout.ordererInfo}
                   </h2>
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        이메일 <span className="text-gray-400">(주문 확인용)</span>
+                        Email <span className="text-gray-400">({t.checkout.emailForOrder})</span>
                       </label>
                       <input type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)}
                         placeholder="example@email.com"
@@ -464,12 +468,12 @@ export default function CheckoutPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        연락처 <span className="text-red-500">*</span>
+                        {t.checkout.phone} <span className="text-red-500">*</span>
                       </label>
                       <input type="tel" value={guestPhone} onChange={e => setGuestPhone(e.target.value)}
                         placeholder="010-0000-0000"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
-                      <p className="text-xs text-gray-500 mt-1">비회원 주문 조회 시 필요합니다</p>
+                      <p className="text-xs text-gray-500 mt-1">{t.checkout.guestLookupHint}</p>
                     </div>
                   </div>
                 </div>
@@ -478,19 +482,19 @@ export default function CheckoutPage() {
               {/* 배송 정보 - 다음 우편번호 API 연동 */}
               <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                  <span>🚚</span> 배송 정보
+                  <span>🚚</span> {t.checkout.deliveryInfo}
                 </h2>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      받는 사람 <span className="text-red-500">*</span>
+                      {t.checkout.receiver} <span className="text-red-500">*</span>
                     </label>
                     <input type="text" value={shippingName} onChange={e => setShippingName(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      연락처 <span className="text-red-500">*</span>
+                      {t.checkout.phone} <span className="text-red-500">*</span>
                     </label>
                     <input type="tel" value={shippingPhone} onChange={e => setShippingPhone(e.target.value)}
                       placeholder="010-0000-0000"
@@ -498,38 +502,39 @@ export default function CheckoutPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      주소 <span className="text-red-500">*</span>
+                      {t.checkout.address} <span className="text-red-500">*</span>
                     </label>
                     <div className="flex gap-2 mb-2">
                       <input type="text" value={shippingZipCode} readOnly
-                        placeholder="우편번호"
+                        placeholder={t.checkout.zipCode}
                         className="w-32 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700" />
                       <AddressSearch onComplete={handleAddressComplete} />
                     </div>
                     <input type="text" value={shippingAddress} readOnly
-                      placeholder="주소 검색 버튼을 클릭하세요"
+                      placeholder={t.checkout.addressSearchHint}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 mb-2" />
                     <input type="text" value={shippingAddressDetail}
                       onChange={e => setShippingAddressDetail(e.target.value)}
-                      placeholder="상세주소 입력 (동/호수 등)"
+                      placeholder={t.checkout.detailAddressPlaceholder}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">배송 메모</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.checkout.memo}</label>
                     <select
                       value={memoPreset}
                       onChange={e => {
                         setMemoPreset(e.target.value);
-                        if (e.target.value !== '직접 입력') setShippingMemo(e.target.value);
-                        else setShippingMemo('');
+                        if (e.target.value !== 'direct') {
+                          setShippingMemo(MEMO_PRESETS.find(m => m.key === e.target.value)?.label || '');
+                        } else setShippingMemo('');
                       }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-700 mb-2"
                     >
-                      {MEMO_PRESETS.map(m => <option key={m} value={m}>{m}</option>)}
+                      {MEMO_PRESETS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
                     </select>
-                    {memoPreset === '직접 입력' && (
+                    {memoPreset === 'direct' && (
                       <textarea value={shippingMemo} onChange={e => setShippingMemo(e.target.value)}
-                        rows={2} placeholder="배송 시 요청사항을 입력하세요"
+                        rows={2} placeholder={t.checkout.memoPlaceholder}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                     )}
                   </div>
@@ -539,7 +544,7 @@ export default function CheckoutPage() {
               {/* 주문 상품 */}
               <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                  <span>📦</span> 주문 상품 ({cartItems.length}개)
+                  <span>📦</span> {t.checkout.orderProducts} ({cartItems.length}{t.checkout.itemsCount})
                 </h2>
                 <div className="space-y-4">
                   {cartItems.map(item => (
@@ -554,7 +559,7 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 line-clamp-2">{item.product.name}</h3>
-                        <p className="text-sm text-gray-600">₩{item.product.price.toLocaleString()} x {item.quantity}개</p>
+                        <p className="text-sm text-gray-600">₩{item.product.price.toLocaleString()} x {item.quantity}{t.checkout.itemsCount}</p>
                       </div>
                       <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                         <p className="font-bold text-gray-900">₩{(item.product.price * item.quantity).toLocaleString()}</p>
@@ -575,7 +580,7 @@ export default function CheckoutPage() {
                             }}
                             className="text-xs text-red-500 hover:text-red-700 font-medium"
                           >
-                            삭제
+                            {t.checkout.delete}
                           </button>
                         )}
                       </div>
@@ -588,30 +593,30 @@ export default function CheckoutPage() {
               {isGuest && (
                 <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                   <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                    <span>📋</span> 약관 동의
+                    <span>📋</span> {t.checkout.agreeTitle}
                   </h2>
                   <div className="space-y-3">
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input type="checkbox" checked={agreeTerms && agreePrivacy}
                         onChange={e => { setAgreeTerms(e.target.checked); setAgreePrivacy(e.target.checked); }}
                         className="w-5 h-5 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="text-sm font-bold text-gray-900">전체 동의</span>
+                      <span className="text-sm font-bold text-gray-900">{t.checkout.agreeAll}</span>
                     </label>
                     <div className="border-t pt-3 space-y-3 pl-8">
                       <label className="flex items-start gap-3 cursor-pointer">
                         <input type="checkbox" checked={agreeTerms} onChange={e => setAgreeTerms(e.target.checked)}
                           className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                         <span className="text-sm text-gray-700">
-                          [필수] 이용약관 동의
-                          <Link href="/terms" className="text-blue-600 hover:underline ml-1" target="_blank">보기</Link>
+                          {t.checkout.agreeTermsRequired}
+                          <Link href="/terms" className="text-blue-600 hover:underline ml-1" target="_blank">{t.checkout.view}</Link>
                         </span>
                       </label>
                       <label className="flex items-start gap-3 cursor-pointer">
                         <input type="checkbox" checked={agreePrivacy} onChange={e => setAgreePrivacy(e.target.checked)}
                           className="w-4 h-4 mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                         <span className="text-sm text-gray-700">
-                          [필수] 개인정보 수집 및 이용 동의
-                          <Link href="/privacy" className="text-blue-600 hover:underline ml-1" target="_blank">보기</Link>
+                          {t.checkout.agreePrivacyRequired}
+                          <Link href="/privacy" className="text-blue-600 hover:underline ml-1" target="_blank">{t.checkout.view}</Link>
                         </span>
                       </label>
                     </div>
@@ -623,7 +628,7 @@ export default function CheckoutPage() {
             {/* 결제 정보 */}
             <div className="lg:col-span-1">
               <div className="bg-white rounded-lg shadow p-4 sm:p-6 sticky top-20 sm:top-4 space-y-4">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900">결제 정보</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">{t.checkout.paymentInfo}</h2>
 
                 {/* 쿠폰 입력 */}
                 <CouponInput
@@ -634,24 +639,24 @@ export default function CheckoutPage() {
 
                 <div className="space-y-3 pt-2">
                   <div className="flex justify-between text-gray-600">
-                    <span>상품 금액</span>
+                    <span>{t.checkout.productAmount}</span>
                     <span>₩{totalAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
-                    <span>배송비</span>
-                    <span>{shippingFee === 0 ? <span className="text-green-600 font-medium">무료</span> : `₩${shippingFee.toLocaleString()}`}</span>
+                    <span>{t.checkout.shippingFee}</span>
+                    <span>{shippingFee === 0 ? <span className="text-green-600 font-medium">{t.checkout.free}</span> : `₩${shippingFee.toLocaleString()}`}</span>
                   </div>
                   {couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600">
-                      <span>쿠폰 할인</span>
+                      <span>{t.checkout.couponDiscount}</span>
                       <span className="font-medium">-₩{couponDiscount.toLocaleString()}</span>
                     </div>
                   )}
                   {shippingFee === 0 && totalAmount > 0 && (
-                    <p className="text-xs text-green-600 font-semibold">무료배송 적용!</p>
+                    <p className="text-xs text-green-600 font-semibold">{t.checkout.freeShippingApplied}</p>
                   )}
                   <div className="border-t pt-3 flex justify-between text-xl font-bold text-gray-900">
-                    <span>총 결제 금액</span>
+                    <span>{t.checkout.finalAmount}</span>
                     <span className="text-blue-600">₩{finalAmount.toLocaleString()}</span>
                   </div>
                 </div>
@@ -659,7 +664,7 @@ export default function CheckoutPage() {
                 {/* [v1.0.22] 잔액 결제수단 선택 */}
                 {!isGuest && user ? (
                   <div className="pt-2 space-y-2">
-                    <p className="text-sm font-semibold text-gray-800">결제 수단</p>
+                    <p className="text-sm font-semibold text-gray-800">{t.checkout.paymentMethod}</p>
 
                     {/* KRW 잔액 */}
                     <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition ${paymentMethod === 'KRW_BALANCE' ? 'border-blue-600 bg-blue-50' : 'border-gray-200'}`}>
@@ -671,10 +676,10 @@ export default function CheckoutPage() {
                           onChange={() => setPaymentMethod('KRW_BALANCE')}
                           className="accent-blue-600"
                         />
-                        <span className="text-sm font-medium text-gray-900">KRW 잔액</span>
+                        <span className="text-sm font-medium text-gray-900">{t.checkout.krwBalance}</span>
                       </div>
                       <span className={`text-sm font-semibold ${krwEnough ? 'text-gray-700' : 'text-red-500'}`}>
-                        {balanceLoading ? '조회 중...' : `₩${(balance?.krwBalance ?? 0).toLocaleString()}`}
+                        {balanceLoading ? t.checkout.loadingBalance : `₩${(balance?.krwBalance ?? 0).toLocaleString()}`}
                       </span>
                     </label>
 
@@ -688,28 +693,28 @@ export default function CheckoutPage() {
                           onChange={() => setPaymentMethod('QKEY_BALANCE')}
                           className="accent-blue-600"
                         />
-                        <span className="text-sm font-medium text-gray-900">QKEY 잔액</span>
+                        <span className="text-sm font-medium text-gray-900">{t.checkout.qkeyBalance}</span>
                       </div>
                       <span className={`text-sm font-semibold ${qkeyEnough ? 'text-gray-700' : 'text-red-500'}`}>
-                        {balanceLoading ? '조회 중...' : `${(balance?.qkeyBalance ?? 0).toLocaleString()} QKEY`}
+                        {balanceLoading ? t.checkout.loadingBalance : `${(balance?.qkeyBalance ?? 0).toLocaleString()} QKEY`}
                       </span>
                     </label>
 
                     {paymentMethod === 'QKEY_BALANCE' && (
-                      <p className="text-xs text-gray-500">필요 QKEY: {requiredQkey.toLocaleString()} QKEY (1 QKEY = 10원)</p>
+                      <p className="text-xs text-gray-500">{t.checkout.requiredQkey}: {requiredQkey.toLocaleString()} QKEY ({t.checkout.qkeyRate})</p>
                     )}
 
                     {!selectedEnough && !balanceLoading && (
                       <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg p-2">
-                        <span className="text-xs text-red-600 font-medium">잔액이 부족합니다</span>
-                        <Link href="/my/balance" className="text-xs font-semibold text-blue-600 underline">충전하기</Link>
+                        <span className="text-xs text-red-600 font-medium">{t.checkout.insufficientBalance}</span>
+                        <Link href="/my/balance" className="text-xs font-semibold text-blue-600 underline">{t.checkout.chargeBalance}</Link>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="pt-2 bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-700">
-                    잔액 결제는 로그인 후 이용 가능합니다.{' '}
-                    <Link href="/login?redirect=/checkout" className="font-semibold underline">로그인</Link>
+                    {t.checkout.balanceLoginRequired}{' '}
+                    <Link href="/login?redirect=/checkout" className="font-semibold underline">{t.checkout.login}</Link>
                   </div>
                 )}
 
@@ -721,22 +726,22 @@ export default function CheckoutPage() {
                   {submitting ? (
                     <span className="flex items-center justify-center gap-2">
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                      결제 처리 중...
+                      {t.checkout.paying}
                     </span>
                   ) : !selectedEnough && !isGuest && user && !balanceLoading ? (
-                    '잔액 충전 필요'
+                    t.checkout.chargeNeeded
                   ) : (
-                    `₩${finalAmount.toLocaleString()} 결제하기`
+                    `₩${finalAmount.toLocaleString()} ${t.checkout.payAmount}`
                   )}
                 </button>
 
                 <div className="pt-4 border-t text-xs text-gray-500 space-y-1">
-                  <p>KRW 잔액 또는 QKEY 잔액으로 결제됩니다 (1 QKEY = 10원)</p>
-                  <p>결제 즉시 주문이 확정됩니다</p>
-                  <p>주문 후 2-3일 이내 배송</p>
-                  <p>교환/반품 가능 (7일 이내)</p>
+                  <p>{t.checkout.footerBalance}</p>
+                  <p>{t.checkout.footerConfirm}</p>
+                  <p>{t.checkout.footerShipping}</p>
+                  <p>{t.checkout.footerReturn}</p>
                   <Link href="/my/balance" className="inline-block text-blue-600 font-medium underline mt-1">
-                    잔액 충전 / 내역 보기 →
+                    {t.checkout.footerChargeLink} →
                   </Link>
                 </div>
               </div>
