@@ -41,7 +41,7 @@ export default function TermsPage() {
               <li>&quot;회원&quot;이란 회사에 개인정보를 제공하고 회원등록을 한 자로서, 서비스를 지속적으로 이용할 수 있는 자를 말합니다.</li>
               <li>&quot;파트너&quot;란 회사와 제휴 계약을 체결하고, 플랫폼을 통해 상품을 판매하거나 라이브 방송을 진행하는 판매자를 말합니다.</li>
               <li>&quot;라이브 방송&quot;이란 파트너가 실시간 영상을 통해 상품을 소개하고 판매하는 서비스를 말합니다.</li>
-              <li>&quot;시큐릿 인증&quot;이란 시큐릿(Securet) 메신저 기반의 본인 인증 수단을 말합니다.</li>
+              <li>&quot;퀀타리움 지갑주소&quot;란 퀀타리움(Quantarium) 블록체인 기반의 본인 확인 및 계정 식별 수단을 말합니다.</li>
             </ol>
           </section>
 
@@ -59,7 +59,7 @@ export default function TermsPage() {
           <section className="mb-10">
             <h2 className="text-xl font-bold text-gray-900 mb-4 pb-2 border-b border-gray-200">제4조 (회원가입 및 계정)</h2>
             <ol className="list-decimal pl-5 space-y-2">
-              <li>회원가입은 이용자가 약관에 동의하고, 시큐릿 QR 인증 및 닉네임, 비밀번호를 등록함으로써 완료됩니다.</li>
+              <li>회원가입은 이용자가 약관에 동의하고, 퀀타리움 지갑주소 및 닉네임, 비밀번호를 등록함으로써 완료됩니다.</li>
               <li>회원은 가입 시 정확한 정보를 제공해야 하며, 허위 정보 제공 시 서비스 이용이 제한될 수 있습니다.</li>
               <li>회원은 자신의 계정 정보를 안전하게 관리할 책임이 있으며, 제3자에게 이를 양도하거나 대여할 수 없습니다.</li>
               <li>회사는 다음 각 호에 해당하는 경우 회원가입을 거부하거나 사후에 이용을 제한할 수 있습니다.

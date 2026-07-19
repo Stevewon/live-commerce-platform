@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth/password';
 
-// POST /api/auth/reset-password - 시큐릿 QR 주소로 비밀번호 재설정
+// POST /api/auth/reset-password - 퀀타리움 지갑주소로 비밀번호 재설정
 export async function POST(request: NextRequest) {
   const prisma = await getPrisma();
   try {
     const body = await request.json();
-    const { securetQrUrl, newPassword } = body;
+    const { newPassword } = body;
+    // 신규: quantariumWallet, 하위호환: securetQrUrl
+    const walletAddress = (body.quantariumWallet ?? body.securetQrUrl ?? '').trim();
     
-    if (!securetQrUrl || !newPassword) {
+    if (!walletAddress || !newPassword) {
       return NextResponse.json(
         {
           success: false,
-          error: '시큐릿 QR 주소와 새 비밀번호를 입력해주세요.',
+          error: '퀀타리움 지갑주소와 새 비밀번호를 입력해주세요.',
         },
         { status: 400 }
       );
@@ -29,9 +31,9 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 시큐릿 QR 주소로 사용자 찾기
+    // 퀀타리움 지갑주소로 사용자 찾기
     const user = await prisma.user.findFirst({
-      where: { securetQrUrl },
+      where: { securetQrUrl: walletAddress },
       select: {
         id: true,
       },
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: '해당 시큐릿 QR 주소로 등록된 계정을 찾을 수 없습니다.',
+          error: '해당 퀀타리움 지갑주소로 등록된 계정을 찾을 수 없습니다.',
         },
         { status: 404 }
       );

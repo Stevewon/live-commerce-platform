@@ -4,7 +4,7 @@ import { getPrisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 
-// POST /api/auth/register - 간편 회원가입 (닉네임 + 비밀번호 + Securet QR 주소)
+// POST /api/auth/register - 간편 회원가입 (닉네임 + 비밀번호 + 퀀타리움 지갑주소)
 export async function POST(request: NextRequest) {
   const prisma = await getPrisma();
   try {
@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
       nickname,
       password, 
       securetQrUrl,
+      quantariumWallet,
       email,
       name, 
       phone, 
@@ -23,24 +24,27 @@ export async function POST(request: NextRequest) {
       description
     } = body;
     
+    // 퀀타리움 지갑주소 (신규: quantariumWallet, 하위호환: securetQrUrl)
+    const walletAddress = (quantariumWallet ?? securetQrUrl ?? '').trim();
+
     // 입력 검증
-    if (!nickname || !password || !securetQrUrl) {
+    if (!nickname || !password || !walletAddress) {
       return NextResponse.json(
         {
           success: false,
-          error: '닉네임, 비밀번호, 시큐릿 QR 주소는 필수입니다.',
+          error: '닉네임, 비밀번호, 퀀타리움 지갑주소는 필수입니다.',
         },
         { status: 400 }
       );
     }
     
-    // Securet QR URL 형식 검증
-    const securetUrlPattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick=.+&token=.+&voip=.+&os=.+$/;
-    if (!securetUrlPattern.test(securetQrUrl)) {
+    // 퀀타리움 지갑주소 형식 검증 (0x + 40 hex)
+    const walletPattern = /^0x[a-fA-F0-9]{40}$/;
+    if (!walletPattern.test(walletAddress)) {
       return NextResponse.json(
         {
           success: false,
-          error: '올바른 시큐릿 QR 주소 형식이 아닙니다.',
+          error: '올바른 퀀타리움 지갑주소 형식이 아닙니다. (0x로 시작하는 42자리 주소)',
         },
         { status: 400 }
       );
@@ -110,7 +114,7 @@ export async function POST(request: NextRequest) {
         data: {
           nickname,
           password: hashedPassword,
-          securetQrUrl,
+          securetQrUrl: walletAddress,
           email: email || null,
           name: name || nickname, // name이 없으면 nickname 사용
           phone: phone || null,

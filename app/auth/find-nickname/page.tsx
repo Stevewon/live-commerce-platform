@@ -7,7 +7,7 @@ import LanguageSelector from '@/components/LanguageSelector';
 
 export default function FindNicknamePage() {
   const { t } = useLanguage();
-  const [securetQrUrl, setSecuretQrUrl] = useState('');
+  const [walletAddress, setWalletAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [foundNickname, setFoundNickname] = useState('');
@@ -17,7 +17,7 @@ export default function FindNicknamePage() {
     setError('');
     setFoundNickname('');
 
-    if (!securetQrUrl) {
+    if (!walletAddress) {
       setError(t.findNickname.errorRequired);
       return;
     }
@@ -30,7 +30,7 @@ export default function FindNicknamePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ securetQrUrl }),
+        body: JSON.stringify({ quantariumWallet: walletAddress }),
       });
 
       const data = await response.json();
@@ -84,21 +84,21 @@ export default function FindNicknamePage() {
           )}
 
           <div>
-            <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1">
-              {t.findNickname.securetQrUrl}
+            <label htmlFor="walletAddress" className="block text-sm font-medium text-gray-700 mb-1">
+              {t.findNickname.walletAddress}
             </label>
             <input
-              id="securetQrUrl"
-              name="securetQrUrl"
+              id="walletAddress"
+              name="walletAddress"
               type="text"
               required
-              placeholder="https://securet.kr/securet.php?key=idcard&nick=..."
+              placeholder="0x..."
               className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={securetQrUrl}
-              onChange={(e) => setSecuretQrUrl(e.target.value)}
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
             />
             <p className="mt-1 text-xs text-gray-500">
-              {t.findNickname.securetQrUrlHelp}
+              {t.findNickname.walletAddressHelp}
             </p>
           </div>
 

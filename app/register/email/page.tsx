@@ -10,7 +10,7 @@ export default function EmailRegisterPage() {
   const { register: authRegister } = useAuth();
   
   const [formData, setFormData] = useState({
-    securetQrUrl: '',
+    quantariumWallet: '',
     nickname: '',
     name: '',
     email: '',
@@ -24,10 +24,9 @@ export default function EmailRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState('');
 
-  // Securet QR URL 형식 검증
-  const validateSecuretUrl = (url: string): boolean => {
-    const pattern = /^https:\/\/securet\.kr\/securet\.php\?key=idcard&nick=.+&token=.+&voip=.+&os=.+$/;
-    return pattern.test(url);
+  // 퀀타리움 지갑주소 형식 검증 (0x + 40 hex)
+  const validateWallet = (address: string): boolean => {
+    return /^0x[a-fA-F0-9]{40}$/.test((address || '').trim());
   };
 
   // 이메일 유효성 검증
@@ -48,10 +47,10 @@ export default function EmailRegisterPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.securetQrUrl.trim()) {
-      newErrors.securetQrUrl = '시큐릿 QR 주소를 입력해주세요.';
-    } else if (!validateSecuretUrl(formData.securetQrUrl)) {
-      newErrors.securetQrUrl = '올바른 시큐릿 QR 주소 형식이 아닙니다.';
+    if (!formData.quantariumWallet.trim()) {
+      newErrors.quantariumWallet = '퀀타리움 지갑주소를 입력해주세요.';
+    } else if (!validateWallet(formData.quantariumWallet)) {
+      newErrors.quantariumWallet = '올바른 퀀타리움 지갑주소 형식이 아닙니다. (0x로 시작하는 42자리 주소)';
     }
 
     if (!formData.nickname.trim()) {
@@ -104,7 +103,7 @@ export default function EmailRegisterPage() {
       await authRegister({
         nickname: formData.nickname,
         password: formData.password,
-        securetQrUrl: formData.securetQrUrl,
+        quantariumWallet: formData.quantariumWallet,
         name: formData.name,
         email: formData.email,
         phone: formData.phone.replace(/[^\d]/g, '') || undefined,
@@ -160,7 +159,7 @@ export default function EmailRegisterPage() {
             이메일로 가입하기
           </h2>
           <p className="text-sm text-gray-600">
-            시큐릿 QR 주소와 함께 이메일로 가입합니다
+            퀀타리움 지갑주소와 함께 이메일로 가입합니다
           </p>
         </div>
 
@@ -172,30 +171,30 @@ export default function EmailRegisterPage() {
             </div>
           )}
 
-          {/* 시큐릿 QR 주소 */}
+          {/* 퀀타리움 지갑주소 */}
           <div>
-            <label htmlFor="securetQrUrl" className="block text-sm font-medium text-gray-700 mb-1.5">
-              시큐릿 QR 주소 <span className="text-red-500">*</span>
+            <label htmlFor="quantariumWallet" className="block text-sm font-medium text-gray-700 mb-1.5">
+              퀀타리움 지갑주소 <span className="text-red-500">*</span>
             </label>
             <input
-              id="securetQrUrl"
-              name="securetQrUrl"
+              id="quantariumWallet"
+              name="quantariumWallet"
               type="text"
-              value={formData.securetQrUrl}
+              value={formData.quantariumWallet}
               onChange={handleChange}
               className={`w-full px-4 py-3 border ${
-                errors.securetQrUrl ? 'border-red-300' : 'border-gray-200'
+                errors.quantariumWallet ? 'border-red-300' : 'border-gray-200'
               } rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all`}
-              placeholder=""
+              placeholder="0x..."
               autoComplete="off"
               data-lpignore="true"
               data-form-type="other"
             />
             <p className="mt-1 text-xs text-gray-500">
-              시큐릿 메신저의 QR 주소를 입력해주세요
+              퀀타리움 지갑주소(0x…)를 입력해주세요
             </p>
-            {errors.securetQrUrl && (
-              <p className="mt-1.5 text-sm text-red-600">{errors.securetQrUrl}</p>
+            {errors.quantariumWallet && (
+              <p className="mt-1.5 text-sm text-red-600">{errors.quantariumWallet}</p>
             )}
           </div>
 

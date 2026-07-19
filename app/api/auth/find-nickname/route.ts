@@ -1,26 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 
-// POST /api/auth/find-nickname - 시큐릿 QR 주소로 닉네임 찾기
+// POST /api/auth/find-nickname - 퀀타리움 지갑주소로 닉네임 찾기
 export async function POST(request: NextRequest) {
   const prisma = await getPrisma();
   try {
     const body = await request.json();
-    const { securetQrUrl } = body;
+    // 신규: quantariumWallet, 하위호환: securetQrUrl
+    const walletAddress = (body.quantariumWallet ?? body.securetQrUrl ?? '').trim();
     
-    if (!securetQrUrl) {
+    if (!walletAddress) {
       return NextResponse.json(
         {
           success: false,
-          error: '시큐릿 QR 주소를 입력해주세요.',
+          error: '퀀타리움 지갑주소를 입력해주세요.',
         },
         { status: 400 }
       );
     }
     
-    // 시큐릿 QR 주소로 사용자 찾기
+    // 퀀타리움 지갑주소로 사용자 찾기
     const user = await prisma.user.findFirst({
-      where: { securetQrUrl },
+      where: { securetQrUrl: walletAddress },
       select: {
         nickname: true,
       },
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: '해당 시큐릿 QR 주소로 등록된 계정을 찾을 수 없습니다.',
+          error: '해당 퀀타리움 지갑주소로 등록된 계정을 찾을 수 없습니다.',
         },
         { status: 404 }
       );
