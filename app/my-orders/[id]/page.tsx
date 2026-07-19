@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { ORDER_STATUS_MAP, COURIER_COMPANIES, getTrackingUrl } from '@/lib/utils/courier';
+import { paymentMethodLabel } from '@/lib/utils/orders';
 
 interface OrderItem {
   id: string;
@@ -303,7 +304,7 @@ export default function OrderDetailPage() {
             </div>
             {order.paymentMethod && (
               <p className="text-xs text-gray-400 text-right mt-1">
-                결제수단: {order.paymentMethod === 'card' ? '신용카드' : order.paymentMethod}
+                결제수단: {paymentMethodLabel(order.paymentMethod)}
                 {order.paidAt && ` | ${new Date(order.paidAt).toLocaleDateString('ko-KR')}`}
               </p>
             )}
