@@ -200,3 +200,30 @@ export const createSampleOrders = (): void => {
   localStorage.setItem(ORDERS_KEY, JSON.stringify(sampleOrders));
   window.dispatchEvent(new Event('ordersUpdated'));
 };
+
+/**
+ * [v1.0.22] 결제수단 사용자 표시 라벨
+ * - 사용자에게는 안전한 한글 문구만 노출 (내부 마커/PG/enum 노출 금지)
+ * - 잔액 결제: KRW 잔액 / QKEY 잔액
+ * - 과거 KISPG/카드 주문 및 auto-cancel 마커 등은 중립 문구로 표시
+ */
+export function paymentMethodLabel(method?: string | null): string {
+  if (!method) return '잔액 결제';
+  const m = String(method).trim();
+  if (m === 'KRW_BALANCE') return 'KRW 잔액';
+  if (m === 'QKEY_BALANCE') return 'QKEY 잔액';
+  // 과거 카드/PG 주문 또는 내부 마커가 섞인 값 → 사용자에게는 중립 문구
+  const lower = m.toLowerCase();
+  if (
+    m === 'card' ||
+    m === '신용카드' ||
+    m === '결제대기' ||
+    m === '결제창진입' ||
+    lower.includes('card') ||
+    lower.includes('kispg') ||
+    lower.includes('auto-cancel')
+  ) {
+    return '결제 완료';
+  }
+  return m;
+}

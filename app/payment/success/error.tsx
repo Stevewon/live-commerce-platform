@@ -4,7 +4,7 @@
  * [2026-05-12 v1.0.17 HOTFIX] payment/success 전용 error boundary
  *
  * 배경:
- *   - PC 카드결제 후 /payment/success 에서 어떤 throw 가 발생하면 app/error.tsx (global) 가 트리거
+ *   - /payment/success 에서 어떤 throw 가 발생하면 app/error.tsx (global) 가 트리거
  *     → 흰 창 + "😢 오류가 발생했습니다" 표시 → 사장님 사고 보고
  *
  * 목적:

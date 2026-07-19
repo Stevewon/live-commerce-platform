@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
 import { authFetch } from '@/lib/auth/clientFetch';
+import { paymentMethodLabel } from '@/lib/utils/orders';
 
 interface OrderItem {
   id: string;
@@ -220,7 +221,7 @@ export default function OrderDetailPage() {
             {order.paymentMethod && (
               <div className="flex justify-between text-sm text-gray-500 pt-2">
                 <span>결제수단</span>
-                <span>{order.paymentMethod === 'card' ? '신용카드' : order.paymentMethod}</span>
+                <span>{paymentMethodLabel(order.paymentMethod)}</span>
               </div>
             )}
           </div>
