@@ -5,7 +5,7 @@ import { orderConfirmationEmail, sendEmail } from '@/lib/email'
 import { orderConfirmationSMS, sendSMS } from '@/lib/sms'
 import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
 // [v1.0.22] 잔액 결제 시스템 통합
-import { getD1, krwToQkey, QKEY_TO_KRW, newId } from '@/lib/balance';
+import { getD1, krwToQkey, QKEY_TO_KRW, newId, qtaFromKrw, ensureQtaColumn } from '@/lib/balance';
 // Cloudflare Workers compatible crypto
 
 // ─── 휴대전화번호 정규화 (KR) ───
@@ -383,6 +383,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // QTA 적립 컬럼 자동 보정 (멱등, 회원 주문 시에만 의미)
+    if (userId) {
+      try {
+        await ensureQtaColumn(await getD1());
+      } catch { /* 보정 실패해도 주문은 진행 */ }
+    }
+
     // 주문 생성 (트랜잭션)
     const order = await prisma.$transaction(async (tx) => {
       // Build order data - only include non-null/undefined fields for D1 compatibility
@@ -478,6 +485,51 @@ export async function POST(req: NextRequest) {
           '주문 결제',
           newOrder.id
         );
+      }
+
+      // [QTA 적립] 구매 금액의 5% 를 QTA 로 적립 (100원 = 1 QTA)
+      // ── 회원(userId 존재)만 적립. 예: 20,000원 → 5% = 1,000원 → ÷100 = 10 QTA
+      //    같은 트랜잭션 내부 raw 실행으로 원자성 보장.
+      //    적립 실패가 주문 자체를 막지 않도록 방어적으로 처리.
+      if (userId) {
+        try {
+          const qtaEarned = qtaFromKrw(total);
+          if (qtaEarned > 0) {
+            // 1) 현재 QTA 적립 잔액 재조회
+            const qtaRows: any = await tx.$queryRawUnsafe(
+              `SELECT "qtaBalance" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
+              userId
+            );
+            const qtaRow = Array.isArray(qtaRows) ? qtaRows[0] : qtaRows;
+            const curQta = Number(qtaRow?.bal) || 0;
+            const afterQta = curQta + qtaEarned;
+
+            // 2) User QTA 적립 잔액 증가
+            await tx.$executeRawUnsafe(
+              `UPDATE "User" SET "qtaBalance" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
+              afterQta,
+              userId
+            );
+
+            // 3) BalanceLedger 기록 (사용자 노출 안전 문구만)
+            const qtaLedgerId = newId();
+            await tx.$executeRawUnsafe(
+              `INSERT INTO "BalanceLedger"
+                 ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+               VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+              qtaLedgerId,
+              userId,
+              'QTA',
+              qtaEarned,
+              afterQta,
+              '구매 적립',
+              newOrder.id
+            );
+          }
+        } catch (qtaErr: any) {
+          // QTA 적립 실패는 주문 결제/생성을 막지 않는다 (로그만 남김)
+          console.warn('[QTA 적립 실패(무시)]', String(qtaErr?.message || qtaErr || ''));
+        }
       }
 
       // 재고 차감 (batch update - N+1 쿼리 제거)
