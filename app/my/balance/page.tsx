@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import ShopNavigation from '@/components/ShopNavigation';
 import { authFetch } from '@/lib/auth/clientFetch';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 // 회사 입금/수령 정보 (lib/balance.ts 와 동일)
 const BANK_INFO = {
@@ -53,6 +54,8 @@ interface RequestRow {
 
 export default function BalancePage() {
   const router = useRouter();
+  const { t, locale } = useLanguage();
+  const dateLocaleMap: Record<string, string> = { ko: 'ko-KR', en: 'en-US', vi: 'vi-VN', th: 'th-TH', ja: 'ja-JP', zh: 'zh-CN' };
   const { user, loading: authLoading } = useAuth();
 
   const [balance, setBalance] = useState<Balance | null>(null);
@@ -111,9 +114,9 @@ export default function BalancePage() {
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      alert(`${label}이(가) 복사되었습니다.`);
+      alert(`${label}${t.balance.copied}`);
     } catch {
-      alert('복사에 실패했습니다. 직접 입력해주세요.');
+      alert(t.balance.copyFail);
     }
   };
 
@@ -121,14 +124,14 @@ export default function BalancePage() {
     e.preventDefault();
     const amt = parseInt(amount.replace(/[^0-9]/g, ''), 10);
     if (!Number.isFinite(amt) || amt <= 0) {
-      alert('충전 금액을 올바르게 입력해주세요.');
+      alert(t.balance.amountInvalid);
       return;
     }
     if (depositType === 'KRW_DEPOSIT') {
-      if (amt < 1000) return alert('무통장입금 최소 충전 금액은 1,000원 입니다.');
-      if (!depositorName.trim()) return alert('입금자명을 입력해주세요.');
+      if (amt < 1000) return alert(t.balance.krwMin);
+      if (!depositorName.trim()) return alert(t.balance.depositorRequired);
     } else {
-      if (!txHash.trim()) return alert('TX 해시를 입력해주세요.');
+      if (!txHash.trim()) return alert(t.balance.txHashRequired);
     }
 
     const body: any = { type: depositType, amount: amt };
@@ -147,9 +150,9 @@ export default function BalancePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        throw new Error(data.error || '충전 신청에 실패했습니다.');
+        throw new Error(data.error || t.balance.chargeFail);
       }
-      alert(data.message || '충전 신청이 접수되었습니다. 관리자 승인 후 반영됩니다.');
+      alert(data.message || t.balance.chargeSuccess);
       setAmount('');
       setDepositorName('');
       setTxHash('');
@@ -157,7 +160,7 @@ export default function BalancePage() {
       setTab('requests');
       loadAll();
     } catch (err: any) {
-      alert(err.message || '충전 신청 중 오류가 발생했습니다.');
+      alert(err.message || t.balance.chargeError);
     } finally {
       setSubmitting(false);
     }
@@ -170,9 +173,9 @@ export default function BalancePage() {
       REJECTED: 'text-red-700 bg-red-100',
     };
     const label: Record<string, string> = {
-      PENDING: '승인 대기',
-      APPROVED: '승인 완료',
-      REJECTED: '거부됨',
+      PENDING: t.balance.statusPending,
+      APPROVED: t.balance.statusApproved,
+      REJECTED: t.balance.statusRejected,
     };
     return (
       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${map[status] || 'text-gray-700 bg-gray-100'}`}>
@@ -183,7 +186,7 @@ export default function BalancePage() {
 
   const fmtDate = (s: string) => {
     try {
-      return new Date(s).toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' } as any);
+      return new Date(s).toLocaleString(dateLocaleMap[locale] || 'ko-KR', { dateStyle: 'medium', timeStyle: 'short' } as any);
     } catch {
       return s;
     }
@@ -203,32 +206,32 @@ export default function BalancePage() {
 
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-4xl">
         <div className="mb-6 flex items-center gap-2">
-          <Link href="/my" className="text-gray-400 hover:text-gray-600 text-sm">← 마이페이지</Link>
+          <Link href="/my" className="text-gray-400 hover:text-gray-600 text-sm">← {t.balance.myPage}</Link>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">💰 내 잔액</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">💰 {t.balance.title}</h1>
 
         {/* 잔액 카드 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-            <div className="text-sm text-gray-500 mb-1">KRW 잔액</div>
+            <div className="text-sm text-gray-500 mb-1">{t.balance.krwBalance}</div>
             <div className="text-3xl font-bold text-blue-600">
               {loading ? '...' : `₩${(balance?.krwBalance ?? 0).toLocaleString()}`}
             </div>
           </div>
           <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-            <div className="text-sm text-gray-500 mb-1">QKEY 잔액</div>
+            <div className="text-sm text-gray-500 mb-1">{t.balance.qkeyBalance}</div>
             <div className="text-3xl font-bold text-indigo-600">
               {loading ? '...' : `${(balance?.qkeyBalance ?? 0).toLocaleString()} QKEY`}
             </div>
             {!loading && (
-              <div className="text-xs text-gray-400 mt-1">≈ ₩{(balance?.qkeyBalanceInKrw ?? 0).toLocaleString()} (1 QKEY = 10원)</div>
+              <div className="text-xs text-gray-400 mt-1">≈ ₩{(balance?.qkeyBalanceInKrw ?? 0).toLocaleString()} ({t.checkout.qkeyRate})</div>
             )}
           </div>
         </div>
 
         {/* 충전 신청 폼 */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm mb-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">충전 신청</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">{t.balance.chargeRequest}</h2>
 
           {/* 타입 선택 */}
           <div className="flex gap-2 mb-5">
@@ -237,37 +240,37 @@ export default function BalancePage() {
               onClick={() => setDepositType('KRW_DEPOSIT')}
               className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border transition ${depositType === 'KRW_DEPOSIT' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
             >
-              KRW 무통장입금
+              {t.balance.krwDeposit}
             </button>
             <button
               type="button"
               onClick={() => setDepositType('QKEY_DEPOSIT')}
               className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border transition ${depositType === 'QKEY_DEPOSIT' ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-600'}`}
             >
-              QKEY 송금
+              {t.balance.qkeyTransfer}
             </button>
           </div>
 
           {/* 입금/송금 안내 */}
           {depositType === 'KRW_DEPOSIT' ? (
             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4 text-sm space-y-1.5">
-              <p className="font-semibold text-blue-800">아래 계좌로 입금 후 신청해주세요</p>
+              <p className="font-semibold text-blue-800">{t.balance.depositGuideKrw}</p>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">{BANK_INFO.bankName}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="font-mono font-semibold text-gray-900">{BANK_INFO.accountNumber}</span>
-                <button type="button" onClick={() => copyToClipboard(BANK_INFO.accountNumber, '계좌번호')} className="text-xs text-blue-600 underline">복사</button>
+                <button type="button" onClick={() => copyToClipboard(BANK_INFO.accountNumber, t.balance.accountNumberLabel)} className="text-xs text-blue-600 underline">{t.balance.copy}</button>
               </div>
-              <div className="text-gray-600">예금주: {BANK_INFO.accountHolder}</div>
+              <div className="text-gray-600">{t.balance.accountHolder}: {BANK_INFO.accountHolder}</div>
             </div>
           ) : (
             <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 mb-4 text-sm space-y-1.5">
-              <p className="font-semibold text-indigo-800">아래 지갑으로 QKEY 송금 후 TX 해시를 입력해주세요</p>
+              <p className="font-semibold text-indigo-800">{t.balance.depositGuideQkey}</p>
               <div className="text-gray-600">{QKEY_WALLET.network}</div>
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-xs text-gray-900 break-all">{QKEY_WALLET.address}</span>
-                <button type="button" onClick={() => copyToClipboard(QKEY_WALLET.address, '지갑 주소')} className="text-xs text-indigo-600 underline flex-shrink-0">복사</button>
+                <button type="button" onClick={() => copyToClipboard(QKEY_WALLET.address, t.balance.walletAddressLabel)} className="text-xs text-indigo-600 underline flex-shrink-0">{t.balance.copy}</button>
               </div>
             </div>
           )}
@@ -275,7 +278,7 @@ export default function BalancePage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                충전 {depositType === 'KRW_DEPOSIT' ? '금액 (원)' : '수량 (QKEY)'}
+                {depositType === 'KRW_DEPOSIT' ? t.balance.chargeAmountKrw : t.balance.chargeAmountQkey}
               </label>
               <input
                 type="text"
@@ -292,29 +295,29 @@ export default function BalancePage() {
 
             {depositType === 'KRW_DEPOSIT' ? (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">입금자명</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.balance.depositorName}</label>
                 <input
                   type="text"
                   value={depositorName}
                   onChange={(e) => setDepositorName(e.target.value)}
-                  placeholder="실제 입금하신 분의 성함"
+                  placeholder={t.balance.depositorPlaceholder}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             ) : (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">TX 해시</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.balance.txHash}</label>
                   <input
                     type="text"
                     value={txHash}
                     onChange={(e) => setTxHash(e.target.value)}
-                    placeholder="송금 트랜잭션 해시"
+                    placeholder={t.balance.txHashPlaceholder}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">보내는 지갑 주소 (선택)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.balance.senderAddress}</label>
                   <input
                     type="text"
                     value={senderAddress}
@@ -331,9 +334,9 @@ export default function BalancePage() {
               disabled={submitting}
               className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 transition"
             >
-              {submitting ? '신청 중...' : '충전 신청'}
+              {submitting ? t.balance.requesting : t.balance.submitCharge}
             </button>
-            <p className="text-xs text-gray-400 text-center">관리자 확인 후 잔액이 반영됩니다.</p>
+            <p className="text-xs text-gray-400 text-center">{t.balance.adminApproveNote}</p>
           </form>
         </div>
 
@@ -344,22 +347,22 @@ export default function BalancePage() {
               onClick={() => setTab('ledger')}
               className={`flex-1 py-3 text-sm font-semibold transition ${tab === 'ledger' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
             >
-              잔액 이력
+              {t.balance.ledgerTab}
             </button>
             <button
               onClick={() => setTab('requests')}
               className={`flex-1 py-3 text-sm font-semibold transition ${tab === 'requests' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
             >
-              충전 신청 내역
+              {t.balance.requestsTab}
             </button>
           </div>
 
           <div className="p-4 sm:p-6">
             {loading ? (
-              <div className="text-center py-8 text-gray-400">불러오는 중...</div>
+              <div className="text-center py-8 text-gray-400">{t.balance.loading}</div>
             ) : tab === 'ledger' ? (
               ledger.length === 0 ? (
-                <div className="text-center py-8 text-gray-400 text-sm">잔액 이력이 없습니다.</div>
+                <div className="text-center py-8 text-gray-400 text-sm">{t.balance.noLedger}</div>
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {ledger.map((row) => (
@@ -373,31 +376,31 @@ export default function BalancePage() {
                           {row.amount >= 0 ? '+' : ''}
                           {row.amount.toLocaleString()} {row.currency}
                         </div>
-                        <div className="text-xs text-gray-400">잔액 {row.balanceAfter.toLocaleString()}</div>
+                        <div className="text-xs text-gray-400">{t.balance.balanceLabel} {row.balanceAfter.toLocaleString()}</div>
                       </div>
                     </li>
                   ))}
                 </ul>
               )
             ) : requests.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 text-sm">충전 신청 내역이 없습니다.</div>
+              <div className="text-center py-8 text-gray-400 text-sm">{t.balance.noRequests}</div>
             ) : (
               <ul className="divide-y divide-gray-100">
                 {requests.map((r) => (
                   <li key={r.id} className="py-3">
                     <div className="flex items-center justify-between mb-1">
                       <div className="text-sm font-medium text-gray-900">
-                        {r.type === 'KRW_DEPOSIT' ? `KRW 충전 ₩${r.amount.toLocaleString()}` : `QKEY 충전 ${r.amount.toLocaleString()} QKEY`}
+                        {r.type === 'KRW_DEPOSIT' ? `${t.balance.krwBalance} +₩${r.amount.toLocaleString()}` : `${t.balance.qkeyBalance} +${r.amount.toLocaleString()} QKEY`}
                       </div>
                       {statusBadge(r.status)}
                     </div>
                     <div className="text-xs text-gray-400">
-                      {r.type === 'KRW_DEPOSIT' && r.depositorName ? `입금자: ${r.depositorName} · ` : ''}
+                      {r.type === 'KRW_DEPOSIT' && r.depositorName ? `${t.balance.depositor}: ${r.depositorName} · ` : ''}
                       {r.type === 'QKEY_DEPOSIT' && r.txHash ? `TX: ${r.txHash.slice(0, 12)}… · ` : ''}
                       {fmtDate(r.createdAt)}
                     </div>
                     {r.status === 'REJECTED' && r.adminNote && (
-                      <div className="text-xs text-red-500 mt-1">사유: {r.adminNote}</div>
+                      <div className="text-xs text-red-500 mt-1">{t.balance.reason}: {r.adminNote}</div>
                     )}
                   </li>
                 ))}
