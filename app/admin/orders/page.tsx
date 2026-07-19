@@ -771,7 +771,7 @@ export default function AdminOrdersPage() {
                     결제 정보 미등록
                   </h4>
                   <p className="text-sm text-yellow-700 mb-4 font-medium">
-                    이 주문의 거래번호(TID)가 등록되어 있지 않습니다. 실제 결제가 완료된 경우 KISPG 관리자 페이지에서 TID를 확인하여 아래에 입력해주세요.
+                    이 주문의 거래번호(TID)가 등록되어 있지 않습니다. 필요한 경우 아래에 거래번호를 입력해주세요.
                   </p>
                   <div className="space-y-3">
                     <div>
@@ -779,7 +779,7 @@ export default function AdminOrdersPage() {
                       <input
                         type="text"
                         id="manualTidInput"
-                        placeholder="KISPG 거래번호 (TID)를 입력하세요"
+                        placeholder="거래번호 (TID)를 입력하세요"
                         className="w-full px-4 py-3 border-2 border-yellow-300 rounded-xl text-sm font-mono font-medium focus:ring-4 focus:ring-yellow-200 focus:border-yellow-500 bg-white"
                       />
                     </div>
@@ -868,7 +868,7 @@ export default function AdminOrdersPage() {
                         
                         const confirmMsg = tidToUse
                           ? `정말 카드 결제를 취소하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n거래번호: ${tidToUse}\n\n카드 결제 취소 후 고객에게 환불됩니다.`
-                          : `주문을 취소하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n\n⚠️ 거래번호(TID)가 없어 카드 자동환불은 진행되지 않습니다.\nKISPG 관리자 페이지에서 수동 취소가 필요합니다.`;
+                          : `주문을 취소하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n\n주문 상태를 취소로 변경합니다.`;
                         
                         if (!confirm(confirmMsg)) return;
                         
@@ -929,7 +929,7 @@ export default function AdminOrdersPage() {
                           : undefined;
                         const tidToUse = selectedOrder.paymentKey || manualTid;
                         
-                        if (!confirm(`환불 처리하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n${tidToUse ? `거래번호: ${tidToUse}\n` : '⚠️ TID 없음 - KISPG 수동 환불 필요\n'}\n주문 상태를 환불됨으로 변경합니다.`)) {
+                        if (!confirm(`환불 처리하시겠습니까?\n\n주문번호: ${selectedOrder.orderNumber}\n결제금액: ${formatCurrency(selectedOrder.total)}\n${tidToUse ? `거래번호: ${tidToUse}\n` : ''}\n주문 상태를 환불됨으로 변경합니다.`)) {
                           return;
                         }
                         try {

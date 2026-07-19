@@ -10,16 +10,16 @@ import { authFetch } from '@/lib/auth/clientFetch'
 // [2026-05-11 v2 PERF FIX] recharts 라이브러리 (419KB) 를 lazy-load
 // 대시보드 페이지 초기 로딩 시 차트 번들을 다운로드하지 않고,
 // 메인 대시보드 UI가 먼저 표시된 후 차트 컴포넌트를 비동기 로드
-// [2026-05-12 옵션 3-3] KISPG STUCK 결제 감지 위젯 — 대시보드 최상단 배치
-const StuckOrdersWidget = dynamic(() => import('@/components/dashboard/StuckOrdersWidget'), {
-  ssr: false,
-  loading: () => (
-    <div className="bg-white rounded-2xl shadow-xl p-6 border-l-4 border-gray-300 animate-pulse">
-      <div className="h-6 bg-gray-200 rounded w-64 mb-3"></div>
-      <div className="h-4 bg-gray-100 rounded w-40"></div>
-    </div>
-  ),
-})
+// [2026-07-19 PG 제거] KISPG STUCK 결제 감지 위젯 — PG 결제 전면 폐기로 비활성화(주석 처리)
+// const StuckOrdersWidget = dynamic(() => import('@/components/dashboard/StuckOrdersWidget'), {
+//   ssr: false,
+//   loading: () => (
+//     <div className="bg-white rounded-2xl shadow-xl p-6 border-l-4 border-gray-300 animate-pulse">
+//       <div className="h-6 bg-gray-200 rounded w-64 mb-3"></div>
+//       <div className="h-4 bg-gray-100 rounded w-40"></div>
+//     </div>
+//   ),
+// })
 
 const AdminCharts = dynamic(() => import('@/components/dashboard/AdminCharts'), {
   ssr: false,
@@ -363,10 +363,11 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* [2026-05-12 옵션 3-3] KISPG STUCK 결제 감지 위젯 — 30초마다 자동 갱신 */}
+        {/* [2026-07-19 PG 제거] KISPG STUCK 결제 감지 위젯 — PG 결제 전면 폐기로 비활성화(주석 처리)
         <div className="mb-8">
           <StuckOrdersWidget />
         </div>
+        */}
 
         {/* Charts Section */}
         <div className="mb-8">

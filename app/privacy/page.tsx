@@ -193,10 +193,6 @@ export default function PrivacyPage() {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-4 py-2">KISPG(KIS정보통신)</td>
-                    <td className="border border-gray-300 px-4 py-2">결제 처리 및 결제 정보 관리</td>
-                  </tr>
-                  <tr className="bg-gray-50">
                     <td className="border border-gray-300 px-4 py-2">Cloudflare, Inc.</td>
                     <td className="border border-gray-300 px-4 py-2">서비스 인프라 운영, 콘텐츠 전송, 보안 서비스</td>
                   </tr>
