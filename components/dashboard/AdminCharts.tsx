@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { authFetch } from '@/lib/auth/clientFetch';
 import {
   LineChart,
   Line,
@@ -58,13 +59,9 @@ export default function AdminCharts() {
   const fetchChartData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      
-      const res = await fetch('/api/admin/charts', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // [2026-07-19 FIX] 잘못된 localStorage 키('token') 사용으로 토큰 null → 401 발생하던 버그 수정.
+      // 표준 authFetch 사용(auth-token + 쿠키 양면 방어).
+      const res = await authFetch('/api/admin/charts');
 
       if (!res.ok) {
         throw new Error('차트 데이터를 불러올 수 없습니다.');
