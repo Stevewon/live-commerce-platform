@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import LanguageSelector from '@/components/LanguageSelector';
 
 interface Product {
@@ -181,6 +182,16 @@ function ProductsContent() {
 
   const hasActiveFilters = currentSearch || currentBrand || currentMinPrice || currentMaxPrice || currentInStock;
 
+  // 동적 텍스트(상품명/카테고리명/브랜드/카테고리 표시명) 자동 번역
+  const dynamicTexts = [
+    ...categories.map(c => c.name),
+    ...products.map(p => p.name),
+    ...products.map(p => p.category?.name).filter(Boolean) as string[],
+    ...products.map(p => p.brand).filter(Boolean) as string[],
+    ...brands,
+  ];
+  const { tr } = useAutoTranslate(dynamicTexts);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
@@ -247,7 +258,7 @@ function ProductsContent() {
                       onClick={() => router.push(buildUrl({ category: cat.slug, page: '1' }))}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${currentCategory === cat.slug ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
                     >
-                      {CATEGORY_ICONS[cat.slug] || '📦'} {cat.name}
+                      {CATEGORY_ICONS[cat.slug] || '📦'} {tr(cat.name)}
                     </button>
                   ))}
                 </div>
@@ -287,7 +298,7 @@ function ProductsContent() {
                         onClick={() => router.push(buildUrl({ brand: currentBrand === b ? '' : b, page: '1' }))}
                         className={`w-full text-left px-3 py-1.5 rounded text-sm transition ${currentBrand === b ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
                       >
-                        {b}
+                        {tr(b)}
                       </button>
                     ))}
                   </div>
@@ -331,7 +342,7 @@ function ProductsContent() {
                     onClick={() => router.push(buildUrl({ category: cat.slug, page: '1' }))}
                     className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition ${currentCategory === cat.slug ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
                   >
-                    {CATEGORY_ICONS[cat.slug] || '📦'} {cat.name}
+                    {CATEGORY_ICONS[cat.slug] || '📦'} {tr(cat.name)}
                   </button>
                 ))}
               </div>
@@ -421,8 +432,8 @@ function ProductsContent() {
                         )}
                       </div>
                       <div className="p-3">
-                        <p className="text-[10px] text-gray-400 mb-1">{product.category?.name}{product.brand ? ` / ${product.brand}` : ''}</p>
-                        <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-2 leading-snug">{product.name}</h3>
+                        <p className="text-[10px] text-gray-400 mb-1">{tr(product.category?.name)}{product.brand ? ` / ${tr(product.brand)}` : ''}</p>
+                        <h3 className="text-sm font-medium text-gray-900 line-clamp-2 mb-2 leading-snug">{tr(product.name)}</h3>
                         <div className="flex items-baseline gap-2">
                           {discountPercent > 0 && (
                             <span className="text-red-500 font-bold text-sm">{discountPercent}%</span>
