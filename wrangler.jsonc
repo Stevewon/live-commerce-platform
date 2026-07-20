@@ -30,6 +30,10 @@
       "database_id": "16a947c1-5194-4fe6-b1ce-999421ede395"
     }
   ],
+  // Cloudflare Workers AI (상품명/카테고리 자동 번역용 - 별도 API 키 불필요)
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "NODE_ENV": "production",
     "NEXT_PUBLIC_APP_URL": "https://qrlive.io",
