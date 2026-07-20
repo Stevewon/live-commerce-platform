@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useLanguage } from '@/lib/i18n/LanguageContext';
 
 interface Product {
   id: string;
@@ -33,15 +34,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   kitchen: '🍳', living: '🧹', health: '💊', hobby: '🎨',
 };
 
-const SORT_OPTIONS = [
-  { value: 'newest', label: '최신순' },
-  { value: 'popular', label: '인기순' },
-  { value: 'price-low', label: '낮은가격순' },
-  { value: 'price-high', label: '높은가격순' },
-  { value: 'discount', label: '할인율순' },
-  { value: 'name', label: '이름순' },
-];
-
 export default function ProductsPage() {
   return (
     <Suspense fallback={
@@ -58,6 +50,17 @@ function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const tp = t.products;
+
+  const SORT_OPTIONS = [
+    { value: 'newest', label: tp.newest },
+    { value: 'popular', label: tp.popular },
+    { value: 'price-low', label: tp.priceLow },
+    { value: 'price-high', label: tp.priceHigh },
+    { value: 'discount', label: tp.sortDiscount },
+    { value: 'name', label: tp.sortName },
+  ];
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string; slug: string }[]>([]);
@@ -190,20 +193,20 @@ function ProductsContent() {
                   type="text"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="상품 검색..."
+                  placeholder={tp.searchPlaceholder}
                   className="w-64 lg:w-80 px-4 py-2 pr-10 border border-gray-300 rounded-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   🔍
                 </button>
               </form>
-              <Link href="/cart" className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">🛒 장바구니</Link>
+              <Link href="/cart" className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">{tp.cartBtn}</Link>
               {user ? (
-                <span className="hidden sm:inline text-sm text-gray-700 font-medium">{user.name}님</span>
+                <span className="hidden sm:inline text-sm text-gray-700 font-medium">{tp.greeting.replace('{name}', user.name)}</span>
               ) : (
                 <>
-                  <Link href="/login" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 font-medium">로그인</Link>
-                  <Link href="/register" className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">회원가입</Link>
+                  <Link href="/login" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 font-medium">{tp.loginBtn}</Link>
+                  <Link href="/register" className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">{tp.registerBtn}</Link>
                 </>
               )}
             </div>
@@ -214,7 +217,7 @@ function ProductsContent() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="상품 검색..."
+              placeholder={tp.searchPlaceholder}
               className="w-full px-4 py-2 border border-gray-300 rounded-full text-sm focus:ring-2 focus:ring-blue-500"
             />
           </form>
@@ -228,13 +231,13 @@ function ProductsContent() {
             <div className="bg-white rounded-lg shadow-sm p-5 sticky top-20 space-y-6">
               {/* 카테고리 필터 */}
               <div>
-                <h3 className="text-sm font-bold text-gray-900 mb-3">카테고리</h3>
+                <h3 className="text-sm font-bold text-gray-900 mb-3">{tp.category}</h3>
                 <div className="space-y-1.5">
                   <button
                     onClick={() => router.push(buildUrl({ category: 'all', page: '1' }))}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${currentCategory === 'all' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
                   >
-                    🏷️ 전체
+                    {tp.allWithIcon}
                   </button>
                   {categories.map(cat => (
                     <button
@@ -250,13 +253,13 @@ function ProductsContent() {
 
               {/* 가격 필터 */}
               <div>
-                <h3 className="text-sm font-bold text-gray-900 mb-3">가격 범위</h3>
+                <h3 className="text-sm font-bold text-gray-900 mb-3">{tp.priceRange}</h3>
                 <div className="flex gap-2 items-center">
                   <input
                     type="number"
                     value={priceMin}
                     onChange={e => setPriceMin(e.target.value)}
-                    placeholder="최소"
+                    placeholder={tp.min}
                     className="w-full px-2 py-1.5 border rounded text-sm text-gray-900"
                   />
                   <span className="text-gray-400">~</span>
@@ -264,17 +267,17 @@ function ProductsContent() {
                     type="number"
                     value={priceMax}
                     onChange={e => setPriceMax(e.target.value)}
-                    placeholder="최대"
+                    placeholder={tp.max}
                     className="w-full px-2 py-1.5 border rounded text-sm text-gray-900"
                   />
                 </div>
-                <button onClick={handlePriceFilter} className="mt-2 w-full py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded font-medium text-gray-700 transition">적용</button>
+                <button onClick={handlePriceFilter} className="mt-2 w-full py-1.5 text-xs bg-gray-100 hover:bg-gray-200 rounded font-medium text-gray-700 transition">{tp.apply}</button>
               </div>
 
               {/* 브랜드 필터 */}
               {brands.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 mb-3">브랜드</h3>
+                  <h3 className="text-sm font-bold text-gray-900 mb-3">{tp.brand}</h3>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {brands.map(b => (
                       <button
@@ -297,13 +300,13 @@ function ProductsContent() {
                   onChange={e => router.push(buildUrl({ inStock: e.target.checked ? 'true' : '', page: '1' }))}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600"
                 />
-                <span className="text-sm text-gray-700">재고 있는 상품만</span>
+                <span className="text-sm text-gray-700">{tp.inStockOnly}</span>
               </label>
 
               {/* 필터 초기화 */}
               {hasActiveFilters && (
                 <button onClick={clearFilters} className="w-full py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg font-medium transition">
-                  필터 초기화
+                  {tp.clearFilters}
                 </button>
               )}
             </div>
@@ -318,7 +321,7 @@ function ProductsContent() {
                   onClick={() => router.push(buildUrl({ category: 'all', page: '1' }))}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition ${currentCategory === 'all' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
                 >
-                  전체
+                  {tp.all}
                 </button>
                 {categories.map(cat => (
                   <button
@@ -336,15 +339,15 @@ function ProductsContent() {
             <div className="flex items-center justify-between mb-4 bg-white rounded-lg shadow-sm px-4 py-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">
-                  총 <strong className="text-gray-900">{pagination.totalCount}</strong>개
+                  {tp.totalCount.split('{count}')[0]}<strong className="text-gray-900">{pagination.totalCount}</strong>{tp.totalCount.split('{count}')[1]}
                 </span>
                 {currentSearch && (
                   <span className="text-sm text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-                    &quot;{currentSearch}&quot; 검색결과
+                    {tp.searchResultFor.replace('{query}', currentSearch)}
                   </span>
                 )}
                 {hasActiveFilters && (
-                  <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 lg:hidden">초기화</button>
+                  <button onClick={clearFilters} className="text-xs text-red-500 hover:text-red-700 lg:hidden">{tp.reset}</button>
                 )}
               </div>
               <select
@@ -375,10 +378,10 @@ function ProductsContent() {
             ) : products.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-lg shadow-sm">
                 <span className="text-6xl block mb-4">🔍</span>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">검색 결과가 없습니다</h2>
-                <p className="text-gray-500 mb-6">다른 키워드나 필터를 사용해보세요.</p>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">{tp.noResultsTitle}</h2>
+                <p className="text-gray-500 mb-6">{tp.noResultsDesc}</p>
                 <button onClick={clearFilters} className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition">
-                  필터 초기화
+                  {tp.clearFilters}
                 </button>
               </div>
             ) : (
@@ -404,14 +407,14 @@ function ProductsContent() {
                           }}
                         />
                         {product.isFeatured && (
-                          <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded font-bold">BEST</span>
+                          <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded font-bold">{tp.best}</span>
                         )}
                         {discountPercent > 0 && (
                           <span className="absolute top-2 right-2 bg-yellow-400 text-gray-900 text-[10px] px-2 py-0.5 rounded font-bold">{discountPercent}%</span>
                         )}
                         {product.stock === 0 && (
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <span className="text-white font-bold text-sm bg-gray-900/70 px-3 py-1 rounded">품절</span>
+                            <span className="text-white font-bold text-sm bg-gray-900/70 px-3 py-1 rounded">{tp.soldOut}</span>
                           </div>
                         )}
                       </div>
@@ -429,10 +432,10 @@ function ProductsContent() {
                         )}
                         <div className="flex gap-1 mt-2">
                           {product.stock > 0 && (shippingConfig.shippingFee === 0 || (shippingConfig.freeShippingThreshold > 0 && product.price >= shippingConfig.freeShippingThreshold)) && (
-                            <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">무료배송</span>
+                            <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{tp.freeShipping}</span>
                           )}
                           {product.stock > 0 && product.stock <= 5 && (
-                            <span className="text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">{product.stock}개 남음</span>
+                            <span className="text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">{tp.stockLeft.replace('{count}', String(product.stock))}</span>
                           )}
                         </div>
                       </div>
@@ -450,7 +453,7 @@ function ProductsContent() {
                   disabled={currentPage <= 1}
                   className="px-3 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition"
                 >
-                  ← 이전
+                  {tp.prev}
                 </button>
                 {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                   let pageNum: number;
@@ -482,7 +485,7 @@ function ProductsContent() {
                   disabled={currentPage >= pagination.totalPages}
                   className="px-3 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition"
                 >
-                  다음 →
+                  {tp.next}
                 </button>
               </div>
             )}
