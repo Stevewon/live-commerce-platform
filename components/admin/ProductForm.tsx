@@ -32,6 +32,7 @@ interface ProductFormData {
   detailContent: string
   price: number | string
   comparePrice: number | string
+  supplyPrice: number | string
   stock: number | string
   sku: string
   thumbnail: string
@@ -94,6 +95,7 @@ export default function ProductForm({ mode, initialData }: Props) {
     detailContent: '',
     price: '',
     comparePrice: '',
+    supplyPrice: '',
     stock: '',
     sku: '',
     thumbnail: '',
@@ -143,6 +145,7 @@ export default function ProductForm({ mode, initialData }: Props) {
         detailContent: initialData.detailContent || '',
         price: initialData.price || '',
         comparePrice: initialData.comparePrice || '',
+        supplyPrice: initialData.supplyPrice ?? '',
         stock: initialData.stock ?? '',
         sku: initialData.sku || '',
         thumbnail: initialData.thumbnail || '',
@@ -390,6 +393,7 @@ export default function ProductForm({ mode, initialData }: Props) {
         detailContent: form.detailContent || null,
         price: Number(form.price),
         comparePrice: form.comparePrice ? Number(form.comparePrice) : null,
+        supplyPrice: form.supplyPrice !== '' && form.supplyPrice !== null && form.supplyPrice !== undefined ? Number(form.supplyPrice) : null,
         stock: Number(form.stock),
         sku: form.sku.trim() || null,
         thumbnail: form.thumbnail || form.images[0] || '',
@@ -456,6 +460,14 @@ export default function ProductForm({ mode, initialData }: Props) {
 
   const discountRate = form.comparePrice && form.price
     ? Math.round((1 - Number(form.price) / Number(form.comparePrice)) * 100)
+    : 0
+
+  // 공급가 기반 마진 계산 (관리자 전용)
+  const marginAmount = form.supplyPrice && form.price
+    ? Number(form.price) - Number(form.supplyPrice)
+    : 0
+  const marginRate = form.supplyPrice && form.price && Number(form.price) > 0
+    ? Math.round((marginAmount / Number(form.price)) * 100)
     : 0
 
   // === 옵션 관리 함수들 ===
@@ -755,6 +767,41 @@ export default function ProductForm({ mode, initialData }: Props) {
                     </div>
                   </div>
                 </div>
+
+                {/* 공급가 (관리자 전용) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      공급가 (원) <span className="text-gray-400">(선택 · 관리자 전용)</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={form.supplyPrice}
+                      onChange={(e) => setForm(prev => ({ ...prev, supplyPrice: e.target.value }))}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      placeholder="매입 원가"
+                      min="0"
+                    />
+                    {form.supplyPrice && <p className="mt-1 text-xs text-gray-500 font-medium">₩{formatPrice(form.supplyPrice)}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">마진 (판매가 - 공급가)</label>
+                    <div className={`px-4 py-2.5 rounded-lg border text-center font-bold ${
+                      marginAmount > 0 ? 'bg-green-50 border-green-200 text-green-700' : marginAmount < 0 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-100 border-gray-200 text-gray-400'
+                    }`}>
+                      {form.supplyPrice && form.price ? `₩${formatPrice(marginAmount)}` : '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">마진율</label>
+                    <div className={`px-4 py-2.5 rounded-lg border text-center font-bold ${
+                      marginRate > 0 ? 'bg-green-50 border-green-200 text-green-700' : marginRate < 0 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-100 border-gray-200 text-gray-400'
+                    }`}>
+                      {form.supplyPrice && form.price ? `${marginRate}%` : '-'}
+                    </div>
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] text-gray-400">※ 공급가/마진은 관리자에게만 표시되며, 구매자 화면에는 노출되지 않습니다.</p>
               </div>
 
               {/* 재고/SKU */}

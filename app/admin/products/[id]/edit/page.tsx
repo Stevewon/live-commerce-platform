@@ -76,6 +76,7 @@ export default function EditProductPage() {
         detailContent: product.detailContent,
         price: product.price,
         comparePrice: product.comparePrice,
+        supplyPrice: product.supplyPrice,
         stock: product.stock,
         sku: product.sku,
         thumbnail: product.thumbnail,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { ensureSupplyPriceColumn } from '@/lib/ensureProductColumns';
 
 // 관리자 상품 상세 조회 (GET)
 export async function GET(
@@ -95,7 +96,7 @@ export async function PATCH(
     const body = await req.json();
     const {
       name, slug, description, detailContent,
-      price, comparePrice, stock, sku,
+      price, comparePrice, supplyPrice, stock, sku,
       images, detailImages, thumbnail,
       specifications, shippingInfo, returnInfo,
       categoryId, isActive, isFeatured,
@@ -129,6 +130,9 @@ export async function PATCH(
       }
     }
 
+    // 공급가(supplyPrice) 컬럼 자동 보정 (셀프 힐링)
+    await ensureSupplyPriceColumn();
+
     // 업데이트 데이터 구성 (전달된 필드만 업데이트)
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
@@ -137,6 +141,7 @@ export async function PATCH(
     if (detailContent !== undefined) updateData.detailContent = detailContent;
     if (price !== undefined) updateData.price = parseFloat(price);
     if (comparePrice !== undefined) updateData.comparePrice = comparePrice ? parseFloat(comparePrice) : null;
+    if (supplyPrice !== undefined) updateData.supplyPrice = (supplyPrice !== null && supplyPrice !== '') ? parseFloat(supplyPrice) : null;
     if (stock !== undefined) updateData.stock = parseInt(stock);
     if (sku !== undefined) updateData.sku = sku || null;
     if (images !== undefined) updateData.images = typeof images === 'string' ? images : JSON.stringify(images);

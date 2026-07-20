@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { ensureSupplyPriceColumn } from '@/lib/ensureProductColumns';
 
 // 관리자 상품 조회 (GET)
 export async function GET(req: NextRequest) {
@@ -110,6 +111,7 @@ export async function POST(req: NextRequest) {
       detailContent,
       detailImages,
       comparePrice,
+      supplyPrice,
       sku,
       specifications,
       shippingInfo,
@@ -135,6 +137,9 @@ export async function POST(req: NextRequest) {
     // slug 자동 생성 (제공되지 않은 경우)
     const productSlug = slug || (name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'product') + '-' + Date.now();
 
+    // 공급가(supplyPrice) 컬럼 자동 보정 (셀프 힐링)
+    await ensureSupplyPriceColumn();
+
     // 상품 생성
     const product = await prisma.product.create({
       data: {
@@ -145,6 +150,7 @@ export async function POST(req: NextRequest) {
         detailImages: detailImages ? (typeof detailImages === 'string' ? detailImages : JSON.stringify(detailImages)) : null,
         price: parseFloat(price),
         comparePrice: comparePrice ? parseFloat(comparePrice) : null,
+        supplyPrice: (supplyPrice !== undefined && supplyPrice !== null && supplyPrice !== '') ? parseFloat(supplyPrice) : null,
         stock: parseInt(stock) || 0,
         sku: sku || null,
         images: images || JSON.stringify([imageUrl || '']),
