@@ -244,6 +244,7 @@ model Product {
   
   price         Float
   comparePrice  Float?    // 정가 (할인 표시용)
+  supplyPrice   Float?    // 공급가 (매입 원가, 어드민 전용 - 사용자 미노출)
   
   // 재고
   stock         Int       @default(0)
