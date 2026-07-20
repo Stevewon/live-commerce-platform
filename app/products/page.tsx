@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import LanguageSelector from '@/components/LanguageSelector';
 
 interface Product {
   id: string;
@@ -200,6 +201,7 @@ function ProductsContent() {
                   🔍
                 </button>
               </form>
+              <LanguageSelector variant="compact" />
               <Link href="/cart" className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">{tp.cartBtn}</Link>
               {user ? (
                 <span className="hidden sm:inline text-sm text-gray-700 font-medium">{tp.greeting.replace('{name}', user.name)}</span>
