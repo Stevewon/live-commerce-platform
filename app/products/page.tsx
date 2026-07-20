@@ -29,6 +29,8 @@ interface Pagination {
 const CATEGORY_ICONS: Record<string, string> = {
   electronics: '📱', beauty: '💄', food: '🍯', fashion: '👕',
   home: '🏠', sports: '⚽', kids: '👶', books: '📚', all: '🏷️',
+  // 추가 카테고리
+  kitchen: '🍳', living: '🧹', health: '💊', hobby: '🎨',
 };
 
 const SORT_OPTIONS = [

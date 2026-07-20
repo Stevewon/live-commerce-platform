@@ -43,6 +43,43 @@ async function main() {
         description: '의류, 신발, 액세서리',
       },
     }),
+    // 추가 카테고리 4종
+    prisma.category.upsert({
+      where: { slug: 'kitchen' },
+      update: {},
+      create: {
+        name: '주방',
+        slug: 'kitchen',
+        description: '주방용품, 조리도구, 식기',
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'living' },
+      update: {},
+      create: {
+        name: '생활',
+        slug: 'living',
+        description: '생활용품, 청소, 수납',
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'health' },
+      update: {},
+      create: {
+        name: '건강식품',
+        slug: 'health',
+        description: '건강기능식품, 비타민, 영양제',
+      },
+    }),
+    prisma.category.upsert({
+      where: { slug: 'hobby' },
+      update: {},
+      create: {
+        name: '취미',
+        slug: 'hobby',
+        description: '취미용품, 문구, 완구',
+      },
+    }),
   ]);
 
   console.log('✅ Categories created:', categories.length);
