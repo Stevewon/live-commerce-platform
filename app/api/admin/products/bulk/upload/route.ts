@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getPrisma } from '@/lib/prisma';
+import { ensureSupplyPriceColumn } from '@/lib/ensureProductColumns';
 import * as XLSX from 'xlsx';
 
 /**
@@ -66,6 +67,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '등록할 상품 데이터가 없습니다' }, { status: 400 });
     }
 
+    // 공급가(supplyPrice) 컬럼 자동 보정 (마이그레이션 없이 D1 컬럼 보장)
+    await ensureSupplyPriceColumn();
+
     // 카테고리 목록 조회 (이름 → ID 매핑)
     const categories = await prisma.category.findMany();
     const categoryMap = new Map<string, string>();
@@ -105,21 +109,22 @@ export async function POST(req: NextRequest) {
         const categoryName = String(row[1] || '').trim();
         const priceStr = String(row[2] || '').trim();
         const comparePriceStr = String(row[3] || '').trim();
-        const stockStr = String(row[4] || '').trim();
-        const sku = String(row[5] || '').trim() || null;
-        const description = String(row[6] || '').trim();
-        const detailContent = String(row[7] || '').trim() || null;
-        const thumbnailUrl = String(row[8] || '').trim();
-        const galleryUrls = String(row[9] || '').trim();
-        const detailImageUrls = String(row[10] || '').trim();
-        const origin = String(row[11] || '').trim() || null;
-        const manufacturer = String(row[12] || '').trim() || null;
-        const brand = String(row[13] || '').trim() || null;
-        const tags = String(row[14] || '').trim() || null;
-        const shippingInfo = String(row[15] || '').trim() || null;
-        const returnInfo = String(row[16] || '').trim() || null;
-        const isActiveStr = String(row[17] || 'Y').trim().toUpperCase();
-        const isFeaturedStr = String(row[18] || 'N').trim().toUpperCase();
+        const supplyPriceStr = String(row[4] || '').trim();
+        const stockStr = String(row[5] || '').trim();
+        const sku = String(row[6] || '').trim() || null;
+        const description = String(row[7] || '').trim();
+        const detailContent = String(row[8] || '').trim() || null;
+        const thumbnailUrl = String(row[9] || '').trim();
+        const galleryUrls = String(row[10] || '').trim();
+        const detailImageUrls = String(row[11] || '').trim();
+        const origin = String(row[12] || '').trim() || null;
+        const manufacturer = String(row[13] || '').trim() || null;
+        const brand = String(row[14] || '').trim() || null;
+        const tags = String(row[15] || '').trim() || null;
+        const shippingInfo = String(row[16] || '').trim() || null;
+        const returnInfo = String(row[17] || '').trim() || null;
+        const isActiveStr = String(row[18] || 'Y').trim().toUpperCase();
+        const isFeaturedStr = String(row[19] || 'N').trim().toUpperCase();
 
         // ── 필수 필드 검증 ──
         if (!name) {
@@ -156,12 +161,6 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        if (!description) {
-          results.push({ row: rowNum, name, status: 'error', message: '상품 간단설명이 비어 있습니다' });
-          errorCount++;
-          continue;
-        }
-
         // ── SKU 중복 체크 ──
         if (sku && existingSkus.has(sku)) {
           results.push({ row: rowNum, name, status: 'skipped', message: `SKU "${sku}"가 이미 존재합니다. 건너뜁니다.` });
@@ -178,6 +177,15 @@ export async function POST(req: NextRequest) {
           } else if (comparePrice <= priceNum) {
             // 정가가 판매가보다 낮거나 같으면 무시
             comparePrice = null;
+          }
+        }
+
+        // ── 공급가 파싱 (관리자 전용, 구매자 미노출) ──
+        let supplyPrice: number | null = null;
+        if (supplyPriceStr) {
+          const sp = parseFloat(supplyPriceStr.replace(/[^\d.]/g, ''));
+          if (!isNaN(sp) && sp >= 0) {
+            supplyPrice = sp;
           }
         }
 
@@ -211,8 +219,9 @@ export async function POST(req: NextRequest) {
           data: {
             name,
             slug,
-            description,
+            description: description || '',
             detailContent,
+            supplyPrice,
             detailImages: detailImagesJson,
             price: priceNum,
             comparePrice,
