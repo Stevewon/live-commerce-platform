@@ -80,6 +80,7 @@ export default function ProductForm({ mode, initialData }: Props) {
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'images' | 'shipping' | 'seo' | 'options'>('basic')
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadingDetail, setUploadingDetail] = useState(false)
+  const [detailHtmlInput, setDetailHtmlInput] = useState('')
   const thumbnailRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
   const detailImgRef = useRef<HTMLInputElement>(null)
@@ -291,6 +292,39 @@ export default function ProductForm({ mode, initialData }: Props) {
     setForm(prev => ({ ...prev, detailImages: [...prev.detailImages, ...urls] }))
     setUploadingDetail(false)
     if (detailImgRef.current) detailImgRef.current.value = ''
+  }
+
+  // Detail images add by HTML / URL (붙여넣기로 이미지 URL 등록)
+  const handleDetailHtmlAdd = () => {
+    const raw = detailHtmlInput.trim()
+    if (!raw) return
+
+    const urls: string[] = []
+
+    // 1) HTML <img src="..."> 태그에서 URL 추출
+    const imgTagRegex = /<img[^>]+src\s*=\s*["']([^"']+)["'][^>]*>/gi
+    let m: RegExpExecArray | null
+    while ((m = imgTagRegex.exec(raw)) !== null) {
+      if (m[1]) urls.push(m[1].trim())
+    }
+
+    // 2) HTML 태그가 없으면 줄바꿈/쉼표/공백으로 구분된 순수 URL로 처리
+    if (urls.length === 0) {
+      raw
+        .split(/[\n,\s]+/)
+        .map((u) => u.trim())
+        .filter((u) => /^https?:\/\//i.test(u))
+        .forEach((u) => urls.push(u))
+    }
+
+    if (urls.length === 0) {
+      setError('유효한 이미지 URL을 찾을 수 없습니다. (http/https 로 시작하는 URL 또는 <img> 태그를 입력하세요)')
+      return
+    }
+
+    setError('')
+    setForm(prev => ({ ...prev, detailImages: [...prev.detailImages, ...urls] }))
+    setDetailHtmlInput('')
   }
 
   const removeImage = (index: number, type: 'images' | 'detailImages') => {
@@ -1065,8 +1099,34 @@ export default function ProductForm({ mode, initialData }: Props) {
                   disabled={uploadingDetail}
                   className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-500 transition disabled:opacity-50"
                 >
-                  {uploadingDetail ? '업로드 중...' : '+ 상세 이미지 추가'}
+                  {uploadingDetail ? '업로드 중...' : '+ 상세 이미지 추가 (파일 업로드)'}
                 </button>
+
+                {/* HTML / URL 로 이미지 등록 */}
+                <div className="mt-4 border-t border-gray-200 pt-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    HTML / URL로 상세 이미지 등록
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    이미지 URL을 직접 붙여넣거나 <code className="bg-gray-100 px-1 rounded">&lt;img src="..."&gt;</code> HTML 코드를 붙여넣으세요.
+                    여러 개는 줄바꿈 또는 쉼표로 구분됩니다.
+                  </p>
+                  <textarea
+                    value={detailHtmlInput}
+                    onChange={(e) => setDetailHtmlInput(e.target.value)}
+                    rows={3}
+                    placeholder={'https://example.com/detail-1.jpg\nhttps://example.com/detail-2.jpg\n또는\n<img src="https://example.com/detail.jpg">'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleDetailHtmlAdd}
+                    disabled={!detailHtmlInput.trim()}
+                    className="mt-2 w-full py-2.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-medium hover:bg-blue-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    + HTML/URL로 이미지 추가
+                  </button>
+                </div>
               </div>
           </div>
 
