@@ -108,6 +108,7 @@ export async function GET(req: NextRequest) {
               select: {
                 name: true,
                 price: true,
+                supplyPrice: true,
               },
             },
           },
@@ -138,6 +139,8 @@ export async function GET(req: NextRequest) {
       '상품수량',
       '상품단가',
       '상품소계',
+      '공급단가',
+      '공급가소계',
       '소계',
       '할인금액',
       '배송비',
@@ -192,6 +195,8 @@ export async function GET(req: NextRequest) {
           '', // 수량
           '', // 단가
           '', // 소계
+          '', // 공급단가
+          '', // 공급가소계
           order.subtotal || 0,
           order.discount || 0,
           order.shippingFee || 0,
@@ -225,6 +230,8 @@ export async function GET(req: NextRequest) {
             item.quantity || 0,
             item.price || 0,
             (item.price || 0) * (item.quantity || 0),
+            item.product?.supplyPrice ?? 0,
+            (item.product?.supplyPrice ?? 0) * (item.quantity || 0),
             idx === 0 ? (order.subtotal || 0) : '',
             idx === 0 ? (order.discount || 0) : '',
             idx === 0 ? (order.shippingFee || 0) : '',
