@@ -192,7 +192,7 @@ export default function BulkProductUploadPage() {
               <h2 className="text-lg font-semibold text-gray-900 mb-2">엑셀 템플릿 다운로드</h2>
               <p className="text-sm text-gray-600 mb-4">
                 아래 버튼을 클릭하여 대량등록용 엑셀 템플릿을 다운로드하세요.<br />
-                템플릿에는 <strong>상품입력 시트</strong>, <strong>카테고리 목록 시트</strong>, <strong>입력 가이드 시트</strong>가 포함되어 있습니다.
+                템플릿에는 <strong>상품입력 시트</strong>, <strong>카테고리 목록 시트</strong>, <strong>입력 가이드 시트</strong>, <strong>옵션입력 시트</strong>가 포함되어 있습니다.
               </p>
               <button
                 onClick={handleDownloadTemplate}
@@ -301,6 +301,7 @@ export default function BulkProductUploadPage() {
               <li>판매가, 재고수량은 필수 입력입니다. 숫자만 입력하세요.</li>
               <li>이미지 URL은 사전에 업로드된 이미지의 URL을 입력하세요.</li>
               <li>SKU가 기존 상품과 중복되면 해당 행은 자동으로 건너뜁니다.</li>
+              <li>옵션 상품은 "옵션입력" 시트에서 <strong>연결상품명</strong>을 상품입력 시트의 상품명과 <strong>정확히</strong> 일치시켜 입력하세요.</li>
               <li>한 번에 최대 500개 상품까지 등록 가능합니다.</li>
               <li>파일 크기는 10MB 이하여야 합니다.</li>
             </ul>

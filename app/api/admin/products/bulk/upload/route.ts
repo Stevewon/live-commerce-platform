@@ -98,6 +98,9 @@ export async function POST(req: NextRequest) {
     let errorCount = 0;
     let skipCount = 0;
 
+    // 옵션 연결용: 등록 성공한 상품 (상품명 → { id, price })
+    const createdProducts = new Map<string, { id: string; price: number }>();
+
     // 각 행 처리
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
@@ -245,6 +248,9 @@ export async function POST(req: NextRequest) {
         // SKU 등록 후 중복 방지
         if (sku) existingSkus.add(sku);
 
+        // 옵션 연결용 매핑 (상품명 기준, 마지막 등록건 우선)
+        createdProducts.set(name, { id: product.id, price: priceNum });
+
         results.push({
           row: rowNum,
           name,
@@ -272,15 +278,144 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ═══════════════════════════════════════
+    // 옵션(변형) 처리 - "옵션입력" 시트
+    // ═══════════════════════════════════════
+    let optionVariantCount = 0;
+    let optionProductCount = 0;
+    const optionResults: { product: string; status: 'success' | 'error'; message: string }[] = [];
+
+    // "옵션입력" 시트 찾기 (이름 기준, 없으면 스킵)
+    const optionSheetName = wb.SheetNames.find((n) => n.replace(/\s/g, '') === '옵션입력');
+    if (optionSheetName) {
+      const optWs = wb.Sheets[optionSheetName];
+      const optRows: any[][] = XLSX.utils.sheet_to_json(optWs, { header: 1, defval: '' });
+
+      // 헤더 제거 + 빈 행(연결상품명 없음) 필터
+      const optDataRows = optRows.slice(1).filter((row) => row[0] && String(row[0]).trim() !== '');
+
+      // 연결상품명 기준으로 그룹화
+      const grouped = new Map<string, {
+        optionNames: string[];
+        variants: { optionValues: Record<string, string>; price: number | null; stock: number; sku: string | null }[];
+      }>();
+
+      for (const row of optDataRows) {
+        const linkName = String(row[0] || '').trim();
+        const optName1 = String(row[1] || '').trim();
+        const optValue1 = String(row[2] || '').trim();
+        const optName2 = String(row[3] || '').trim();
+        const optValue2 = String(row[4] || '').trim();
+        const optPriceStr = String(row[5] || '').trim();
+        const optStockStr = String(row[6] || '').trim();
+        const optSku = String(row[7] || '').trim() || null;
+
+        if (!linkName) continue;
+        // 최소 옵션명1/옵션값1은 있어야 유효
+        if (!optName1 || !optValue1) continue;
+
+        if (!grouped.has(linkName)) {
+          grouped.set(linkName, { optionNames: [], variants: [] });
+        }
+        const g = grouped.get(linkName)!;
+
+        // 옵션명 수집 (중복 없이, 순서 유지)
+        if (optName1 && !g.optionNames.includes(optName1)) g.optionNames.push(optName1);
+        if (optName2 && !g.optionNames.includes(optName2)) g.optionNames.push(optName2);
+
+        // 옵션값 조합
+        const optionValues: Record<string, string> = {};
+        if (optName1 && optValue1) optionValues[optName1] = optValue1;
+        if (optName2 && optValue2) optionValues[optName2] = optValue2;
+
+        // 가격 파싱 (비어 있으면 null → 상품 기본가 사용)
+        let vPrice: number | null = null;
+        if (optPriceStr) {
+          const p = parseFloat(optPriceStr.replace(/[^\d.]/g, ''));
+          if (!isNaN(p) && p > 0) vPrice = p;
+        }
+        // 재고 파싱
+        let vStock = parseInt(optStockStr.replace(/[^\d]/g, ''), 10);
+        if (isNaN(vStock) || vStock < 0) vStock = 0;
+
+        g.variants.push({ optionValues, price: vPrice, stock: vStock, sku: optSku });
+      }
+
+      // 그룹별로 상품에 옵션 적용
+      for (const [linkName, g] of grouped) {
+        const target = createdProducts.get(linkName);
+        if (!target) {
+          optionResults.push({
+            product: linkName,
+            status: 'error',
+            message: `옵션 연결 실패: "${linkName}" 상품을 이번 등록분에서 찾을 수 없습니다`,
+          });
+          continue;
+        }
+        if (g.variants.length === 0) continue;
+
+        try {
+          // 상품에 옵션 정보 반영
+          await prisma.product.update({
+            where: { id: target.id },
+            data: {
+              hasOptions: true,
+              optionNames: JSON.stringify(g.optionNames),
+            },
+          });
+
+          // 변형 생성
+          for (const v of g.variants) {
+            // SKU 중복 방지
+            const variantSku = v.sku && !existingSkus.has(v.sku) ? v.sku : null;
+            await prisma.productVariant.create({
+              data: {
+                productId: target.id,
+                optionValues: JSON.stringify(v.optionValues),
+                price: v.price,
+                comparePrice: null,
+                stock: v.stock,
+                sku: variantSku,
+                thumbnail: null,
+                isActive: true,
+              },
+            });
+            if (variantSku) existingSkus.add(variantSku);
+            optionVariantCount++;
+          }
+          optionProductCount++;
+          optionResults.push({
+            product: linkName,
+            status: 'success',
+            message: `옵션 ${g.variants.length}개 등록 완료`,
+          });
+        } catch (optErr: any) {
+          console.error(`[대량등록] 옵션 처리 실패 (${linkName}):`, optErr);
+          optionResults.push({
+            product: linkName,
+            status: 'error',
+            message: optErr?.message || '옵션 등록 실패',
+          });
+        }
+      }
+    }
+
+    const optionMsg = optionProductCount > 0
+      ? `, 옵션 ${optionProductCount}개 상품에 변형 ${optionVariantCount}개 등록`
+      : '';
+
     return NextResponse.json({
       success: true,
-      message: `대량등록 완료: 성공 ${successCount}건, 실패 ${errorCount}건, 건너뜀 ${skipCount}건`,
+      message: `대량등록 완료: 성공 ${successCount}건, 실패 ${errorCount}건, 건너뜀 ${skipCount}건${optionMsg}`,
       data: {
         totalRows: dataRows.length,
         successCount,
         errorCount,
         skipCount,
         results,
+        optionProductCount,
+        optionVariantCount,
+        optionResults,
       },
     });
 
