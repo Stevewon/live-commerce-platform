@@ -11,7 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
 // - Workers 런타임엔 sharp 가 없어 리사이즈는 못 하지만,
 //   엣지 캐시 + WebP Accept 전달 + 장기 캐시로 반복 로딩 비용을 없앤다.
 
-export const runtime = 'edge'; // 엣지에서 실행 (해당 시)
+// OpenNext(Cloudflare Workers)에서는 별도 edge runtime 선언을 쓰지 않는다.
+// 기본 Worker 런타임에서 globalThis.caches.default(Cache API)에 접근 가능.
+export const dynamic = 'force-dynamic';
 
 const ALLOWED_HOSTS = [
   'dbimg.co.kr',
