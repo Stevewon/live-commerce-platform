@@ -62,10 +62,12 @@ export default function CheckoutPage() {
   // 쿠폰
   const [appliedCoupon, setAppliedCoupon] = useState<CouponData | null>(null);
 
-  // [v1.0.22] 잔액 결제 (KRW / QKEY)
-  const [paymentMethod, setPaymentMethod] = useState<'KRW_BALANCE' | 'QKEY_BALANCE'>('KRW_BALANCE');
+  // [v1.0.22] 잔액 결제 (KRW / QKEY / SPLIT: 쿠키+현금 병행)
+  const [paymentMethod, setPaymentMethod] = useState<'KRW_BALANCE' | 'QKEY_BALANCE' | 'SPLIT_BALANCE'>('KRW_BALANCE');
   const [balance, setBalance] = useState<{ krwBalance: number; qkeyBalance: number } | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  // 병행결제: 사용자가 쿠키(QKEY)를 얼마나 쓸지 (개수). 나머지는 현금(KRW) 잔액으로 자동 결제.
+  const [splitQkey, setSplitQkey] = useState<number>(0);
 
   // 파트너 스토어 경유 정보
   const [storePartnerId, setStorePartnerId] = useState<string | null>(null);
@@ -240,7 +242,27 @@ export default function CheckoutPage() {
   const requiredQkey = Math.ceil(finalAmount / QKEY_RATE);
   const krwEnough = !!balance && balance.krwBalance >= finalAmount;
   const qkeyEnough = !!balance && balance.qkeyBalance >= requiredQkey;
-  const selectedEnough = paymentMethod === 'KRW_BALANCE' ? krwEnough : qkeyEnough;
+
+  // ── [병행결제] 쿠키+현금 분할 계산 ──
+  // splitQkey: 사용자가 쓰려는 쿠키 개수. 실제 사용 가능한 최대치는
+  //   (1) 보유 쿠키 잔액, (2) 결제금액을 쿠키로 환산한 값 중 작은 값.
+  const maxSplitQkey = Math.min(
+    balance?.qkeyBalance ?? 0,
+    Math.floor(finalAmount / QKEY_RATE) // 결제금액을 넘겨 쓰지 않도록 내림
+  );
+  // 실제 반영되는 쿠키 사용량 (범위 clamp)
+  const usedQkey = Math.max(0, Math.min(splitQkey, maxSplitQkey));
+  // 쿠키로 충당한 금액 (원)
+  const qkeyPaidKrw = usedQkey * QKEY_RATE;
+  // 나머지는 현금(KRW) 잔액으로 결제
+  const splitKrwRemainder = Math.max(0, finalAmount - qkeyPaidKrw);
+  const splitKrwEnough = !!balance && balance.krwBalance >= splitKrwRemainder;
+  const splitEnough = !!balance && usedQkey <= (balance.qkeyBalance ?? 0) && splitKrwEnough;
+
+  const selectedEnough =
+    paymentMethod === 'KRW_BALANCE' ? krwEnough
+    : paymentMethod === 'QKEY_BALANCE' ? qkeyEnough
+    : splitEnough;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -301,10 +323,15 @@ export default function CheckoutPage() {
         shippingAddress: fullAddress,
         shippingZipCode,
         shippingMemo: finalMemo,
-        // [v1.0.22] 잔액 결제수단: KRW_BALANCE | QKEY_BALANCE
+        // [v1.0.22] 잔액 결제수단: KRW_BALANCE | QKEY_BALANCE | SPLIT_BALANCE
         paymentMethod,
         shippingFee,
       };
+
+      // [병행결제] SPLIT_BALANCE 인 경우 사용할 쿠키 개수 전달
+      if (paymentMethod === 'SPLIT_BALANCE') {
+        orderData.splitQkey = usedQkey; // 서버가 나머지는 현금으로 자동 차감
+      }
 
       // 쿠폰 적용
       if (appliedCoupon) {
@@ -702,6 +729,70 @@ export default function CheckoutPage() {
 
                     {paymentMethod === 'QKEY_BALANCE' && (
                       <p className="text-xs text-gray-500">{t.checkout.requiredQkey}: {requiredQkey.toLocaleString()} QKEY ({t.checkout.qkeyRate})</p>
+                    )}
+
+                    {/* [병행결제] 쿠키 + 현금 병행 */}
+                    <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition ${paymentMethod === 'SPLIT_BALANCE' ? 'border-purple-600 bg-purple-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          checked={paymentMethod === 'SPLIT_BALANCE'}
+                          onChange={() => {
+                            setPaymentMethod('SPLIT_BALANCE');
+                            // 기본값: 가능한 만큼 쿠키를 먼저 사용
+                            setSplitQkey(Math.min(balance?.qkeyBalance ?? 0, Math.floor(finalAmount / QKEY_RATE)));
+                          }}
+                          className="accent-purple-600"
+                        />
+                        <span className="text-sm font-medium text-gray-900">🍪 {t.checkout.splitPayment}</span>
+                      </div>
+                    </label>
+
+                    {/* 병행결제 상세 입력 */}
+                    {paymentMethod === 'SPLIT_BALANCE' && (
+                      <div className="rounded-lg border border-purple-200 bg-purple-50/60 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-gray-700">{t.checkout.useQkeyAmount}</label>
+                          <span className="text-[11px] text-gray-500">{t.checkout.qkeyRate}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={0}
+                            max={maxSplitQkey}
+                            step={1}
+                            value={usedQkey}
+                            onChange={e => {
+                              const v = Math.floor(Number(e.target.value) || 0);
+                              setSplitQkey(Math.max(0, Math.min(v, maxSplitQkey)));
+                            }}
+                            className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">쿠키</span>
+                          <button
+                            type="button"
+                            onClick={() => setSplitQkey(maxSplitQkey)}
+                            className="text-xs font-semibold text-purple-600 border border-purple-300 rounded px-2 py-1 whitespace-nowrap hover:bg-purple-100"
+                          >
+                            {t.checkout.useMax}
+                          </button>
+                        </div>
+                        {/* 병행 결제 내역 요약 */}
+                        <div className="text-xs text-gray-700 space-y-1 pt-1 border-t border-purple-200">
+                          <div className="flex justify-between">
+                            <span>🍪 {t.checkout.qkeyPortion}</span>
+                            <span className="font-medium">{usedQkey.toLocaleString()} 쿠키 (₩{qkeyPaidKrw.toLocaleString()})</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>💰 {t.checkout.cashPortion}</span>
+                            <span className={`font-medium ${splitKrwEnough ? 'text-gray-700' : 'text-red-500'}`}>₩{splitKrwRemainder.toLocaleString()}</span>
+                          </div>
+                          {!splitKrwEnough && (
+                            <p className="text-[11px] text-red-500">{t.checkout.cashShortForSplit}</p>
+                          )}
+                        </div>
+                      </div>
                     )}
 
                     {!selectedEnough && !balanceLoading && (

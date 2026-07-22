@@ -6,6 +6,8 @@ import { orderConfirmationSMS, sendSMS } from '@/lib/sms'
 import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
 // [v1.0.22] 잔액 결제 시스템 통합
 import { getD1, krwToQkey, QKEY_TO_KRW, newId, qtaFromKrw, ensureQtaColumn } from '@/lib/balance';
+// [병행결제] Order 테이블 결제 분할 기록 컬럼 자동 보정
+import { ensureOrderPaymentColumns } from '@/lib/ensureProductColumns';
 // Cloudflare Workers compatible crypto
 
 // ─── 휴대전화번호 정규화 (KR) ───
@@ -169,13 +171,15 @@ export async function POST(req: NextRequest) {
       paymentMethod: rawPaymentMethod = 'KRW_BALANCE',
       shippingFee = 3000,
       couponCode,
+      // [병행결제] SPLIT_BALANCE 시 사용할 쿠키(QKEY) 개수 (나머지는 현금으로 자동 차감)
+      splitQkey: rawSplitQkey,
       // 비회원 전용 필드
       guestEmail,
       guestPhone,
     } = body;
 
-    // [v1.0.22] 결제수단 검증 — KRW 잔액 또는 QKEY 잔액만 허용, PG 계열 완전 차단
-    const ALLOWED_METHODS = ['KRW_BALANCE', 'QKEY_BALANCE'] as const;
+    // [v1.0.22] 결제수단 검증 — KRW 잔액 / QKEY 잔액 / SPLIT(쿠키+현금 병행) 만 허용, PG 계열 완전 차단
+    const ALLOWED_METHODS = ['KRW_BALANCE', 'QKEY_BALANCE', 'SPLIT_BALANCE'] as const;
     type PaymentMethod = typeof ALLOWED_METHODS[number];
 
     const paymentMethod: PaymentMethod = ALLOWED_METHODS.includes(rawPaymentMethod as any)
@@ -352,7 +356,21 @@ export async function POST(req: NextRequest) {
     const currentKrw = Number(userRow.krwBalance) || 0;
     const currentQkey = Number(userRow.qkeyBalance) || 0;
 
-    // 필요 금액 (KRW 기준 total)
+    // ── [병행결제] 서버측 분할 금액 산정 (신뢰: 클라이언트 splitQkey 는 참고값, 서버에서 재검증) ──
+    // splitUsedQkey: 실제 사용할 쿠키 개수. 다음 세 값 중 최솟값으로 clamp.
+    //   (1) 클라이언트 요청 개수, (2) 보유 쿠키 잔액, (3) 결제금액을 쿠키로 환산(내림)
+    let splitUsedQkey = 0;
+    let splitKrwRemainder = 0;
+    if (paymentMethod === 'SPLIT_BALANCE') {
+      const requested = Math.max(0, Math.floor(Number(rawSplitQkey) || 0));
+      const maxByBalance = currentQkey;
+      const maxByTotal = Math.floor(total / QKEY_TO_KRW); // 결제금액 초과 사용 방지
+      splitUsedQkey = Math.min(requested, maxByBalance, maxByTotal);
+      if (splitUsedQkey < 0) splitUsedQkey = 0;
+      splitKrwRemainder = Math.max(0, total - splitUsedQkey * QKEY_TO_KRW);
+    }
+
+    // 필요 금액 검증
     if (paymentMethod === 'KRW_BALANCE') {
       if (currentKrw < total) {
         return NextResponse.json(
@@ -366,7 +384,7 @@ export async function POST(req: NextRequest) {
           { status: 402 } // Payment Required
         );
       }
-    } else {
+    } else if (paymentMethod === 'QKEY_BALANCE') {
       // QKEY_BALANCE: total(KRW) 을 QKEY 로 환산 (올림하여 사용자 손해 방지)
       const requiredQkey = Math.ceil(total / QKEY_TO_KRW);
       if (currentQkey < requiredQkey) {
@@ -381,6 +399,33 @@ export async function POST(req: NextRequest) {
           { status: 402 }
         );
       }
+    } else {
+      // SPLIT_BALANCE: 쿠키 usedQkey 개 + 나머지 현금 splitKrwRemainder 원
+      // 쿠키 보유 확인 (splitUsedQkey 는 이미 잔액 이하로 clamp 되었지만 방어)
+      if (currentQkey < splitUsedQkey) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `쿠키 잔액이 부족합니다 (현재: ${currentQkey.toLocaleString()} 쿠키)`,
+            code: 'INSUFFICIENT_BALANCE',
+            balance: { krw: currentKrw, qkey: currentQkey },
+          },
+          { status: 402 }
+        );
+      }
+      // 나머지 현금 잔액 확인
+      if (currentKrw < splitKrwRemainder) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `현금 잔액이 부족합니다 (현재: ${currentKrw.toLocaleString()}원, 필요: ${splitKrwRemainder.toLocaleString()}원). 쿠키 사용량을 늘리거나 잔액을 충전해주세요.`,
+            code: 'INSUFFICIENT_BALANCE',
+            balance: { krw: currentKrw, qkey: currentQkey },
+            required: { krw: splitKrwRemainder, qkey: splitUsedQkey },
+          },
+          { status: 402 }
+        );
+      }
     }
 
     // QTA 적립 컬럼 자동 보정 (멱등, 회원 주문 시에만 의미)
@@ -389,6 +434,21 @@ export async function POST(req: NextRequest) {
         await ensureQtaColumn(await getD1());
       } catch { /* 보정 실패해도 주문은 진행 */ }
     }
+
+    // [병행결제] Order.paidQkey / paidKrw 컬럼 자동 보정 (멱등)
+    try {
+      await ensureOrderPaymentColumns(d1);
+    } catch { /* 보정 실패해도 주문은 진행 (컬럼 없으면 아래 set 시 무시됨) */ }
+
+    // 결제 분할 금액 산정 (모든 결제수단 공통 — 주문 기록용)
+    const paidQkey =
+      paymentMethod === 'QKEY_BALANCE' ? Math.ceil(total / QKEY_TO_KRW)
+      : paymentMethod === 'SPLIT_BALANCE' ? splitUsedQkey
+      : 0;
+    const paidKrw =
+      paymentMethod === 'KRW_BALANCE' ? total
+      : paymentMethod === 'SPLIT_BALANCE' ? splitKrwRemainder
+      : 0;
 
     // 주문 생성 (트랜잭션)
     const order = await prisma.$transaction(async (tx) => {
@@ -402,7 +462,10 @@ export async function POST(req: NextRequest) {
         shippingName,
         shippingPhone,
         shippingAddress,
-        paymentMethod, // 'KRW_BALANCE' | 'QKEY_BALANCE'
+        paymentMethod, // 'KRW_BALANCE' | 'QKEY_BALANCE' | 'SPLIT_BALANCE'
+        // [병행결제] 이 주문에서 쿠키/현금으로 각각 결제한 양 (자동 보정된 컬럼)
+        paidQkey,
+        paidKrw,
         // [v1.0.22] 잔액 결제는 즉시 확정 (PG 없음, 승인 대기 없음)
         status: 'CONFIRMED',
         paidAt: new Date().toISOString(),
@@ -444,13 +507,14 @@ export async function POST(req: NextRequest) {
       // [v1.0.22] 잔액 원자 차감 + BalanceLedger 기록 (트랜잭션 내부 raw)
       // ── Prisma $transaction(tx) 컨텍스트 안에서 직접 raw 실행하여 원자성 보장.
       //    (lib/balance.adjustBalance 는 별도 D1 바인딩이라 이 트랜잭션과 무관 → 여기서는 tx 사용)
-      {
-        const isKrw = paymentMethod === 'KRW_BALANCE';
-        const column = isKrw ? 'krwBalance' : 'qkeyBalance';
-        const currency = isKrw ? 'KRW' : 'QKEY';
-        // 차감 금액: KRW 는 total 그대로, QKEY 는 올림 환산 (사전 확인과 동일 규칙)
-        const debitAmount = isKrw ? total : Math.ceil(total / QKEY_TO_KRW);
-
+      //
+      // 통화별 차감을 공통 헬퍼로 처리 (KRW / QKEY 각각 원자적 재확인 후 차감 + 원장 기록).
+      const debitOneCurrency = async (
+        column: 'krwBalance' | 'qkeyBalance',
+        currency: 'KRW' | 'QKEY',
+        debitAmount: number,
+      ) => {
+        if (debitAmount <= 0) return; // 0 이하면 차감/기록 생략 (병행결제에서 한쪽이 0인 경우)
         // 1) 현재 잔액 재조회 (트랜잭션 내부 최신값) — 동시성 대비 재확인
         const balRows: any = await tx.$queryRawUnsafe(
           `SELECT "${column}" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
@@ -463,21 +527,18 @@ export async function POST(req: NextRequest) {
           // 트랜잭션 롤백 유도 (동시 주문으로 잔액이 그 사이 소진된 경우)
           throw new Error('INSUFFICIENT_BALANCE_TX');
         }
-
         // 2) User 잔액 차감
         await tx.$executeRawUnsafe(
           `UPDATE "User" SET "${column}" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
           afterBal,
           userId
         );
-
         // 3) BalanceLedger 기록 (사용자 노출 안전 문구만)
-        const ledgerId = newId();
         await tx.$executeRawUnsafe(
           `INSERT INTO "BalanceLedger"
              ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
-          ledgerId,
+          newId(),
           userId,
           currency,
           -debitAmount,
@@ -485,6 +546,18 @@ export async function POST(req: NextRequest) {
           '주문 결제',
           newOrder.id
         );
+      };
+
+      if (paymentMethod === 'KRW_BALANCE') {
+        await debitOneCurrency('krwBalance', 'KRW', total);
+      } else if (paymentMethod === 'QKEY_BALANCE') {
+        // QKEY 는 올림 환산 (사전 확인과 동일 규칙)
+        await debitOneCurrency('qkeyBalance', 'QKEY', Math.ceil(total / QKEY_TO_KRW));
+      } else {
+        // [병행결제] SPLIT_BALANCE: 쿠키(splitUsedQkey개) + 나머지 현금(splitKrwRemainder원)
+        // 두 차감이 같은 트랜잭션 안에서 실행되어 원자성 보장 (하나라도 실패하면 전체 롤백).
+        await debitOneCurrency('qkeyBalance', 'QKEY', splitUsedQkey);
+        await debitOneCurrency('krwBalance', 'KRW', splitKrwRemainder);
       }
 
       // [QTA 적립] 구매 금액의 5% 를 QTA 로 적립 (100원 = 1 QTA)

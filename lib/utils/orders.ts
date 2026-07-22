@@ -210,8 +210,9 @@ export const createSampleOrders = (): void => {
 export function paymentMethodLabel(method?: string | null): string {
   if (!method) return '잔액 결제';
   const m = String(method).trim();
-  if (m === 'KRW_BALANCE') return 'KRW 잔액';
-  if (m === 'QKEY_BALANCE') return 'QKEY 잔액';
+  if (m === 'KRW_BALANCE') return '현금 잔액';
+  if (m === 'QKEY_BALANCE') return '쿠키 잔액';
+  if (m === 'SPLIT_BALANCE') return '쿠키+현금 병행결제';
   // 과거 카드/PG 주문 또는 내부 마커가 섞인 값 → 사용자에게는 중립 문구
   const lower = m.toLowerCase();
   if (

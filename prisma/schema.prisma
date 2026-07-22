@@ -454,8 +454,11 @@ model Order {
   refundedAt        DateTime?     // 환불 완료 시각
   
   // 결제 정보
-  paymentMethod     String?       // card, bank, kakaopay 등
+  paymentMethod     String?       // KRW_BALANCE | QKEY_BALANCE | SPLIT_BALANCE (구: card, bank 등)
   paymentKey        String?       // KISPG 결제키/TID (환불용)
+  // [병행결제] 쿠키+현금 병행결제 시 각각 결제한 양 (self-healing 컬럼)
+  paidQkey          Int           @default(0) // 쿠키(QKEY)로 결제한 개수
+  paidKrw           Int           @default(0) // 현금(KRW)으로 결제한 금액(원)
   paidAt            DateTime?
   
   // 배송 추적 정보
