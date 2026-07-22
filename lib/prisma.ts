@@ -736,45 +736,79 @@ async function resolveIncludes(db: D1DB, tableName: string, rows: any[], include
       ? Object.keys((relConfig as any).select).map(f => `"${f}"`).join(', ')
       : '*';
     
-    for (const row of rows) {
-      if (rel.type === 'one') {
-        // 외래키가 현재 테이블에 있는 경우 (예: Product.category -> categoryId)
-        const fkValue = row[rel.foreignKey];
-        if (fkValue) {
-          const related = await db.prepare(
-            `SELECT ${selectFields} FROM "${rel.table}" WHERE "id" = ? LIMIT 1`
-          ).bind(fkValue).first();
-          row[relName] = related ? convertRow(related) : null;
-        } else {
-          // 외래키가 관련 테이블에 있는 경우 (예: User.partner -> Partner.userId)
-          const related = await db.prepare(
-            `SELECT ${selectFields} FROM "${rel.table}" WHERE "${rel.foreignKey}" = ? LIMIT 1`
-          ).bind(row.id).first();
-          row[relName] = related ? convertRow(related) : null;
+    // ── N+1 쿼리 제거: 행마다 개별 쿼리 대신, 한 번의 IN 절로 일괄 조회 ──
+    // 기존엔 rows.length 만큼 D1 왕복(20행이면 20회, D1 왕복당 ~17ms → 340ms).
+    // 관계 대상을 한 쿼리로 모아 가져온 뒤 메모리에서 매핑한다. (쿠팡/토스식 배치 로딩)
+    if (rel.type === 'one') {
+      // fk 가 현재 테이블에 있는 정방향(예: Product.categoryId → Category.id)
+      const fkVals = Array.from(
+        new Set(rows.map((r) => r[rel.foreignKey]).filter((v) => v != null))
+      );
+      // fk 가 없으면(역방향, 예: User.partner) 각 row.id 기준으로 조회
+      if (fkVals.length > 0) {
+        const placeholders = fkVals.map(() => '?').join(',');
+        const relResult = await db.prepare(
+          `SELECT ${selectFields === '*' ? '*' : `${selectFields}, "id"`} FROM "${rel.table}" WHERE "id" IN (${placeholders})`
+        ).bind(...fkVals).all();
+        const byId = new Map<any, any>();
+        for (const rr of (relResult.results || [])) byId.set((rr as any).id, convertRow(rr));
+        for (const row of rows) {
+          row[relName] = byId.get(row[rel.foreignKey]) || null;
         }
       } else {
-        // many 관계
-        let relWhere: any = {};
-        if (typeof relConfig === 'object' && (relConfig as any).where) {
-          relWhere = (relConfig as any).where;
+        // 역방향 one 관계 (fk 가 관련 테이블에 있음): parent id 들을 IN 으로 일괄 조회
+        const ids = Array.from(new Set(rows.map((r) => r.id).filter((v) => v != null)));
+        if (ids.length > 0) {
+          const placeholders = ids.map(() => '?').join(',');
+          const relResult = await db.prepare(
+            `SELECT ${selectFields === '*' ? '*' : `${selectFields}, "${rel.foreignKey}"`} FROM "${rel.table}" WHERE "${rel.foreignKey}" IN (${placeholders})`
+          ).bind(...ids).all();
+          const byFk = new Map<any, any>();
+          for (const rr of (relResult.results || [])) {
+            const k = (rr as any)[rel.foreignKey];
+            if (!byFk.has(k)) byFk.set(k, convertRow(rr)); // one: 첫 번째만
+          }
+          for (const row of rows) row[relName] = byFk.get(row.id) || null;
+        } else {
+          for (const row of rows) row[relName] = null;
         }
-        
+      }
+    } else {
+      // many 관계: parent id 들을 IN 으로 일괄 조회 후 그룹핑
+      let relWhere: any = {};
+      if (typeof relConfig === 'object' && (relConfig as any).where) {
+        relWhere = (relConfig as any).where;
+      }
+      const ids = Array.from(new Set(rows.map((r) => r.id).filter((v) => v != null)));
+      if (ids.length === 0) {
+        for (const row of rows) row[relName] = [];
+      } else {
         const w = buildWhere(relWhere);
-        let sql = `SELECT ${selectFields} FROM "${rel.table}" WHERE "${rel.foreignKey}" = ?${w.sql ? ' AND' + w.sql.substring(6) : ''}`;
-        
+        const placeholders = ids.map(() => '?').join(',');
+        let sql = `SELECT ${selectFields === '*' ? '*' : `${selectFields}, "${rel.foreignKey}"`} FROM "${rel.table}" WHERE "${rel.foreignKey}" IN (${placeholders})${w.sql ? ' AND' + w.sql.substring(6) : ''}`;
         if (typeof relConfig === 'object' && (relConfig as any).orderBy) {
           sql += buildOrderBy((relConfig as any).orderBy);
         }
-        if (typeof relConfig === 'object' && (relConfig as any).take) {
-          sql += ` LIMIT ${(relConfig as any).take}`;
+        // take 는 부모별 제한이므로 IN 일괄조회에선 전체를 가져와 메모리에서 자른다
+        const related = await db.prepare(sql).bind(...ids, ...w.params).all();
+        const grouped = new Map<any, any[]>();
+        for (const rr of (related.results || [])) {
+          const k = (rr as any)[rel.foreignKey];
+          if (!grouped.has(k)) grouped.set(k, []);
+          grouped.get(k)!.push(convertRow(rr));
         }
-        
-        const related = await db.prepare(sql).bind(row.id, ...w.params).all();
-        row[relName] = (related.results || []).map(convertRow);
-        
-        // Nested includes
+        const take = typeof relConfig === 'object' ? (relConfig as any).take : undefined;
+        for (const row of rows) {
+          let list = grouped.get(row.id) || [];
+          if (take && list.length > take) list = list.slice(0, take);
+          row[relName] = list;
+        }
+        // Nested includes: 모아서 한 번에 재귀 처리
         if (typeof relConfig === 'object' && (relConfig as any).include) {
-          row[relName] = await resolveIncludes(db, rel.table, row[relName], (relConfig as any).include);
+          const allChildren = rows.flatMap((r) => r[relName] || []);
+          if (allChildren.length > 0) {
+            await resolveIncludes(db, rel.table, allChildren, (relConfig as any).include);
+          }
         }
       }
     }
