@@ -59,11 +59,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 이전 대상(외부 썸네일) 상품을 batch*4 개 후보로 가져와, 실제 대상만 batch 개 처리
+    // 이전 대상(외부 http 썸네일) 상품만 DB 레벨에서 직접 필터링.
+    // 이전에는 createdAt desc + take 로 후보를 가져와 필터링했는데,
+    // 이미 이전된 최신 상품이 후보 창(window)을 가득 채우면 오래된 외부 상품에
+    // 영원히 도달하지 못하는 버그가 있었다. thumbnail contains 'http' 로 직접 조회한다.
     const candidates = await prisma.product.findMany({
+      where: { thumbnail: { contains: 'http' } },
       select: { id: true, thumbnail: true, images: true, detailImages: true },
-      orderBy: { createdAt: 'desc' },
-      take: batch * 6,
+      take: batch,
     });
 
     const targets = candidates.filter((p: any) => needsMigration(p.thumbnail)).slice(0, batch);
