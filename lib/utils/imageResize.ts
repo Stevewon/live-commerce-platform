@@ -91,6 +91,23 @@ export async function resizeImageToWebP(file: File, options: ResizeOptions = {})
   }
 }
 
+/**
+ * 이미지 URL 을 가져와 File 로 변환 (기존 R2 이미지 백필용).
+ * 실패 시 null 반환.
+ */
+export async function fetchUrlAsFile(url: string, fileName = 'image'): Promise<File | null> {
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    if (!blob.type.startsWith('image/')) return null;
+    const ext = blob.type.split('/')[1] || 'jpg';
+    return new File([blob], `${fileName}.${ext}`, { type: blob.type });
+  } catch {
+    return null;
+  }
+}
+
 function readFileAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -205,6 +205,16 @@ export default function AdminProductsPage() {
                 대량등록
               </Link>
               <Link
+                href="/admin/products/optimize-images"
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium text-sm flex items-center gap-1"
+                title="기존 상품 이미지를 리사이즈 + WebP 변환하여 용량을 줄입니다"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                이미지 최적화
+              </Link>
+              <Link
                 href="/admin/products/new"
                 className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm flex items-center gap-1"
               >
