@@ -7,7 +7,27 @@ import { ensureProductIndexes } from '@/lib/ensureProductColumns';
 // (cf-cache-status 없음) 매 요청마다 Worker 가 DB 를 조회한다(1.3s+).
 // Cache API(caches.default)를 명시적으로 사용해 목록 응답을 엣지에 저장하고,
 // 다음 요청부터는 DB 조회 없이 수십 ms 로 응답한다.
-const EDGE_CACHE_TTL = 60; // 초
+const EDGE_CACHE_TTL = 300; // 초 (5분) — MISS 빈도를 줄여 콜드 DB 조회 최소화
+
+// 백그라운드 작업을 응답 반환 이후로 미룬다(waitUntil). 컨텍스트가 없으면 즉시 실행.
+async function runAfterResponse(task: Promise<any>): Promise<void> {
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const ctx: any = await getCloudflareContext();
+    const wu = ctx?.ctx?.waitUntil || ctx?.executionCtx?.waitUntil;
+    if (typeof wu === 'function') {
+      wu.call(ctx.ctx || ctx.executionCtx, task);
+      return;
+    }
+  } catch { /* 무시 */ }
+  // waitUntil 사용 불가 시엔 그냥 fire-and-forget (await 하지 않음)
+  task.catch(() => {});
+}
+
+// 브랜드 목록(필터 UI용)은 페이지네이션과 무관하므로 프로세스 메모리에 캐시.
+// 페이지를 넘길 때마다 전체 상품에서 distinct brand 를 재조회하던 비용 제거.
+let _brandsCache: { at: number; brands: string[] } | null = null;
+const BRANDS_TTL_MS = 5 * 60 * 1000; // 5분
 
 // GET /api/products - 상품 목록 조회 (정렬/필터/페이지네이션 지원)
 export async function GET(request: NextRequest) {
@@ -102,8 +122,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 목록 조회 성능 인덱스 보장 (프로세스당 1회, 멱등)
-    await ensureProductIndexes();
+    // 목록 조회 성능 인덱스 보장 — 응답을 블로킹하지 않도록 백그라운드로.
+    // (인덱스는 IF NOT EXISTS 이므로 이미 존재하면 no-op. 콜드 요청마다
+    //  5회 D1 왕복으로 응답이 지연되던 것을 waitUntil 로 밀어냄)
+    runAfterResponse(ensureProductIndexes());
 
     // 상품 목록 조회 - 필터 빌드
     const where: any = {
@@ -182,10 +204,17 @@ export async function GET(request: NextRequest) {
         orderBy = { createdAt: 'desc' };
     }
 
-    // 상품 조회 + 페이지네이션 + 브랜드 목록 (병렬 실행)
+    // 브랜드 목록(필터 UI용)은 페이지/필터와 무관 → 프로세스 메모리 캐시 사용.
+    // 캐시가 살아있으면 이 요청에선 distinct 쿼리를 아예 실행하지 않는다.
+    const brandsCached =
+      _brandsCache && Date.now() - _brandsCache.at < BRANDS_TTL_MS
+        ? _brandsCache.brands
+        : null;
+
+    // 상품 조회 + 페이지네이션 (병렬 실행)
     // 목록에 필요한 필드만 select → 응답 크기/속도 개선
     // (detailContent, detailImages, specifications 등 무거운 필드 제외)
-    const [products, totalCount, brands] = await Promise.all([
+    const queries: Promise<any>[] = [
       prisma.product.findMany({
         where,
         select: {
@@ -208,13 +237,28 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       prisma.product.count({ where }),
-      // 사용 가능한 브랜드 목록 (필터 UI용)
-      prisma.product.findMany({
-        where: { isActive: true, brand: { not: null } },
-        select: { brand: true },
-        distinct: ['brand'],
-      }),
-    ]);
+    ];
+    // 브랜드 캐시가 없을 때만 distinct 쿼리를 병렬에 추가
+    if (!brandsCached) {
+      queries.push(
+        prisma.product.findMany({
+          where: { isActive: true, brand: { not: null } },
+          select: { brand: true },
+          distinct: ['brand'],
+        })
+      );
+    }
+
+    const results = await Promise.all(queries);
+    const products = results[0];
+    const totalCount = results[1];
+    let brandList: string[];
+    if (brandsCached) {
+      brandList = brandsCached;
+    } else {
+      brandList = (results[2] as any[]).map((b: any) => b.brand).filter(Boolean);
+      _brandsCache = { at: Date.now(), brands: brandList };
+    }
 
     const response = NextResponse.json({
       success: true,
@@ -226,20 +270,23 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(totalCount / limit),
       },
       filters: {
-        brands: brands.map((b: any) => b.brand).filter(Boolean),
+        brands: brandList,
       },
     }, {
       headers: {
         // 브라우저 + 엣지 캐시 (stale-while-revalidate로 반복 로딩 체감 속도 개선)
-        'Cache-Control': `public, max-age=30, s-maxage=${EDGE_CACHE_TTL}, stale-while-revalidate=120`,
+        'Cache-Control': `public, max-age=60, s-maxage=${EDGE_CACHE_TTL}, stale-while-revalidate=600`,
         'CDN-Cache-Control': `public, s-maxage=${EDGE_CACHE_TTL}`,
         'X-Edge-Cache': 'MISS',
       },
     });
 
     // ── 엣지 캐시에 저장 (다음 요청부터 HIT → DB 조회 생략) ──
+    // waitUntil 로 응답 반환 이후에 저장 → put 완료를 기다리지 않아 체감속도 개선
     if (edgeCache) {
-      try { await edgeCache.put(cacheKey, response.clone()); } catch { /* 무시 */ }
+      runAfterResponse(
+        Promise.resolve().then(() => edgeCache.put(cacheKey, response.clone()))
+      );
     }
 
     return response;
