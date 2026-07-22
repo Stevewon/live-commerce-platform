@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import ShopNavigation from '@/components/ShopNavigation';
 
 interface Live {
   id: string;
@@ -55,32 +56,25 @@ export default function LivesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b sticky top-0 z-10">
+      {/* 공통 네비게이션 (모바일 최적화 헤더) */}
+      <ShopNavigation />
+
+      {/* 페이지 타이틀 */}
+      <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">🔴 라이브 쇼핑</h1>
-              <p className="text-gray-600 mt-1">실시간 라이브 방송을 시청하세요</p>
-            </div>
-            <Link
-              href="/products"
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
-            >
-              쇼핑몰로
-            </Link>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">🔴 라이브 쇼핑</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">실시간 라이브 방송을 시청하세요</p>
         </div>
       </div>
 
       {/* 필터 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1">
           {['LIVE', 'SCHEDULED', 'ENDED', 'ALL'].map((s) => (
             <button
               key={s}
               onClick={() => setStatus(s)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex-shrink-0 whitespace-nowrap px-4 py-2 rounded-lg font-medium transition-colors ${
                 status === s
                   ? 'bg-red-500 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'

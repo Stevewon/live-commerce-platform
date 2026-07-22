@@ -3,10 +3,9 @@
 import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
-import LanguageSelector from '@/components/LanguageSelector';
+import ShopNavigation from '@/components/ShopNavigation';
 
 interface Product {
   id: string;
@@ -51,7 +50,6 @@ export default function ProductsPage() {
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
   const { t } = useLanguage();
   const tp = t.products;
 
@@ -194,45 +192,23 @@ function ProductsContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-40">
+      {/* 공통 네비게이션 (모바일 최적화 헤더) */}
+      <ShopNavigation />
+
+      {/* 검색 바 (상품 목록 전용) */}
+      <div className="bg-white border-b shadow-sm sticky top-14 sm:top-16 z-30">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <Link href="/products" className="text-xl font-bold text-gray-900">QRLIVE Shop</Link>
-            <div className="flex items-center gap-3">
-              <form onSubmit={handleSearch} className="relative hidden sm:block">
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder={tp.searchPlaceholder}
-                  className="w-64 lg:w-80 px-4 py-2 pr-10 border border-gray-300 rounded-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  🔍
-                </button>
-              </form>
-              <LanguageSelector variant="compact" />
-              <Link href="/cart" className="px-3 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium">{tp.cartBtn}</Link>
-              {user ? (
-                <span className="hidden sm:inline text-sm text-gray-700 font-medium">{tp.greeting.replace('{name}', user.name)}</span>
-              ) : (
-                <>
-                  <Link href="/login" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 font-medium">{tp.loginBtn}</Link>
-                  <Link href="/register" className="px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">{tp.registerBtn}</Link>
-                </>
-              )}
-            </div>
-          </div>
-          {/* 모바일 검색 */}
-          <form onSubmit={handleSearch} className="mt-2 sm:hidden">
+          <form onSubmit={handleSearch} className="relative">
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={tp.searchPlaceholder}
-              className="w-full px-4 py-2 border border-gray-300 rounded-full text-sm focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-full text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+            <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              🔍
+            </button>
           </form>
         </div>
       </div>
