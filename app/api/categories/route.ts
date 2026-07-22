@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { translateTextsServer } from '@/lib/translateCache';
+
+async function getEnv(): Promise<any> {
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const ctx = await getCloudflareContext();
+    return ctx.env as any;
+  } catch {
+    return null;
+  }
+}
 
 // GET /api/categories - 카테고리 목록 조회
+// ?locale=ja 등을 주면 서버에서 카테고리명을 미리 번역해 name 에 실어 보낸다
+// (클라이언트 async 번역 타이밍 이슈 제거 → 첫 렌더부터 번역 상태로 노출)
 export async function GET(req: NextRequest) {
   const prisma = await getPrisma();
   try {
@@ -17,6 +30,19 @@ export async function GET(req: NextRequest) {
         name: 'asc',
       },
     });
+
+    // 언어 요청 시 서버 번역 적용
+    const locale = String(req.nextUrl.searchParams.get('locale') || '').trim();
+    if (locale && locale !== 'ko') {
+      try {
+        const env = await getEnv();
+        const map = await translateTextsServer(env, categories.map((c: any) => c.name), locale, 'ko');
+        for (const c of categories as any[]) {
+          c.nameOriginal = c.name;
+          c.name = map.get(c.name) || c.name;
+        }
+      } catch { /* 번역 실패 시 원문 유지 */ }
+    }
 
     return NextResponse.json({
       success: true,
