@@ -229,7 +229,8 @@ export default function CheckoutPage() {
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity, 0
   );
-  const shippingFee = shippingConfig.freeShippingThreshold > 0 && totalAmount >= shippingConfig.freeShippingThreshold ? 0 : shippingConfig.shippingFee;
+  // [정책] 전 상품 무조건 무료배송 — 가격과 무관하게 배송비 항상 0원
+  const shippingFee = 0;
   const couponDiscount = appliedCoupon?.discountAmount || 0;
   const finalAmount = Math.max(0, totalAmount + shippingFee - couponDiscount);
 
@@ -673,7 +674,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>{t.checkout.shippingFee}</span>
-                    <span>{shippingFee === 0 ? <span className="text-green-600 font-medium">{t.checkout.free}</span> : `₩${shippingFee.toLocaleString()}`}</span>
+                    <span className="text-green-600 font-medium">{t.checkout.free}</span>
                   </div>
                   {couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600">
@@ -681,7 +682,7 @@ export default function CheckoutPage() {
                       <span className="font-medium">-₩{couponDiscount.toLocaleString()}</span>
                     </div>
                   )}
-                  {shippingFee === 0 && totalAmount > 0 && (
+                  {totalAmount > 0 && (
                     <p className="text-xs text-green-600 font-semibold">{t.checkout.freeShippingApplied}</p>
                   )}
                   <div className="border-t pt-3 flex justify-between text-xl font-bold text-gray-900">

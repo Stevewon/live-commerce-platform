@@ -288,8 +288,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 서버사이드 배송비 계산 (클라이언트 값 대신 DB 설정 사용)
-    const serverShippingFee = configFreeThreshold > 0 && subtotal >= configFreeThreshold ? 0 : configShippingFee;
+    // 서버사이드 배송비 계산
+    // [정책] 가격을 떠나 전 상품 무조건 무료배송 — 배송비는 항상 0원.
+    //  (기존 임계금액/기본배송비 설정은 무시하고 강제로 무료 처리)
+    const serverShippingFee = 0;
+    // (참고용으로 남겨둔 설정값 — 계산에는 사용하지 않음)
+    void configShippingFee; void configFreeThreshold;
 
     // 쿠폰 처리
     let discount = 0;
