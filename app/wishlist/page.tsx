@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import ShopNavigation from '@/components/ShopNavigation';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface ServerWishlistItem {
   id: string;
@@ -231,8 +232,12 @@ export default function WishlistPage() {
                       <div className="relative aspect-square overflow-hidden bg-gray-100">
                         {thumb ? (
                           <img
-                            src={thumb}
+                            src={proxyImg(thumb)}
                             alt={p.name}
+                            loading="lazy"
+                            width={400}
+                            height={400}
+                            sizes="(max-width: 640px) 50vw, 200px"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';

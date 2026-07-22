@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { ensureProductIndexes } from '@/lib/ensureProductColumns';
 
+// [엣지 캐시 헬퍼]
+// OpenNext 응답은 Cache-Control 헤더만으로는 Cloudflare 엣지에 자동 캐시되지 않아
+// (cf-cache-status 없음) 매 요청마다 Worker 가 DB 를 조회한다(1.3s+).
+// Cache API(caches.default)를 명시적으로 사용해 목록 응답을 엣지에 저장하고,
+// 다음 요청부터는 DB 조회 없이 수십 ms 로 응답한다.
+const EDGE_CACHE_TTL = 60; // 초
+
 // GET /api/products - 상품 목록 조회 (정렬/필터/페이지네이션 지원)
 export async function GET(request: NextRequest) {
   const prisma = await getPrisma();
@@ -12,6 +19,20 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get('featured');
     const slug = searchParams.get('slug');
     const tag = searchParams.get('tag');
+
+    // ── 엣지 캐시 조회 (단일 slug 조회는 상세라 제외, 목록만 캐시) ──
+    const edgeCache = !slug ? (globalThis as any).caches?.default : null;
+    const cacheKey = new Request(request.url);
+    if (edgeCache) {
+      try {
+        const hit = await edgeCache.match(cacheKey);
+        if (hit) {
+          const h = new Headers(hit.headers);
+          h.set('X-Edge-Cache', 'HIT');
+          return new NextResponse(hit.body, { status: hit.status, headers: h });
+        }
+      } catch { /* 캐시 조회 실패는 무시하고 DB 조회 진행 */ }
+    }
 
     // 정렬
     const sort = searchParams.get('sort'); // popular, price-low, price-high, newest, rating, discount
@@ -195,7 +216,7 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: products,
       pagination: {
@@ -209,10 +230,19 @@ export async function GET(request: NextRequest) {
       },
     }, {
       headers: {
-        // 짧은 캐시 + stale-while-revalidate로 반복 로딩 체감 속도 개선
-        'Cache-Control': 'public, max-age=30, s-maxage=60, stale-while-revalidate=120',
+        // 브라우저 + 엣지 캐시 (stale-while-revalidate로 반복 로딩 체감 속도 개선)
+        'Cache-Control': `public, max-age=30, s-maxage=${EDGE_CACHE_TTL}, stale-while-revalidate=120`,
+        'CDN-Cache-Control': `public, s-maxage=${EDGE_CACHE_TTL}`,
+        'X-Edge-Cache': 'MISS',
       },
     });
+
+    // ── 엣지 캐시에 저장 (다음 요청부터 HIT → DB 조회 생략) ──
+    if (edgeCache) {
+      try { await edgeCache.put(cacheKey, response.clone()); } catch { /* 무시 */ }
+    }
+
+    return response;
   } catch (error) {
     console.error('[PRODUCTS_GET]', error);
     return NextResponse.json(

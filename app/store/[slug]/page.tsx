@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import ShopNavigation from '@/components/ShopNavigation'
+import { proxyImg } from '@/lib/utils/imgProxy'
 
 interface StoreInfo {
   id: string
@@ -124,8 +125,9 @@ export default function StorePage() {
           <div className="flex items-center gap-6">
             {store.logo ? (
               <img
-                src={store.logo}
+                src={proxyImg(store.logo)}
                 alt={store.storeName}
+                loading="lazy"
                 className="w-24 h-24 rounded-2xl object-cover border-4 border-white/30 shadow-xl"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -207,8 +209,12 @@ export default function StorePage() {
                   <div className="aspect-square relative overflow-hidden bg-gray-100">
                     {product.thumbnail ? (
                       <img
-                        src={product.thumbnail}
+                        src={proxyImg(product.thumbnail)}
                         alt={product.name}
+                        loading="lazy"
+                        width={400}
+                        height={400}
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { proxyImg } from '@/lib/utils/imgProxy';
 import {
   getGuestCart,
   updateGuestCartQuantity,
@@ -249,8 +250,11 @@ export default function CartPage() {
                     className="w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100"
                   >
                     <img
-                      src={item.product.thumbnail}
+                      src={proxyImg(item.product.thumbnail)}
                       alt={item.product.name}
+                      loading="lazy"
+                      width={112}
+                      height={112}
                       className="w-full h-full object-cover"
                       onError={e => {
                         e.currentTarget.style.display = 'none';

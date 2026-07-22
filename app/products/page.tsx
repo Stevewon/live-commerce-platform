@@ -7,6 +7,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import ShopNavigation from '@/components/ShopNavigation';
 import { krwToQkeyDisplay } from '@/lib/utils/qkey';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface Product {
   id: string;
@@ -388,10 +389,13 @@ function ProductsContent() {
                     >
                       <div className="relative aspect-square bg-gray-100 overflow-hidden">
                         <img
-                          src={product.thumbnail}
+                          src={proxyImg(product.thumbnail)}
                           alt={product.name}
                           loading="lazy"
                           decoding="async"
+                          width={400}
+                          height={400}
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 200px"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={e => {
                             e.currentTarget.style.display = 'none';

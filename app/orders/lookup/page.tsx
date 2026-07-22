@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
   product: { name: string; thumbnail: string; price: number };
@@ -239,8 +240,11 @@ export default function OrderLookupPage() {
                   <div key={idx} className="flex gap-3">
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                       <img
-                        src={item.product.thumbnail}
+                        src={proxyImg(item.product.thumbnail)}
                         alt={item.product.name}
+                        loading="lazy"
+                        width={64}
+                        height={64}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
