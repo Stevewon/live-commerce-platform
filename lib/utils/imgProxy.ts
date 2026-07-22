@@ -26,3 +26,22 @@ export function proxyImg(url: string | null | undefined): string {
   // 그 외에는 원본 그대로 사용 (가장 빠름)
   return u;
 }
+
+// [목록/카드용 경량 썸네일 URL]
+// 우리 R2 서빙 경로(/api/images/...)인 경우에만 ?w=<width> 를 붙여
+// 미리 만들어둔 경량 WebP 변형을 받도록 한다. (변형 없으면 서버가 원본으로 폴백)
+// 외부 URL(dbimg 등)이나 data:/blob:/기타는 리사이즈 대상이 아니므로 그대로 반환.
+export function thumbUrl(
+  url: string | null | undefined,
+  width: 200 | 300 | 400 | 600 | 800 = 400
+): string {
+  const u = proxyImg(url);
+  if (!u) return '';
+  // 우리 R2 서빙 경로만 리사이즈 파라미터 적용
+  if (u.startsWith('/api/images/')) {
+    // 이미 쿼리가 있으면 건드리지 않음
+    if (u.includes('?')) return u;
+    return `${u}?w=${width}`;
+  }
+  return u;
+}

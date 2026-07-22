@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toggleWishlist, isInWishlist, getWishlistCount } from '@/lib/utils/wishlist';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 const categories = [
   { id: 'all', name: '전체', icon: '🔥', color: 'from-yellow-500 to-orange-500' },
@@ -365,7 +365,7 @@ export default function ShopPage() {
             >
               <div className="relative aspect-square overflow-hidden bg-gray-700">
                 <img
-                  src={proxyImg(product.thumbnail)}
+                  src={thumbUrl(product.thumbnail, 400)}
                   alt={product.name}
                   loading="lazy"
                   width={400}

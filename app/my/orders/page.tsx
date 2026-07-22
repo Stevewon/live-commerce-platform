@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ReviewForm from '@/components/ReviewForm';
 import { authFetch } from '@/lib/auth/clientFetch';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
   id: string;
@@ -360,7 +360,7 @@ export default function OrdersPage() {
                       >
                         <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-700 flex-shrink-0">
                           <img
-                            src={proxyImg(item.product.thumbnail)}
+                            src={thumbUrl(item.product.thumbnail, 200)}
                             alt={item.product.name}
                             loading="lazy"
                             width={96}

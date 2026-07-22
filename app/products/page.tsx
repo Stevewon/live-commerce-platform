@@ -7,7 +7,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import ShopNavigation from '@/components/ShopNavigation';
 import { krwToQkeyDisplay } from '@/lib/utils/qkey';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface Product {
   id: string;
@@ -389,7 +389,7 @@ function ProductsContent() {
                     >
                       <div className="relative aspect-square bg-gray-100 overflow-hidden">
                         <img
-                          src={proxyImg(product.thumbnail)}
+                          src={thumbUrl(product.thumbnail, 400)}
                           alt={product.name}
                           loading="lazy"
                           decoding="async"
