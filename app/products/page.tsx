@@ -52,7 +52,7 @@ export default function ProductsPage() {
 function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const tp = t.products;
 
   const SORT_OPTIONS = [
@@ -122,15 +122,19 @@ function ProductsContent() {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+    // locale 이 바뀌면 서버 번역된 카테고리명으로 다시 조회
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
 
   useEffect(() => {
     fetchProducts();
-  }, [currentCategory, currentSort, currentSearch, currentPage, currentBrand, currentMinPrice, currentMaxPrice, currentInStock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCategory, currentSort, currentSearch, currentPage, currentBrand, currentMinPrice, currentMaxPrice, currentInStock, locale]);
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
+      const qs = locale && locale !== 'ko' ? `?locale=${encodeURIComponent(locale)}` : '';
+      const res = await fetch(`/api/categories${qs}`);
       const data = await res.json();
       if (data.success) setCategories(data.data || []);
     } catch (e) { /* ignore */ }
@@ -149,6 +153,7 @@ function ProductsContent() {
       if (currentMinPrice) params.set('minPrice', currentMinPrice);
       if (currentMaxPrice) params.set('maxPrice', currentMaxPrice);
       if (currentInStock) params.set('inStock', currentInStock);
+      if (locale && locale !== 'ko') params.set('locale', locale);
 
       const res = await fetch(`/api/products?${params.toString()}`);
       const data = await res.json();

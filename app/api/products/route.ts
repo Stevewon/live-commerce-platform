@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { ensureProductIndexes } from '@/lib/ensureProductColumns';
+import { translateTextsServer } from '@/lib/translateCache';
+
+async function getProductsEnv(): Promise<any> {
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const ctx: any = await getCloudflareContext();
+    return ctx?.env || null;
+  } catch {
+    return null;
+  }
+}
 
 // [엣지 캐시 헬퍼]
 // OpenNext 응답은 Cache-Control 헤더만으로는 Cloudflare 엣지에 자동 캐시되지 않아
@@ -252,6 +263,29 @@ export async function GET(request: NextRequest) {
     const results = await Promise.all(queries);
     const products = results[0];
     const totalCount = results[1];
+
+    // ── 서버측 다국어 번역 (?locale=ja 등) ──
+    // 상품명/카테고리명/브랜드를 서버에서 미리 번역해 응답에 실어 보낸다.
+    // 클라이언트 async 번역의 리렌더 타이밍 이슈를 원천 제거하고,
+    // 엣지 캐시에도 번역본이 담겨 다음 요청부터 즉시 번역 상태로 응답한다.
+    const locale = String(searchParams.get('locale') || '').trim();
+    if (locale && locale !== 'ko' && Array.isArray(products) && products.length > 0) {
+      try {
+        const env = await getProductsEnv();
+        const toTr: string[] = [];
+        for (const p of products as any[]) {
+          if (p?.name) toTr.push(p.name);
+          if (p?.category?.name) toTr.push(p.category.name);
+          if (p?.brand) toTr.push(p.brand);
+        }
+        const map = await translateTextsServer(env, toTr, locale, 'ko');
+        for (const p of products as any[]) {
+          if (p?.name) { p.nameOriginal = p.name; p.name = map.get(p.name) || p.name; }
+          if (p?.category?.name) { p.category.nameOriginal = p.category.name; p.category.name = map.get(p.category.name) || p.category.name; }
+          if (p?.brand) { p.brand = map.get(p.brand) || p.brand; }
+        }
+      } catch { /* 번역 실패 시 원문 유지 */ }
+    }
     let brandList: string[];
     if (brandsCached) {
       brandList = brandsCached;

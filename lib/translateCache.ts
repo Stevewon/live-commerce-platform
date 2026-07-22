@@ -64,6 +64,76 @@ export async function getCachedTranslations(
   return result;
 }
 
+// m2m100 언어 코드 매핑 (앱 Locale → 모델 언어코드)
+const SERVER_LANG_MAP: Record<string, string> = {
+  ko: 'ko', en: 'en', ja: 'ja', zh: 'zh', vi: 'vi', th: 'th',
+};
+
+/**
+ * 서버 측 일괄 번역: D1 캐시 우선 → 미캐시만 Workers AI → 캐시 저장.
+ * API 라우트가 응답에 번역본을 곧바로 실어 보낼 때 사용(클라이언트 async 번역 타이밍 이슈 제거).
+ * 실패/미지원 시 원문을 그대로 매핑해 화면이 깨지지 않도록 한다.
+ *
+ * @returns Map<원문, 번역문>
+ */
+export async function translateTextsServer(
+  env: any,
+  texts: string[],
+  target: string,
+  source = 'ko'
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const uniqueTexts = Array.from(
+    new Set((texts || []).map((t) => (typeof t === 'string' ? t.trim() : '')).filter(Boolean))
+  ).slice(0, 200);
+
+  // 원문 언어거나 미지원 언어면 원문 그대로
+  if (!target || target === source || !SERVER_LANG_MAP[target]) {
+    for (const t of uniqueTexts) out.set(t, t);
+    return out;
+  }
+  if (uniqueTexts.length === 0) return out;
+
+  const db = env?.DB;
+  const ai = env?.AI;
+
+  // 1) 캐시 조회
+  if (db) {
+    try {
+      await ensureTranslationTable(db);
+      const cached = await getCachedTranslations(db, uniqueTexts, target);
+      for (const [k, v] of cached) out.set(k, v);
+    } catch { /* 무시 */ }
+  }
+
+  // 2) 미캐시만 AI 번역
+  const toTranslate = uniqueTexts.filter((t) => !out.has(t));
+  if (toTranslate.length > 0 && ai) {
+    const newly: { sourceText: string; translatedText: string }[] = [];
+    for (const text of toTranslate) {
+      try {
+        const res: any = await ai.run('@cf/meta/m2m100-1.2b', {
+          text,
+          source_lang: SERVER_LANG_MAP[source] || 'ko',
+          target_lang: SERVER_LANG_MAP[target],
+        });
+        const translated = (res && (res.translated_text || res.result?.translated_text)) || text;
+        out.set(text, translated);
+        if (translated && translated !== text) newly.push({ sourceText: text, translatedText: translated });
+      } catch {
+        out.set(text, text);
+      }
+    }
+    if (db && newly.length > 0) {
+      try { await saveTranslations(db, newly, target); } catch { /* 무시 */ }
+    }
+  } else {
+    for (const t of toTranslate) if (!out.has(t)) out.set(t, t);
+  }
+
+  return out;
+}
+
 /** 번역 결과 캐시에 저장 (멱등 - 이미 있으면 무시) */
 export async function saveTranslations(
   db: any,
