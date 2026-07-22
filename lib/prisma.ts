@@ -148,7 +148,33 @@ function convertRow(row: any): any {
 function createModelProxy(db: D1DB, tableName: string) {
   return {
     async findMany(args?: any) {
-      let sql = `SELECT * FROM "${tableName}"`;
+      // ── 컬럼 프로젝션 최적화 ──
+      // 기존엔 항상 SELECT * 로 모든 컬럼(detailContent/detailImages/specifications 등
+      // 수십~수백 KB 텍스트 포함)을 읽어온 뒤 JS 에서 버렸다. 목록 조회처럼
+      // select 로 가벼운 스칼라 필드만 요청한 경우, 실제 SQL 에서도 그 컬럼만 읽어
+      // D1 I/O 를 대폭 줄인다. (관계 필드는 FK 컬럼이 필요하므로 함께 포함)
+      let selectClause = '*';
+      if (args?.select) {
+        const relations = RELATIONS[tableName] || {};
+        const selKeys = Object.keys(args.select).filter((k) => args.select[k]);
+        const relKeys = selKeys.filter((k) => relations[k]);
+        const scalarKeys = selKeys.filter((k) => !relations[k]);
+        // 관계 resolve 에 필요한 FK 컬럼 + id 를 항상 포함
+        const need = new Set<string>(scalarKeys);
+        need.add('id');
+        for (const rk of relKeys) {
+          const fk = relations[rk]?.foreignKey;
+          if (fk) need.add(fk);
+        }
+        // distinct 대상 컬럼도 필요
+        if (Array.isArray(args.distinct)) for (const d of args.distinct) need.add(d);
+        if (need.size > 0) {
+          selectClause = Array.from(need)
+            .map((c) => `"${c}"`)
+            .join(', ');
+        }
+      }
+      let sql = `SELECT ${selectClause} FROM "${tableName}"`;
       let params: any[] = [];
       
       if (args?.where) {
