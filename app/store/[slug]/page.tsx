@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import ShopNavigation from '@/components/ShopNavigation'
-import { proxyImg } from '@/lib/utils/imgProxy'
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy'
 
 interface StoreInfo {
   id: string
@@ -209,7 +209,7 @@ export default function StorePage() {
                   <div className="aspect-square relative overflow-hidden bg-gray-100">
                     {product.thumbnail ? (
                       <img
-                        src={proxyImg(product.thumbnail)}
+                        src={thumbUrl(product.thumbnail, 400)}
                         alt={product.name}
                         loading="lazy"
                         width={400}

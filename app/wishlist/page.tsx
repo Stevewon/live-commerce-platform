@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import ShopNavigation from '@/components/ShopNavigation';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface ServerWishlistItem {
   id: string;
@@ -232,7 +232,7 @@ export default function WishlistPage() {
                       <div className="relative aspect-square overflow-hidden bg-gray-100">
                         {thumb ? (
                           <img
-                            src={proxyImg(thumb)}
+                            src={thumbUrl(thumb, 300)}
                             alt={p.name}
                             loading="lazy"
                             width={400}
