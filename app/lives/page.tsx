@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface Live {
   id: string;
@@ -113,7 +113,7 @@ export default function LivesPage() {
                 <div className="relative aspect-video bg-gray-900">
                   {live.thumbnail ? (
                     <img
-                      src={proxyImg(live.thumbnail)}
+                      src={thumbUrl(live.thumbnail, 400)}
                       alt={live.title}
                       loading="lazy"
                       className="w-full h-full object-cover"

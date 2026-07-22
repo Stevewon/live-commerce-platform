@@ -11,7 +11,7 @@ import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface CartItem {
   id: string;
@@ -579,7 +579,7 @@ export default function CheckoutPage() {
                   {cartItems.map(item => (
                     <div key={item.id} className="flex gap-4 items-start">
                       <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                        <img src={proxyImg(item.product.thumbnail)} alt={item.product.name}
+                        <img src={thumbUrl(item.product.thumbnail, 200)} alt={item.product.name}
                           loading="lazy" width={80} height={80}
                           className="w-full h-full object-cover"
                           onError={e => {

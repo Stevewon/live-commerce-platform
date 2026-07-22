@@ -6,7 +6,7 @@ import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { paymentMethodLabel } from '@/lib/utils/orders';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
   id: string;
@@ -149,7 +149,7 @@ export default function OrderDetailPage() {
             {order.items.map((item) => (
               <div key={item.id} className="flex gap-4 pb-4 border-b last:border-b-0">
                 <img
-                  src={proxyImg(item.product.thumbnail) || 'https://via.placeholder.com/100'}
+                  src={thumbUrl(item.product.thumbnail, 200) || 'https://via.placeholder.com/100'}
                   alt={item.product.name}
                   loading="lazy"
                   width={80}

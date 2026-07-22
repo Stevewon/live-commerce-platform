@@ -12,15 +12,26 @@ if (!TOKEN) { console.error('토큰 필요'); process.exit(1); }
 
 const auth = { Authorization: `Bearer ${TOKEN}` };
 
+function parseArr(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string');
+  try {
+    const p = JSON.parse(String(v));
+    return Array.isArray(p) ? p.filter((x) => typeof x === 'string') : [];
+  } catch { return []; }
+}
+
 async function main() {
-  // 1) 전체 상품 목록에서 R2 썸네일 수집
+  // 1) 전체 상품에서 모든 R2 이미지 수집 (썸네일 + 갤러리 images + 상세 detailImages)
   const res = await fetch(`${BASE}/api/admin/products?limit=500`, { headers: auth });
   const j = await res.json();
   const list = j.data?.products || j.products || j.data || [];
   const keys = new Set();
+  const add = (t) => { if (t && String(t).startsWith('/api/images/')) keys.add(String(t).split('?')[0]); };
   for (const p of list) {
-    const t = p.thumbnail || '';
-    if (t.startsWith('/api/images/')) keys.add(t.split('?')[0]);
+    add(p.thumbnail);
+    for (const u of parseArr(p.images)) add(u);
+    for (const u of parseArr(p.detailImages)) add(u);
   }
   const all = [...keys].slice(0, LIMIT);
   console.log(`대상 썸네일: ${all.length}개 (width=${WIDTH})`);
