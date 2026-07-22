@@ -51,6 +51,13 @@ model User {
   // 퀀타리움 지갑주소 (닉네임/비밀번호 찾기용 본인확인 식별자) - nullable for existing users
   // 컬럼명(securetQrUrl)은 하위호환을 위해 유지, 값은 0x로 시작하는 퀀타리움 지갑주소
   securetQrUrl  String?   // 예: 0xE0c166B147a742E4FbCf5e5BCf73aCA631f14f0e
+
+  // [QRChat 연동] 가입 출처 구분 (사장님 확정: A/B 회원을 절대 자동병합하지 않음)
+  //   - "QRLIVE" : 큐라이브 쇼핑몰에서 직접 가입한 A 회원 (기존 로그인 유지)
+  //   - "QRCHAT" : QRChat 앱에서 넘어와 자동 생성된 B 회원 (지갑+닉네임 SSO)
+  origin        String    @default("QRLIVE")
+  // QRChat 측 사용자 UID (B 회원, 또는 지갑을 연결한 A 회원). QKEY 직접 차감 매칭 키.
+  qrchatUid     String?   @unique
   
   // [v1.0.22] 잔액 결제 시스템 (KISPG PG 대체)
   // KRW: 원 단위 정수 (예: 12345 = 12,345원)
