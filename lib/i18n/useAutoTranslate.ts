@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLanguage } from './LanguageContext';
 
 // 세션(브라우저) 단위 메모리 캐시: locale → (sourceText → translated)
@@ -23,58 +23,67 @@ export function useAutoTranslate(texts: string[]): {
   ready: boolean;
 } {
   const { locale } = useLanguage();
-  const [, forceRender] = useState(0);
+  // 번역 버전: 캐시가 갱신될 때마다 증가시켜 확실히 리렌더를 유발한다.
+  const [version, setVersion] = useState(0);
   const [ready, setReady] = useState(locale === 'ko');
-  const inFlight = useRef<string>('');
+  // 진행 중인 요청 키들(중복 요청만 방지, 새 항목 요청은 절대 막지 않음)
+  const inFlight = useRef<Set<string>>(new Set());
+
+  // texts 를 정규화한 안정적인 키 (렌더마다 새 배열이어도 내용 같으면 동일)
+  const uniqueTexts = Array.from(
+    new Set((texts || []).map((t) => (typeof t === 'string' ? t.trim() : '')).filter(Boolean))
+  );
+  const textsKey = uniqueTexts.slice().sort().join('\u0001');
 
   useEffect(() => {
     if (locale === 'ko') {
       setReady(true);
       return;
     }
-
-    const unique = Array.from(
-      new Set((texts || []).map((t) => (typeof t === 'string' ? t.trim() : '')).filter(Boolean))
-    );
-    if (unique.length === 0) {
+    if (uniqueTexts.length === 0) {
       setReady(true);
       return;
     }
 
     const cache = (memoryCache[locale] = memoryCache[locale] || {});
-    const missing = unique.filter((t) => !(t in cache));
+    // 아직 캐시에 없고, 현재 진행 중이지도 않은 항목만 요청
+    const missing = uniqueTexts.filter((t) => !(t in cache) && !inFlight.current.has(`${locale}::${t}`));
 
     if (missing.length === 0) {
-      setReady(true);
+      // 이미 전부 캐시에 있으면 준비 완료
+      const allCached = uniqueTexts.every((t) => t in cache);
+      if (allCached) setReady(true);
       return;
     }
 
-    // 동일 요청 중복 방지 키
-    const key = `${locale}::${missing.slice().sort().join('|')}`;
-    if (inFlight.current === key) return;
-    inFlight.current = key;
+    for (const t of missing) inFlight.current.add(`${locale}::${t}`);
     setReady(false);
 
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texts: missing, target: locale, source: 'ko' }),
-        });
-        const data = await res.json().catch(() => ({}));
-        const translations: Record<string, string> = data?.translations || {};
-        for (const t of missing) {
-          cache[t] = translations[t] || t;
+        // 100개씩 나눠 요청 (API 한도)
+        for (let i = 0; i < missing.length; i += 100) {
+          const chunk = missing.slice(i, i + 100);
+          const res = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ texts: chunk, target: locale, source: 'ko' }),
+          });
+          const data = await res.json().catch(() => ({}));
+          const translations: Record<string, string> = data?.translations || {};
+          for (const t of chunk) {
+            cache[t] = translations[t] || t;
+          }
+          if (!cancelled) setVersion((n) => n + 1); // 청크마다 즉시 반영
         }
       } catch {
-        // 실패 시 원문 유지
-        for (const t of missing) cache[t] = t;
+        for (const t of missing) if (!(t in cache)) cache[t] = t;
       } finally {
+        for (const t of missing) inFlight.current.delete(`${locale}::${t}`);
         if (!cancelled) {
           setReady(true);
-          forceRender((n) => n + 1);
+          setVersion((n) => n + 1);
         }
       }
     })();
@@ -82,15 +91,21 @@ export function useAutoTranslate(texts: string[]): {
     return () => {
       cancelled = true;
     };
+    // textsKey 가 바뀌면(상품이 async 로 추가로 로드되는 경우 포함) 다시 실행
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locale, JSON.stringify(texts)]);
+  }, [locale, textsKey]);
 
-  const tr = (text: string | null | undefined): string => {
-    if (!text) return '';
-    if (locale === 'ko') return text;
-    const cache = memoryCache[locale];
-    return (cache && cache[text.trim()]) || text;
-  };
+  // version 을 의존해 캐시 갱신 시 tr 이 새 값을 읽도록 보장
+  const tr = React.useCallback(
+    (text: string | null | undefined): string => {
+      if (!text) return '';
+      if (locale === 'ko') return text;
+      const cache = memoryCache[locale];
+      return (cache && cache[text.trim()]) || text;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale, version]
+  );
 
   return { tr, ready };
 }
