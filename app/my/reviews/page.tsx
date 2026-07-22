@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface Review {
   id: string;
@@ -88,8 +89,11 @@ export default function MyReviewsPage() {
               <div className="flex items-start gap-4">
                 {review.product?.thumbnail && (
                   <img
-                    src={review.product.thumbnail}
+                    src={proxyImg(review.product.thumbnail)}
                     alt={review.product.name}
+                    loading="lazy"
+                    width={64}
+                    height={64}
                     className="w-16 h-16 rounded object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';

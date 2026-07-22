@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import ShopNavigation from '@/components/ShopNavigation';
 import { authFetch } from '@/lib/auth/clientFetch';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface RecentOrder {
   id: string;
@@ -358,8 +359,11 @@ export default function MyPage() {
                     {(order.items || []).slice(0, 3).map((item, idx: number) => (
                       <div key={item.id || idx} className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                         <img
-                          src={item.product?.thumbnail}
+                          src={proxyImg(item.product?.thumbnail)}
                           alt={item.product?.name || ''}
+                          loading="lazy"
+                          width={80}
+                          height={80}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';

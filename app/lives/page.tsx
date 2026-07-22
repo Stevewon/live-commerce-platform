@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface Live {
   id: string;
@@ -112,8 +113,9 @@ export default function LivesPage() {
                 <div className="relative aspect-video bg-gray-900">
                   {live.thumbnail ? (
                     <img
-                      src={live.thumbnail}
+                      src={proxyImg(live.thumbnail)}
                       alt={live.title}
+                      loading="lazy"
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
@@ -150,8 +152,9 @@ export default function LivesPage() {
                   <div className="flex items-center gap-2 mb-3">
                     {live.partner.logo ? (
                       <img
-                        src={live.partner.logo}
+                        src={proxyImg(live.partner.logo)}
                         alt={live.partner.storeName}
+                        loading="lazy"
                         className="w-8 h-8 rounded-full"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { ORDER_STATUS_MAP } from '@/lib/utils/courier';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
   id: string;
@@ -208,8 +209,11 @@ export default function MyOrdersPage() {
                             <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                               {productThumb ? (
                                 <img
-                                  src={productThumb}
+                                  src={proxyImg(productThumb)}
                                   alt={productName}
+                                  loading="lazy"
+                                  width={64}
+                                  height={64}
                                   className="w-full h-full object-cover"
                                   onError={e => {
                                     e.currentTarget.style.display = 'none';

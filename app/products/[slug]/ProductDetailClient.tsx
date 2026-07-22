@@ -9,6 +9,7 @@ import { addToGuestCart } from '@/lib/utils/guestCart';
 import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
 import { krwToQkeyDisplay } from '@/lib/utils/qkey';
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface Partner {
   id: string;
@@ -361,8 +362,10 @@ export default function ProductDetailClient() {
           <div>
             <div className="relative aspect-square bg-white rounded-xl overflow-hidden border">
               <img
-                src={galleryImages[selectedImage] || product.thumbnail}
+                src={proxyImg(galleryImages[selectedImage] || product.thumbnail)}
                 alt={product.name}
+                width={600}
+                height={600}
                 className="w-full h-full object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -388,7 +391,7 @@ export default function ProductDetailClient() {
                       selectedImage === i ? 'border-blue-500' : 'border-transparent hover:border-gray-300'
                     }`}
                   >
-                    <img src={url} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+                    <img src={proxyImg(url)} alt={`${product.name} ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -645,7 +648,7 @@ export default function ProductDetailClient() {
                     {detailImages.map((url, i) => (
                       <img
                         key={i}
-                        src={url}
+                        src={proxyImg(url)}
                         alt={`${product.name} 상세 ${i + 1}`}
                         className="w-full rounded-lg"
                         loading="lazy"

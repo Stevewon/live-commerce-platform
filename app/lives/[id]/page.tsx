@@ -8,6 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useChat } from '@/lib/hooks/useChat'
+import { proxyImg } from '@/lib/utils/imgProxy';
 
 interface LiveData {
   id: string;
@@ -225,8 +226,9 @@ export default function LiveViewPage() {
               <div className="flex items-center gap-3">
                 {live.partner.logo && (
                   <img
-                    src={live.partner.logo}
+                    src={proxyImg(live.partner.logo)}
                     alt={live.partner.storeName}
+                    loading="lazy"
                     className="w-12 h-12 rounded-full"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
@@ -253,8 +255,11 @@ export default function LiveViewPage() {
                       className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition-colors"
                     >
                       <img
-                        src={product.thumbnail}
+                        src={proxyImg(product.thumbnail)}
                         alt={product.name}
+                        loading="lazy"
+                        width={300}
+                        height={300}
                         className="w-full aspect-square object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
