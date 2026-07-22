@@ -51,7 +51,8 @@ export async function GET(
       const variant = await r2.get(variantKey);
       if (variant) {
         servedKey = variantKey;
-        forcedContentType = 'image/webp';
+        // 변형은 대부분 webp 지만, 초장 이미지는 jpeg 로 저장됨 → 저장된 실제 타입 사용
+        forcedContentType = variant.httpMetadata?.contentType || 'image/webp';
         // variant 객체를 그대로 사용해 재조회 비용 절감
         return await respond(variant, forcedContentType, cache, cacheKey);
       }

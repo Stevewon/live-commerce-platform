@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { ORDER_STATUS_MAP, COURIER_COMPANIES, getTrackingUrl } from '@/lib/utils/courier';
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import { paymentMethodLabel } from '@/lib/utils/orders';
 
 interface OrderItem {
@@ -252,7 +252,7 @@ export default function OrderDetailPage() {
                 <div key={item.id} className="flex gap-4 py-2">
                   <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                     <img
-                      src={proxyImg(item.product.thumbnail)}
+                      src={thumbUrl(item.product.thumbnail, 200)}
                       alt={item.product.name}
                       loading="lazy"
                       width={80}

@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useChat } from '@/lib/hooks/useChat'
-import { proxyImg } from '@/lib/utils/imgProxy';
+import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface LiveData {
   id: string;
@@ -255,7 +255,7 @@ export default function LiveViewPage() {
                       className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition-colors"
                     >
                       <img
-                        src={proxyImg(product.thumbnail)}
+                        src={thumbUrl(product.thumbnail, 400)}
                         alt={product.name}
                         loading="lazy"
                         width={300}
