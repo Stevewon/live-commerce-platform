@@ -3,6 +3,10 @@ import { getPrisma } from '@/lib/prisma';
 import { getProductBySlug } from '@/lib/getProductBySlug';
 import ProductDetailClient from './ProductDetailClient';
 
+// 상세 페이지를 60초 캐시(ISR 스타일)해 반복 방문 시 DB 조회 없이 즉시 응답.
+// 상품 정보는 초 단위로 바뀌지 않으므로 안전. 재고/가격 변경은 60초 내 반영.
+export const revalidate = 60;
+
 interface Props {
   params: Promise<{ slug: string }>;
 }
