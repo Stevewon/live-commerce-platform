@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface Review {
@@ -23,6 +24,9 @@ export default function MyReviewsPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [reviews, setReviews] = useState<Review[]>([]);
+  const { tr } = useAutoTranslate(
+    reviews.map((r) => r.product?.name).filter(Boolean) as string[]
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -103,7 +107,7 @@ export default function MyReviewsPage() {
                 )}
                 <div className="flex-1">
                   <Link href={`/products/${review.product?.slug}`} className="font-medium hover:text-blue-600">
-                    {review.product?.name}
+                    {tr(review.product?.name || '')}
                   </Link>
                   <div className="flex items-center gap-1 mt-1">
                     {[1,2,3,4,5].map(s => (

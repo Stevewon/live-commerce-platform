@@ -8,6 +8,7 @@ import { authFetch } from '@/lib/auth/clientFetch';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import ShopNavigation from '@/components/ShopNavigation';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 
 interface ServerWishlistItem {
   id: string;
@@ -33,6 +34,11 @@ export default function WishlistPage() {
   const [items, setItems] = useState<ServerWishlistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // 상품명/카테고리 자동 번역
+  const { tr } = useAutoTranslate(
+    items.flatMap((it) => [it.product?.name, it.product?.category?.name]).filter(Boolean) as string[]
+  );
 
   // 인증 게이트
   useEffect(() => {
@@ -261,13 +267,13 @@ export default function WishlistPage() {
                         {p.category?.name && (
                           <div className="mb-2">
                             <span className="bg-pink-50 text-pink-600 text-xs px-2 py-1 rounded">
-                              {p.category.name}
+                              {tr(p.category.name)}
                             </span>
                           </div>
                         )}
 
                         <h3 className="text-gray-900 font-bold text-base sm:text-lg mb-2 sm:mb-3 group-hover:text-pink-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3.5rem]">
-                          {p.name}
+                          {tr(p.name)}
                         </h3>
 
                         <div className="flex items-baseline gap-2 mb-3">

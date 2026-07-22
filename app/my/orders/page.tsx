@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ReviewForm from '@/components/ReviewForm';
 import { authFetch } from '@/lib/auth/clientFetch';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
@@ -53,6 +54,9 @@ export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const { tr } = useAutoTranslate(
+    orders.flatMap((o) => (o.items || []).map((it) => it.product?.name)).filter(Boolean) as string[]
+  );
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -374,7 +378,7 @@ export default function OrdersPage() {
                         </div>
                         <div className="flex-1">
                           <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition">
-                            {item.product.name}
+                            {tr(item.product.name)}
                           </h3>
                           <div className="flex items-center gap-4 text-sm text-gray-400">
                             <span>수량: {item.quantity}개</span>

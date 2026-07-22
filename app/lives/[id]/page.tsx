@@ -8,6 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useChat } from '@/lib/hooks/useChat'
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface LiveData {
@@ -43,6 +44,9 @@ export default function LiveViewPage() {
   const [live, setLive] = useState<LiveData | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const { tr } = useAutoTranslate(
+    (live?.products || []).map((p) => p.name).filter(Boolean) as string[]
+  );
   
   const chatEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
@@ -268,7 +272,7 @@ export default function LiveViewPage() {
                       />
                       <div className="p-3">
                         <p className="text-white text-sm font-medium line-clamp-2">
-                          {product.name}
+                          {tr(product.name)}
                         </p>
                         <p className="text-red-400 font-bold mt-1">
                           {product.price.toLocaleString()}원
