@@ -54,15 +54,18 @@ export async function POST(req: NextRequest) {
 
   const dotIdx = objectKey.lastIndexOf('.');
   const baseNoExt = dotIdx > 0 ? objectKey.slice(0, dotIdx) : objectKey;
+  // 변형 키는 서빙 라우트 규칙(@w<width>.webp)에 맞춘다. 내용은 webp 가 기본이지만,
+  // 초장(세로가 매우 큰) 이미지는 jpeg 로 저장될 수 있어 contentType 를 별도로 보관.
   const variantKey = `${baseNoExt}@w${width}.webp`;
+  const contentType = String(form.get('contentType') || 'image/webp');
 
   try {
     const buf = await file.arrayBuffer();
     if (!buf || buf.byteLength === 0) {
       return NextResponse.json({ success: false, error: '빈 파일' }, { status: 400 });
     }
-    await r2.put(variantKey, buf, { httpMetadata: { contentType: 'image/webp' } });
-    return NextResponse.json({ success: true, variantKey, bytes: buf.byteLength });
+    await r2.put(variantKey, buf, { httpMetadata: { contentType } });
+    return NextResponse.json({ success: true, variantKey, contentType, bytes: buf.byteLength });
   } catch (e: any) {
     return NextResponse.json({ success: false, error: e?.message || String(e) }, { status: 500 });
   }
