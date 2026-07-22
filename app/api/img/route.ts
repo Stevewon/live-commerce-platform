@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// [이미지 프록시 + 엣지 캐시]
+// [이미지 프록시 + 엣지 캐시 — 스트리밍]
 // 외부(dbimg.co.kr 등) / 내부(R2) 이미지를 우리 Worker 가 대신 받아
 // Cloudflare 엣지(Cache API)에 저장하고 장기 캐시 헤더로 서빙한다.
 //
-// 목적: 상품 목록/상세의 썸네일이 매번 느린 외부 서버(1.5s+)에서 로드되는 문제를
-//       "첫 1회만 외부 fetch, 이후엔 우리 엣지에서 수십 ms" 로 바꾼다.
+// 목적: 상품 썸네일이 매번 느린 외부 서버(1.5s+)에서 로드되는 문제를
+//       "이후엔 우리 엣지에서 수십 ms" 로 바꾼다.
 //
-// 사용: /api/img?url=<원본URL>   (프론트에서 자동으로 감싼다)
-// - Workers 런타임엔 sharp 가 없어 리사이즈는 못 하지만,
-//   엣지 캐시 + WebP Accept 전달 + 장기 캐시로 반복 로딩 비용을 없앤다.
+// [핵심 개선] 첫 요청(MISS)에서 arrayBuffer() 로 전부 버퍼링하지 않고
+//   upstream.body 스트림을 그대로 흘려보낸다(스트리밍). 엣지 저장은
+//   ctx.waitUntil() 로 백그라운드 처리 → MISS 여도 원본과 동일 속도.
 
-// OpenNext(Cloudflare Workers)에서는 별도 edge runtime 선언을 쓰지 않는다.
-// 기본 Worker 런타임에서 globalThis.caches.default(Cache API)에 접근 가능.
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_HOSTS = [
@@ -52,10 +50,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '허용되지 않은 이미지 호스트' }, { status: 400 });
   }
 
-  // ── 엣지 캐시 조회 ──
+  // Cloudflare context (waitUntil 사용) — 없으면 백그라운드 저장 생략
+  let ctxWaitUntil: ((p: Promise<any>) => void) | null = null;
   const cache = (globalThis as any).caches?.default;
-  // 캐시 키는 요청 URL(원본 url 파라미터 포함) 기준
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const cfCtx: any = await getCloudflareContext();
+    if (cfCtx?.ctx?.waitUntil) {
+      ctxWaitUntil = (p: Promise<any>) => cfCtx.ctx.waitUntil(p);
+    }
+  } catch { /* 컨텍스트 없으면 무시 */ }
+
   const cacheKey = new Request(req.url);
+
+  // ── 엣지 캐시 조회 (HIT 이면 즉시 반환) ──
   if (cache) {
     try {
       const hit = await cache.match(cacheKey);
@@ -67,20 +75,19 @@ export async function GET(req: NextRequest) {
     } catch { /* 캐시 조회 실패는 무시 */ }
   }
 
-  // ── 원본 fetch (WebP 선호 Accept 전달) ──
+  // ── 원본 fetch ──
   let upstream: Response;
   try {
     upstream = await fetch(target.toString(), {
       headers: {
-        // 원본 서버가 WebP 를 줄 수 있으면 받도록
         'Accept': 'image/avif,image/webp,image/*,*/*;q=0.8',
         'User-Agent': 'Mozilla/5.0 (compatible; QRLiveImageProxy/1.0)',
         'Referer': target.origin,
       },
-      // Cloudflare 엣지 캐시 힌트
+      // Cloudflare 자체 캐시도 활용(원본을 CF 가 캐시)
       cf: { cacheEverything: true, cacheTtl: 31536000 },
     } as any);
-  } catch (e: any) {
+  } catch {
     return NextResponse.json({ error: '원본 이미지 로드 실패' }, { status: 502 });
   }
 
@@ -93,8 +100,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: '이미지가 아닙니다' }, { status: 415 });
   }
 
-  const body = await upstream.arrayBuffer();
-
   const headers = new Headers();
   headers.set('Content-Type', contentType);
   // 브라우저 + 우리 엣지 장기 캐시 (이미지는 사실상 불변)
@@ -103,13 +108,25 @@ export async function GET(req: NextRequest) {
   headers.set('X-Img-Cache', 'MISS');
   const etag = upstream.headers.get('etag');
   if (etag) headers.set('ETag', etag);
+  const contentLength = upstream.headers.get('content-length');
+  if (contentLength) headers.set('Content-Length', contentLength);
 
-  const response = new NextResponse(body, { headers });
+  const canStore = !!(cache && upstream.body);
 
-  // 엣지 캐시에 저장 (다음 요청부터 HIT)
-  if (cache) {
-    try { await cache.put(cacheKey, response.clone()); } catch { /* 무시 */ }
+  // [스트리밍] body 를 두 갈래로 분기: 하나는 즉시 사용자에게, 하나는 엣지 저장용.
+  // 버퍼링 없이 바로 흘려보내므로 MISS 여도 원본 속도와 동일.
+  if (canStore && ctxWaitUntil) {
+    const [toClient, toCache] = upstream.body!.tee();
+    // 백그라운드로 엣지 캐시에 저장 (사용자 응답을 지연시키지 않음)
+    const cacheResponse = new NextResponse(toCache, { headers });
+    ctxWaitUntil(
+      (async () => {
+        try { await cache.put(cacheKey, cacheResponse); } catch { /* 무시 */ }
+      })()
+    );
+    return new NextResponse(toClient, { headers });
   }
 
-  return response;
+  // waitUntil 을 못 쓰는 환경: 그냥 스트리밍만(캐시 저장 생략) — 여전히 원본 속도
+  return new NextResponse(upstream.body, { headers });
 }
