@@ -7,6 +7,7 @@
  */
 
 let _supplyPriceColumnEnsured = false;
+let _productIndexesEnsured = false;
 
 // D1 바인딩을 가져오는 함수 (lib/prisma.ts 와 동일 패턴)
 async function getD1(): Promise<any> {
@@ -46,5 +47,37 @@ export async function ensureSupplyPriceColumn(db?: any): Promise<void> {
     console.warn('[ensureSupplyPriceColumn] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
   } finally {
     _supplyPriceColumnEnsured = true;
+  }
+}
+
+/**
+ * Product 목록 조회 성능 인덱스 보장 (없으면 CREATE INDEX IF NOT EXISTS).
+ * 프로세스 당 1회만 시도. 실패해도 조회 자체는 진행되도록 예외를 삼킨다.
+ * - isActive/categoryId/isFeatured/createdAt/price: 목록 필터·정렬에 사용
+ */
+export async function ensureProductIndexes(db?: any): Promise<void> {
+  if (_productIndexesEnsured) return;
+  const d1 = db || (await getD1());
+  if (!d1) return;
+  const statements = [
+    `CREATE INDEX IF NOT EXISTS "Product_isActive_idx" ON "Product" ("isActive")`,
+    `CREATE INDEX IF NOT EXISTS "Product_categoryId_idx" ON "Product" ("categoryId")`,
+    `CREATE INDEX IF NOT EXISTS "Product_isFeatured_idx" ON "Product" ("isFeatured")`,
+    `CREATE INDEX IF NOT EXISTS "Product_createdAt_idx" ON "Product" ("createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "Product_price_idx" ON "Product" ("price")`,
+  ];
+  try {
+    for (const sql of statements) {
+      try {
+        await d1.prepare(sql).run();
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (!/already exists/i.test(msg)) {
+          console.warn('[ensureProductIndexes] 인덱스 생성 실패(무시):', msg);
+        }
+      }
+    }
+  } finally {
+    _productIndexesEnsured = true;
   }
 }

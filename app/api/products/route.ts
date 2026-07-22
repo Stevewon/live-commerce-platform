@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
+import { ensureProductIndexes } from '@/lib/ensureProductColumns';
 
 // GET /api/products - 상품 목록 조회 (정렬/필터/페이지네이션 지원)
 export async function GET(request: NextRequest) {
@@ -79,6 +80,9 @@ export async function GET(request: NextRequest) {
         data: [product],
       });
     }
+
+    // 목록 조회 성능 인덱스 보장 (프로세스당 1회, 멱등)
+    await ensureProductIndexes();
 
     // 상품 목록 조회 - 필터 빌드
     const where: any = {
