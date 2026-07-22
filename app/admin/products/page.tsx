@@ -39,6 +39,7 @@ export default function AdminProductsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
@@ -49,7 +50,20 @@ export default function AdminProductsPage() {
       fetchProducts()
       fetchCategories()
     }
-  }, [user, statusFilter, categoryFilter, currentPage])
+  }, [user, statusFilter, categoryFilter, currentPage, debouncedSearch])
+
+  // 검색어 디바운스(300ms) — 입력할 때마다 서버 요청하지 않도록
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim())
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // 검색어/필터가 바뀌면 항상 1페이지부터 다시 조회 (전체 상품 대상 검색)
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch, statusFilter, categoryFilter])
 
   const fetchProducts = async () => {
     try {
@@ -60,6 +74,10 @@ export default function AdminProductsPage() {
         page: currentPage.toString(),
         limit: '20'
       })
+      // 검색어를 서버로 전달 → 현재 페이지가 아니라 전체 상품 DB 에서 검색
+      if (debouncedSearch) {
+        params.set('search', debouncedSearch)
+      }
 
       const res = await authFetch(`/api/admin/products?${params}`, {
         headers: { 'Content-Type': 'application/json' }
@@ -162,10 +180,9 @@ export default function AdminProductsPage() {
     }
   }
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category?.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // 검색/필터는 서버(API)에서 전체 상품 DB 대상으로 처리되므로
+  // 여기서는 서버가 반환한 목록을 그대로 사용한다. (기존: 현재 페이지 내 클라이언트 필터 → 첫 페이지에서만 검색되던 버그)
+  const filteredProducts = products
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount)
@@ -264,7 +281,7 @@ export default function AdminProductsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="상품명 또는 카테고리 검색..."
+                  placeholder="전체 상품 검색 (상품명/브랜드/SKU)..."
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
                 <button onClick={() => setSearchQuery('')} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm">

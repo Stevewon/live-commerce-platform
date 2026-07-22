@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status'); // 'active', 'inactive', 'all'
     const category = searchParams.get('category');
+    const search = (searchParams.get('search') || '').trim(); // 상품명/설명/브랜드/SKU 검색
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
@@ -36,6 +37,17 @@ export async function GET(req: NextRequest) {
     }
     if (category && category !== 'all') {
       where.categoryId = category;
+    }
+
+    // 검색: 전체 상품 대상(현재 페이지가 아닌 DB 전체) — 이름/설명/브랜드/SKU/태그
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { description: { contains: search } },
+        { brand: { contains: search } },
+        { sku: { contains: search } },
+        { tags: { contains: search } },
+      ];
     }
 
     // 상품 조회 (관리자는 모든 상품 조회 가능)
