@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { getPrisma } from '@/lib/prisma';
+import { getProductBySlug } from '@/lib/getProductBySlug';
+import ProductDetailClient from './ProductDetailClient';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -85,5 +87,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-// Re-export the client component
-export { default } from './ProductDetailClient';
+// 서버 컴포넌트: 상품을 서버에서 미리 조회해 클라이언트에 주입한다.
+// → 클릭 즉시 내용이 채워진 상태로 렌더(스피너/빈 화면 없음). 쿠팡/토스식.
+export default async function ProductDetailPage({ params }: Props) {
+  const { slug } = await params;
+  const decodedSlug = decodeURIComponent(slug);
+  let initialProduct: any = null;
+  try {
+    initialProduct = await getProductBySlug(decodedSlug);
+  } catch {
+    initialProduct = null;
+  }
+  return <ProductDetailClient initialProduct={initialProduct} />;
+}

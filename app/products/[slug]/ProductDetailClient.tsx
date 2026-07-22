@@ -80,7 +80,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   home: '🏠', sports: '⚽', kids: '👶', books: '📚',
 };
 
-export default function ProductDetailClient() {
+export default function ProductDetailClient({ initialProduct = null }: { initialProduct?: Product | null }) {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -91,8 +91,9 @@ export default function ProductDetailClient() {
   const storeSlug = searchParams.get('store');
   const partnerId = searchParams.get('partner');
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
+  // 서버에서 미리 조회한 상품이 있으면 그것으로 시작 → 스피너 없이 즉시 표시(쿠팡식)
+  const [product, setProduct] = useState<Product | null>(initialProduct);
+  const [loading, setLoading] = useState(!initialProduct);
   const [error, setError] = useState('');
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -124,7 +125,11 @@ export default function ProductDetailClient() {
   }, []);
 
   useEffect(() => {
+    // 서버에서 이미 완전한 상품 데이터를 받았으면 재조회하지 않는다(즉시 표시).
+    // initialProduct 가 없을 때(직접 API 라우팅 등)만 클라이언트에서 조회.
+    if (initialProduct) return;
     if (slug) fetchProduct();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   // 뒤로가기 시 쇼핑몰 메인(/products)에 머물도록 히스토리 관리
