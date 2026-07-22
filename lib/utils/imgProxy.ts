@@ -1,18 +1,28 @@
-// [이미지 프록시 URL 헬퍼]
-// 상품 이미지 URL 을 우리 엣지 캐시 프록시(/api/img)로 감싼다.
-// - 외부(dbimg.co.kr 등) 이미지를 우리 Cloudflare 엣지에 캐시하여 반복 로딩을 가속.
-// - 이미 우리 프록시/데이터URL/빈 값이면 그대로 반환 (이중 프록시 방지).
+// [이미지 URL 헬퍼]
+// 상품 이미지 URL 을 그대로 반환한다.
+//
+// [중요] 과거엔 외부(dbimg.co.kr) 이미지를 /api/img 프록시(엣지 캐시)로 감쌌으나,
+//   실측 결과 프록시 왕복(사용자→우리Worker→외부→우리→사용자)이
+//   원본 직접 로딩(사용자→외부)보다 항상 느렸다(캐시 MISS 시 2~3s vs 1.3s).
+//   → 프록시를 태우지 않고 원본 URL 을 그대로 쓰는 것이 가장 빠르다.
+//
+//   함수 시그니처는 유지하여 각 페이지 코드를 건드리지 않고 한 곳에서 되돌린다.
+//   (data:/blob:/상대경로/절대URL 모두 원본 그대로 통과)
 
 export function proxyImg(url: string | null | undefined): string {
   if (!url) return '';
   const u = String(url).trim();
   if (!u) return '';
-  // data URL, blob, 이미 프록시된 것은 그대로
-  if (u.startsWith('data:') || u.startsWith('blob:')) return u;
-  if (u.startsWith('/api/img?')) return u;
-  // http(s) 또는 상대경로(/api/images/...) 모두 프록시 대상
-  if (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/')) {
-    return `/api/img?url=${encodeURIComponent(u)}`;
+  // 과거 프록시 형식이 저장돼 있던 경우(/api/img?url=...) 원본으로 복원
+  if (u.startsWith('/api/img?')) {
+    try {
+      const q = u.split('?')[1] || '';
+      const params = new URLSearchParams(q);
+      const orig = params.get('url');
+      if (orig) return orig;
+    } catch { /* 무시 */ }
+    return u;
   }
+  // 그 외에는 원본 그대로 사용 (가장 빠름)
   return u;
 }
