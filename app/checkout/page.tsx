@@ -11,6 +11,7 @@ import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface CartItem {
@@ -42,6 +43,9 @@ export default function CheckoutPage() {
   const { t } = useLanguage();
   const { user, loading: authLoading } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const { tr } = useAutoTranslate(
+    cartItems.map((it) => it.product?.name).filter(Boolean) as string[]
+  );
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
@@ -588,7 +592,7 @@ export default function CheckoutPage() {
                           }} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-gray-900 line-clamp-2">{item.product.name}</h3>
+                        <h3 className="font-semibold text-gray-900 line-clamp-2">{tr(item.product.name)}</h3>
                         <p className="text-sm text-gray-600">₩{item.product.price.toLocaleString()} x {item.quantity}{t.checkout.itemsCount}</p>
                       </div>
                       <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">

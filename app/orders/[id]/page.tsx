@@ -6,6 +6,7 @@ import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { paymentMethodLabel } from '@/lib/utils/orders';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
@@ -52,6 +53,9 @@ export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
+  const { tr } = useAutoTranslate(
+    (order?.items || []).map((it) => it.product?.name).filter(Boolean) as string[]
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -165,7 +169,7 @@ export default function OrderDetailPage() {
                     href={`/products/${item.product.slug}`}
                     className="font-medium text-gray-900 hover:text-blue-600"
                   >
-                    {item.product.name}
+                    {tr(item.product.name)}
                   </Link>
                   <p className="text-sm text-gray-500 mt-1">
                     수량: {item.quantity}개

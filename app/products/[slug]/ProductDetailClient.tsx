@@ -10,6 +10,7 @@ import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
 import { krwToQkeyDisplay } from '@/lib/utils/qkey';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 
 interface Partner {
   id: string;
@@ -102,6 +103,14 @@ export default function ProductDetailClient() {
 
   // 동적 배송비 설정
   const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
+
+  // 동적 텍스트(상품명/카테고리/브랜드/설명) 자동 번역
+  const { tr } = useAutoTranslate([
+    product?.name,
+    product?.category?.name,
+    product?.brand,
+    product?.description,
+  ].filter(Boolean) as string[]);
 
   useEffect(() => {
     fetch('/api/settings/shipping')
@@ -352,9 +361,9 @@ export default function ProductDetailClient() {
           <span>/</span>
           <Link href="/products" className="hover:text-gray-700">전체상품</Link>
           <span>/</span>
-          <Link href={`/products?category=${product.category.slug}`} className="hover:text-gray-700">{product.category.name}</Link>
+          <Link href={`/products?category=${product.category.slug}`} className="hover:text-gray-700">{tr(product.category.name)}</Link>
           <span>/</span>
-          <span className="text-gray-900 font-medium truncate">{product.name}</span>
+          <span className="text-gray-900 font-medium truncate">{tr(product.name)}</span>
         </nav>
 
         {/* Product main section */}
@@ -403,17 +412,17 @@ export default function ProductDetailClient() {
           <div className="space-y-4">
             {/* Category & Brand */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-500">{product.category.name}</span>
+              <span className="text-sm text-gray-500">{tr(product.category.name)}</span>
               {product.brand && (
                 <>
                   <span className="text-gray-300">|</span>
-                  <span className="text-sm font-medium text-gray-700">{product.brand}</span>
+                  <span className="text-sm font-medium text-gray-700">{tr(product.brand)}</span>
                 </>
               )}
             </div>
 
             {/* Name */}
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug">{product.name}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug">{tr(product.name)}</h1>
 
             {/* Rating */}
             {avgRating && (
@@ -602,7 +611,7 @@ export default function ProductDetailClient() {
                   {product.brand && (
                     <div>
                       <span className="text-gray-400 text-xs">브랜드</span>
-                      <p className="font-medium">{product.brand}</p>
+                      <p className="font-medium">{tr(product.brand)}</p>
                     </div>
                   )}
                 </div>
@@ -661,7 +670,7 @@ export default function ProductDetailClient() {
                 {/* Description */}
                 {!product.detailContent && detailImages.length === 0 && (
                   <div className="text-gray-600 whitespace-pre-wrap leading-relaxed">
-                    {product.description}
+                    {tr(product.description)}
                   </div>
                 )}
               </div>
@@ -707,7 +716,7 @@ export default function ProductDetailClient() {
                       {product.brand && (
                         <tr className="border-b border-gray-100">
                           <td className="py-3 px-4 text-sm font-medium text-gray-500 bg-gray-50 w-1/3">브랜드</td>
-                          <td className="py-3 px-4 text-sm text-gray-900">{product.brand}</td>
+                          <td className="py-3 px-4 text-sm text-gray-900">{tr(product.brand)}</td>
                         </tr>
                       )}
                     </tbody>

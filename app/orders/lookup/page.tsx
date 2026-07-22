@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
@@ -42,6 +43,9 @@ export default function OrderLookupPage() {
   const [lookupType, setLookupType] = useState<'phone' | 'email'>('phone');
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
+  const { tr } = useAutoTranslate(
+    (order?.items || []).map((it) => it.product?.name).filter(Boolean) as string[]
+  );
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
 
@@ -252,7 +256,7 @@ export default function OrderLookupPage() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 line-clamp-1">{item.product.name}</p>
+                      <p className="font-medium text-gray-900 line-clamp-1">{tr(item.product.name)}</p>
                       <p className="text-sm text-gray-500">₩{item.price.toLocaleString()} x {item.quantity}개</p>
                     </div>
                     <div className="text-right flex-shrink-0">

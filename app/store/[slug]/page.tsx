@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import ShopNavigation from '@/components/ShopNavigation'
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate'
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy'
 
 interface StoreInfo {
@@ -82,6 +83,12 @@ export default function StorePage() {
   const filteredProducts = selectedCategory === 'all'
     ? products
     : products.filter(p => p.category?.id === selectedCategory)
+
+  const { tr } = useAutoTranslate([
+    ...products.map(p => p.name),
+    ...products.map(p => p.category?.name),
+    ...categories.map(c => c.name),
+  ].filter(Boolean) as string[])
 
   if (loading) {
     return (
@@ -178,7 +185,7 @@ export default function StorePage() {
                     : 'bg-white text-gray-700 hover:bg-gray-100 border'
                 }`}
               >
-                {cat.name} ({products.filter(p => p.category?.id === cat.id).length})
+                {tr(cat.name)} ({products.filter(p => p.category?.id === cat.id).length})
               </button>
             ))}
           </div>
@@ -242,11 +249,11 @@ export default function StorePage() {
                   <div className="p-3 sm:p-4">
                     {product.category && (
                       <span className="text-[10px] text-blue-600 font-medium bg-blue-50 px-2 py-0.5 rounded-full">
-                        {product.category.name}
+                        {tr(product.category.name)}
                       </span>
                     )}
                     <h3 className="mt-1.5 text-sm font-medium text-gray-900 line-clamp-2 leading-snug group-hover:text-blue-600 transition">
-                      {product.name}
+                      {tr(product.name)}
                     </h3>
                     <div className="mt-2">
                       {product.comparePrice && product.comparePrice > displayPrice && (

@@ -9,6 +9,7 @@ import ShopNavigation from '@/components/ShopNavigation';
 import { ORDER_STATUS_MAP, COURIER_COMPANIES, getTrackingUrl } from '@/lib/utils/courier';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import { paymentMethodLabel } from '@/lib/utils/orders';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 
 interface OrderItem {
   id: string;
@@ -62,6 +63,9 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
 
   const [order, setOrder] = useState<Order | null>(null);
+  const { tr } = useAutoTranslate(
+    (order?.items || []).map((it) => it.product?.name).filter(Boolean) as string[]
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -266,7 +270,7 @@ export default function OrderDetailPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <Link href={`/products/${item.product.slug}`} className="font-medium text-gray-900 hover:text-blue-600 line-clamp-2">
-                      {item.product.name}
+                      {tr(item.product.name)}
                     </Link>
                     {optionLabel && (
                       <p className="text-xs text-gray-500 mt-1">{optionLabel}</p>

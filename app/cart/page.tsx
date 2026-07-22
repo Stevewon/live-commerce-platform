@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
+import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import {
   getGuestCart,
@@ -39,6 +40,9 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const { t } = useLanguage();
+  const { tr } = useAutoTranslate(
+    cartItems.flatMap((it) => [it.product?.name, it.product?.category?.name]).filter(Boolean) as string[]
+  );
 
   // 동적 배송비 설정
   const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
@@ -268,13 +272,13 @@ export default function CartPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         {item.product.category && (
-                          <p className="text-xs text-gray-400 mb-0.5">{item.product.category.name}</p>
+                          <p className="text-xs text-gray-400 mb-0.5">{tr(item.product.category.name)}</p>
                         )}
                         <Link
                           href={`/products/${item.product.slug}`}
                           className="text-sm sm:text-base font-semibold text-gray-900 hover:text-blue-600 line-clamp-2 transition"
                         >
-                          {item.product.name}
+                          {tr(item.product.name)}
                         </Link>
                       </div>
                       {/* 삭제 버튼 */}
