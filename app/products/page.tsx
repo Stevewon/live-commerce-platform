@@ -390,6 +390,7 @@ function ProductsContent() {
                     <Link
                       key={product.id}
                       href={`/products/${product.slug}`}
+                      prefetch
                       className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all group"
                     >
                       <div className="relative aspect-square bg-gray-100 overflow-hidden">
