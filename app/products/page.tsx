@@ -432,7 +432,8 @@ function ProductsContent() {
                           <p className="text-xs text-gray-400 line-through">₩{product.comparePrice.toLocaleString()}</p>
                         )}
                         <div className="flex gap-1 mt-2">
-                          {product.stock > 0 && (shippingConfig.shippingFee === 0 || (shippingConfig.freeShippingThreshold > 0 && product.price >= shippingConfig.freeShippingThreshold)) && (
+                          {/* [정책] 전 상품 무조건 무료배송 — 재고 있는 상품엔 항상 무료배송 배지 표시 */}
+                          {product.stock > 0 && (
                             <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{tp.freeShipping}</span>
                           )}
                           {product.stock > 0 && product.stock <= 5 && (

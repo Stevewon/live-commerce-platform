@@ -222,7 +222,8 @@ export default function ProductDetailClient() {
   const discountPercent = currentComparePrice && currentComparePrice > currentPrice
     ? Math.round(((currentComparePrice - currentPrice) / currentComparePrice) * 100)
     : 0;
-  const shippingFree = shippingConfig.shippingFee === 0 || (shippingConfig.freeShippingThreshold > 0 && currentPrice * quantity >= shippingConfig.freeShippingThreshold);
+  // [정책] 전 상품 무조건 무료배송 — 가격과 무관하게 항상 무료배송 표시
+  const shippingFree = true;
 
   // Average rating - safely handle reviews possibly being undefined or not an array
   const safeReviews = Array.isArray(product.reviews) ? product.reviews : [];

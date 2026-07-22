@@ -185,9 +185,8 @@ export default function CartPage() {
   };
 
   const totalAmount = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const shippingFee = totalAmount > 0
-    ? (shippingConfig.freeShippingThreshold > 0 && totalAmount >= shippingConfig.freeShippingThreshold ? 0 : shippingConfig.shippingFee)
-    : 0;
+  // [정책] 전 상품 무조건 무료배송 — 가격과 무관하게 배송비 항상 0원
+  const shippingFee = 0;
   const finalAmount = totalAmount + shippingFee;
 
   if (authLoading || loading) {
@@ -345,18 +344,10 @@ export default function CartPage() {
                   <div className="flex justify-between text-gray-600">
                     <span>{t.cart.shippingFee}</span>
                     <span>
-                      {shippingFee === 0 ? (
-                        <span className="text-green-600 font-medium">{t.common.free}</span>
-                      ) : (
-                        `₩${shippingFee.toLocaleString()}`
-                      )}
+                      <span className="text-green-600 font-medium">{t.common.free}</span>
                     </span>
                   </div>
-                  {totalAmount > 0 && shippingConfig.freeShippingThreshold > 0 && totalAmount < shippingConfig.freeShippingThreshold && (
-                    <p className="text-xs text-blue-600">
-                      ₩{(shippingConfig.freeShippingThreshold - totalAmount).toLocaleString()} {t.cart.remainForFree}
-                    </p>
-                  )}
+                  {/* [정책] 전 상품 무조건 무료배송이므로 '더 담으면 무료배송' 안내 불필요 */}
                   <div className="border-t pt-3 flex justify-between text-lg font-bold text-gray-900">
                     <span>{t.cart.finalAmount}</span>
                     <span className="text-blue-600">₩{finalAmount.toLocaleString()}</span>
