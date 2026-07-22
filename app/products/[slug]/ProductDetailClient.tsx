@@ -8,6 +8,7 @@ import { authFetch } from '@/lib/auth/clientFetch';
 import { addToGuestCart } from '@/lib/utils/guestCart';
 import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
+import { krwToQkeyDisplay } from '@/lib/utils/qkey';
 
 interface Partner {
   id: string;
@@ -436,6 +437,11 @@ export default function ProductDetailClient() {
                   ₩{currentPrice.toLocaleString()}
                 </span>
               </div>
+              {/* [qkey 표시] 1 쿠키 = 10원 */}
+              <p className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                <span aria-hidden>🍪</span>
+                {krwToQkeyDisplay(currentPrice).toLocaleString()} 쿠키
+              </p>
               <div className="flex items-center gap-3 mt-2 text-sm">
                 {shippingFree ? (
                   <span className="text-green-600 font-medium">무료배송</span>
@@ -529,7 +535,11 @@ export default function ProductDetailClient() {
             {/* Total */}
             <div className="flex justify-between items-center py-3 border-t border-b border-gray-200">
               <span className="text-sm font-medium text-gray-700">총 상품 금액</span>
-              <span className="text-xl font-bold text-blue-600">₩{(currentPrice * quantity).toLocaleString()}</span>
+              <div className="text-right">
+                <span className="text-xl font-bold text-blue-600">₩{(currentPrice * quantity).toLocaleString()}</span>
+                {/* [qkey 표시] 1 쿠키 = 10원 */}
+                <p className="text-xs font-semibold text-purple-600 mt-0.5">🍪 {krwToQkeyDisplay(currentPrice * quantity).toLocaleString()} 쿠키</p>
+              </div>
             </div>
 
             {/* Cart notification */}

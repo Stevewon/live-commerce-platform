@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import ShopNavigation from '@/components/ShopNavigation';
+import { krwToQkeyDisplay } from '@/lib/utils/qkey';
 
 interface Product {
   id: string;
@@ -418,6 +419,11 @@ function ProductsContent() {
                           )}
                           <span className="font-bold text-gray-900">₩{product.price.toLocaleString()}</span>
                         </div>
+                        {/* [qkey 표시] 1 쿠키 = 10원 */}
+                        <p className="text-[11px] font-semibold text-purple-600 mt-0.5 flex items-center gap-0.5">
+                          <span aria-hidden>🍪</span>
+                          {krwToQkeyDisplay(product.price).toLocaleString()} {tp.qkeyUnit}
+                        </p>
                         {product.comparePrice && product.comparePrice > product.price && (
                           <p className="text-xs text-gray-400 line-through">₩{product.comparePrice.toLocaleString()}</p>
                         )}

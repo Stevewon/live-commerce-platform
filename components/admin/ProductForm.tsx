@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { resizeImageToWebP } from '@/lib/utils/imageResize'
 
 const RichEditor = lazy(() => import('@/components/admin/RichEditor'))
 
@@ -222,7 +223,8 @@ export default function ProductForm({ mode, initialData }: Props) {
   }
 
   // Image upload helper
-  const uploadImage = async (file: File): Promise<string | null> => {
+  // maxWidth: 썸네일은 400px, 갤러리/상세는 800px 로 리사이즈 + WebP 변환 후 업로드
+  const uploadImage = async (file: File, maxWidth = 800): Promise<string | null> => {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     if (!allowedTypes.includes(file.type)) {
       setError('지원하지 않는 파일 형식입니다. (JPG, PNG, GIF, WEBP만 가능)')
@@ -233,8 +235,16 @@ export default function ProductForm({ mode, initialData }: Props) {
       return null
     }
 
+    // [썸네일 자동 리사이즈/WebP] 업로드 직전 브라우저에서 리사이즈+WebP 변환 (174KB→20~30KB)
+    let uploadFile = file
+    try {
+      uploadFile = await resizeImageToWebP(file, { maxWidth, quality: 0.8 })
+    } catch {
+      uploadFile = file // 실패 시 원본 업로드
+    }
+
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', uploadFile)
 
     const res = await fetch('/api/upload/image', {
       method: 'POST',
@@ -255,7 +265,7 @@ export default function ProductForm({ mode, initialData }: Props) {
     if (!file) return
     setUploadingImage(true)
     setError('')
-    const url = await uploadImage(file)
+    const url = await uploadImage(file, 400) // 썸네일은 400px
     if (url) {
       setForm(prev => ({ ...prev, thumbnail: url }))
     }

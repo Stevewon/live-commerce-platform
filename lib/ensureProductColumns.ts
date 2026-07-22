@@ -8,6 +8,7 @@
 
 let _supplyPriceColumnEnsured = false;
 let _productIndexesEnsured = false;
+let _orderPaymentColumnsEnsured = false;
 
 // D1 바인딩을 가져오는 함수 (lib/prisma.ts 와 동일 패턴)
 async function getD1(): Promise<any> {
@@ -79,5 +80,39 @@ export async function ensureProductIndexes(db?: any): Promise<void> {
     }
   } finally {
     _productIndexesEnsured = true;
+  }
+}
+
+/**
+ * Order 테이블 병행결제(쿠키+현금) 기록용 컬럼 보장.
+ * - paidQkey: 이 주문에서 쿠키(QKEY)로 결제한 개수 (INTEGER, default 0)
+ * - paidKrw:  이 주문에서 현금(KRW)으로 결제한 금액 (INTEGER, default 0)
+ * 프로세스 당 1회만 시도. 이미 있으면 duplicate 에러를 무시한다. (멱등)
+ */
+export async function ensureOrderPaymentColumns(db?: any): Promise<void> {
+  if (_orderPaymentColumnsEnsured) return;
+  const d1 = db || (await getD1());
+  if (!d1) return;
+  try {
+    const cols: any = await d1.prepare(`PRAGMA table_info("Order")`).all();
+    const rows: any[] = cols?.results || cols || [];
+    const names = new Set((Array.isArray(rows) ? rows : []).map((r) => r && r.name));
+    const toAdd: string[] = [];
+    if (!names.has('paidQkey')) toAdd.push(`ALTER TABLE "Order" ADD COLUMN "paidQkey" INTEGER DEFAULT 0`);
+    if (!names.has('paidKrw')) toAdd.push(`ALTER TABLE "Order" ADD COLUMN "paidKrw" INTEGER DEFAULT 0`);
+    for (const sql of toAdd) {
+      try {
+        await d1.prepare(sql).run();
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (!/duplicate column|already exists/i.test(msg)) {
+          console.warn('[ensureOrderPaymentColumns] ALTER 실패(무시):', msg);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[ensureOrderPaymentColumns] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
+  } finally {
+    _orderPaymentColumnsEnsured = true;
   }
 }

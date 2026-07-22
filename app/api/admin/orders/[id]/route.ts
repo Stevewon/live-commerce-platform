@@ -5,61 +5,70 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
 
 // [v1.0.22] 주문 취소/환불 시 결제했던 잔액을 원자적으로 환불 (중복 방지)
-// - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE 인 주문만 환불
+// - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE / SPLIT_BALANCE 인 주문만 환불
 // - order.refundedAt 이 이미 있으면 재환불하지 않음 (멱등)
 // - Prisma 트랜잭션 tx 컨텍스트 내부에서 raw 로 처리하여 원자성 보장
+// - [병행결제] SPLIT_BALANCE 는 주문에 기록된 paidQkey/paidKrw 를 각각 되돌려준다.
 async function refundOrderBalance(
   tx: any,
-  order: { id: string; userId: string | null; paymentMethod: string | null; total: number; refundedAt: any },
+  order: { id: string; userId: string | null; paymentMethod: string | null; total: number; refundedAt: any; paidQkey?: number; paidKrw?: number },
   reason: string
-): Promise<{ refunded: boolean; currency?: 'KRW' | 'QKEY'; amount?: number }> {
+): Promise<{ refunded: boolean; currency?: 'KRW' | 'QKEY' | 'SPLIT'; amount?: number; qkey?: number; krw?: number }> {
   const method = order.paymentMethod || '';
   const isKrw = method === 'KRW_BALANCE';
   const isQkey = method === 'QKEY_BALANCE';
+  const isSplit = method === 'SPLIT_BALANCE';
 
   // 잔액 결제가 아니거나, 회원이 아니거나, 이미 환불된 경우 → 스킵
-  if ((!isKrw && !isQkey) || !order.userId || order.refundedAt) {
+  if ((!isKrw && !isQkey && !isSplit) || !order.userId || order.refundedAt) {
     return { refunded: false };
   }
 
-  const currency: 'KRW' | 'QKEY' = isKrw ? 'KRW' : 'QKEY';
-  const column = isKrw ? 'krwBalance' : 'qkeyBalance';
-  // 결제 시 차감 규칙과 동일하게 환불 (QKEY 는 올림 환산)
-  const refundAmount = isKrw ? order.total : Math.ceil(order.total / QKEY_TO_KRW);
-  if (refundAmount <= 0) return { refunded: false };
+  // 환불할 통화·금액 산정 (결제 시 규칙과 동일)
+  const refundQkey = isQkey
+    ? Math.ceil(order.total / QKEY_TO_KRW)
+    : isSplit
+      ? (Number(order.paidQkey) || 0)
+      : 0;
+  const refundKrw = isKrw
+    ? order.total
+    : isSplit
+      ? (Number(order.paidKrw) || 0)
+      : 0;
+  if (refundQkey <= 0 && refundKrw <= 0) return { refunded: false };
 
-  // 현재 잔액 조회
-  const balRows: any = await tx.$queryRawUnsafe(
-    `SELECT "${column}" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
-    order.userId
-  );
-  const balRow = Array.isArray(balRows) ? balRows[0] : balRows;
-  const curBal = Number(balRow?.bal) || 0;
-  const afterBal = curBal + refundAmount;
+  // 통화 1개 환불 헬퍼
+  const refundOne = async (column: 'krwBalance' | 'qkeyBalance', currency: 'KRW' | 'QKEY', amount: number) => {
+    if (amount <= 0) return;
+    const balRows: any = await tx.$queryRawUnsafe(
+      `SELECT "${column}" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
+      order.userId
+    );
+    const balRow = Array.isArray(balRows) ? balRows[0] : balRows;
+    const afterBal = (Number(balRow?.bal) || 0) + amount;
+    await tx.$executeRawUnsafe(
+      `UPDATE "User" SET "${column}" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
+      afterBal, order.userId
+    );
+    await tx.$executeRawUnsafe(
+      `INSERT INTO "BalanceLedger"
+         ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+      newId(), order.userId, currency, amount /* 양수 = 환불 */, afterBal, reason, order.id
+    );
+  };
 
-  // 잔액 증액
-  await tx.$executeRawUnsafe(
-    `UPDATE "User" SET "${column}" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
-    afterBal,
-    order.userId
-  );
+  await refundOne('qkeyBalance', 'QKEY', refundQkey);
+  await refundOne('krwBalance', 'KRW', refundKrw);
 
-  // 이력 기록 (사용자 노출 안전 문구만)
-  const ledgerId = newId();
-  await tx.$executeRawUnsafe(
-    `INSERT INTO "BalanceLedger"
-       ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
-    ledgerId,
-    order.userId,
-    currency,
-    refundAmount, // 양수 = 환불
-    afterBal,
-    reason,
-    order.id
-  );
-
-  return { refunded: true, currency, amount: refundAmount };
+  if (isSplit) {
+    return { refunded: true, currency: 'SPLIT', amount: order.total, qkey: refundQkey, krw: refundKrw };
+  }
+  return {
+    refunded: true,
+    currency: isKrw ? 'KRW' : 'QKEY',
+    amount: isKrw ? refundKrw : refundQkey,
+  };
 }
 
 // [QTA 적립 회수] 취소/환불 시 해당 주문으로 적립된 QTA 를 자동 회수 (멱등)
@@ -204,7 +213,7 @@ export async function PATCH(
     }
 
     // [v1.0.22] 재고 복구 + 잔액 환불 + 상태 변경을 하나의 트랜잭션으로 원자 처리
-    let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY'; amount?: number } = { refunded: false };
+    let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY' | 'SPLIT'; amount?: number; qkey?: number; krw?: number } = { refunded: false };
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
       // 1) 취소 시 재고 복구 (batch CASE WHEN — N+1 제거)
@@ -231,6 +240,8 @@ export async function PATCH(
             paymentMethod: order.paymentMethod,
             total: order.total,
             refundedAt: order.refundedAt,
+            paidQkey: (order as any).paidQkey,
+            paidKrw: (order as any).paidKrw,
           },
           refundReason
         );
@@ -265,11 +276,19 @@ export async function PATCH(
     };
 
     if (refundResult.refunded) {
-      const amtLabel = refundResult.currency === 'KRW'
-        ? `₩${(refundResult.amount || 0).toLocaleString()}`
-        : `${(refundResult.amount || 0).toLocaleString()} QKEY`;
+      let amtLabel: string;
+      if (refundResult.currency === 'SPLIT') {
+        const parts: string[] = [];
+        if ((refundResult.qkey || 0) > 0) parts.push(`${(refundResult.qkey || 0).toLocaleString()} 쿠키`);
+        if ((refundResult.krw || 0) > 0) parts.push(`₩${(refundResult.krw || 0).toLocaleString()}`);
+        amtLabel = parts.join(' + ');
+      } else if (refundResult.currency === 'KRW') {
+        amtLabel = `₩${(refundResult.amount || 0).toLocaleString()}`;
+      } else {
+        amtLabel = `${(refundResult.amount || 0).toLocaleString()} 쿠키`;
+      }
       responseData.message = `주문 ${isCancelling ? '취소' : '환불'} 및 잔액 환불(${amtLabel})이 완료되었습니다`;
-      responseData.refund = { currency: refundResult.currency, amount: refundResult.amount };
+      responseData.refund = { currency: refundResult.currency, amount: refundResult.amount, qkey: refundResult.qkey, krw: refundResult.krw };
     } else if ((isCancelling || isRefunding) && order.refundedAt) {
       responseData.message = '주문 상태가 변경되었습니다 (이미 환불 처리된 주문)';
     } else {

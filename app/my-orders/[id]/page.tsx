@@ -47,6 +47,8 @@ interface Order {
   refundAmount: number | null;
   refundedAt: string | null;
   paymentMethod: string | null;
+  paidQkey?: number | null;
+  paidKrw?: number | null;
   paidAt: string | null;
   createdAt: string;
   items: OrderItem[];
@@ -307,6 +309,13 @@ export default function OrderDetailPage() {
                 결제수단: {paymentMethodLabel(order.paymentMethod)}
                 {order.paidAt && ` | ${new Date(order.paidAt).toLocaleDateString('ko-KR')}`}
               </p>
+            )}
+            {/* [병행결제] 쿠키+현금 분할 내역 */}
+            {order.paymentMethod === 'SPLIT_BALANCE' && ((order.paidQkey || 0) > 0 || (order.paidKrw || 0) > 0) && (
+              <div className="text-xs text-gray-500 text-right mt-1 space-y-0.5">
+                {(order.paidQkey || 0) > 0 && <p>🍪 쿠키 {(order.paidQkey || 0).toLocaleString()} 쿠키 (₩{((order.paidQkey || 0) * 10).toLocaleString()})</p>}
+                {(order.paidKrw || 0) > 0 && <p>💰 현금 ₩{(order.paidKrw || 0).toLocaleString()}</p>}
+              </div>
             )}
             {order.refundAmount && (
               <div className="flex justify-between text-sm text-red-600 pt-2 border-t mt-2">
