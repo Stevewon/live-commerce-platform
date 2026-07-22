@@ -23,8 +23,12 @@ export function useAutoTranslate(texts: string[]): {
   ready: boolean;
 } {
   const { locale } = useLanguage();
-  // 번역 버전: 캐시가 갱신될 때마다 증가시켜 확실히 리렌더를 유발한다.
-  const [version, setVersion] = useState(0);
+  // 현재 locale 의 번역 맵을 컴포넌트 state 로 보관한다.
+  // 모듈 전역 memoryCache 만 갱신하면 리렌더가 확실히 일어나지 않으므로,
+  // state 로 복제해 캐시가 채워질 때마다 새 참조를 만들어 리렌더를 보장한다.
+  const [map, setMap] = useState<Record<string, string>>(
+    () => ({ ...(memoryCache[locale] || {}) })
+  );
   const [ready, setReady] = useState(locale === 'ko');
   // 진행 중인 요청 키들(중복 요청만 방지, 새 항목 요청은 절대 막지 않음)
   const inFlight = useRef<Set<string>>(new Set());
@@ -40,6 +44,9 @@ export function useAutoTranslate(texts: string[]): {
       setReady(true);
       return;
     }
+    // locale 이 바뀌면 해당 locale 의 기존 캐시를 즉시 반영
+    setMap({ ...(memoryCache[locale] || {}) });
+
     if (uniqueTexts.length === 0) {
       setReady(true);
       return;
@@ -50,7 +57,6 @@ export function useAutoTranslate(texts: string[]): {
     const missing = uniqueTexts.filter((t) => !(t in cache) && !inFlight.current.has(`${locale}::${t}`));
 
     if (missing.length === 0) {
-      // 이미 전부 캐시에 있으면 준비 완료
       const allCached = uniqueTexts.every((t) => t in cache);
       if (allCached) setReady(true);
       return;
@@ -75,15 +81,17 @@ export function useAutoTranslate(texts: string[]): {
           for (const t of chunk) {
             cache[t] = translations[t] || t;
           }
-          if (!cancelled) setVersion((n) => n + 1); // 청크마다 즉시 반영
+          // 청크마다 state 를 새 객체로 갱신 → 확실한 리렌더
+          if (!cancelled) setMap({ ...cache });
         }
       } catch {
         for (const t of missing) if (!(t in cache)) cache[t] = t;
+        if (!cancelled) setMap({ ...cache });
       } finally {
         for (const t of missing) inFlight.current.delete(`${locale}::${t}`);
         if (!cancelled) {
+          setMap({ ...cache });
           setReady(true);
-          setVersion((n) => n + 1);
         }
       }
     })();
@@ -95,16 +103,14 @@ export function useAutoTranslate(texts: string[]): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale, textsKey]);
 
-  // version 을 의존해 캐시 갱신 시 tr 이 새 값을 읽도록 보장
+  // map(state) 을 읽어 번역 반환 → map 이 갱신될 때마다 새 tr 참조 생성 → 리렌더 반영 보장
   const tr = React.useCallback(
     (text: string | null | undefined): string => {
       if (!text) return '';
       if (locale === 'ko') return text;
-      const cache = memoryCache[locale];
-      return (cache && cache[text.trim()]) || text;
+      return map[text.trim()] || text;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [locale, version]
+    [locale, map]
   );
 
   return { tr, ready };

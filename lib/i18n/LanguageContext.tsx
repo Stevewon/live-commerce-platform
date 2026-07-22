@@ -19,13 +19,19 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('ko');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load saved language on mount
+  // Load saved language on mount (URL ?lang= overrides stored value, for testing/sharing)
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
-      if (saved && translations[saved]) {
-        setLocaleState(saved);
+      let next: Locale | null = null;
+      const urlLang = new URLSearchParams(window.location.search).get('lang') as Locale | null;
+      if (urlLang && translations[urlLang]) {
+        next = urlLang;
+        localStorage.setItem(STORAGE_KEY, urlLang);
+      } else {
+        const saved = localStorage.getItem(STORAGE_KEY) as Locale | null;
+        if (saved && translations[saved]) next = saved;
       }
+      if (next) setLocaleState(next);
     } catch {
       // localStorage not available
     }
