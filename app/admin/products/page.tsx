@@ -65,6 +65,45 @@ export default function AdminProductsPage() {
     setCurrentPage(1)
   }, [debouncedSearch, statusFilter, categoryFilter])
 
+  // [자동 이미지 이전] 관리자가 상품관리에 들어오면, 외부(dbimg 등) 상품 이미지를
+  // 우리 R2 로 조용히 백그라운드 이전한다. 사장님/관리자 조작 불필요.
+  // 남은 게 없어질 때까지 배치로 반복(요청 폭주 방지를 위해 batch=5, 간격 1.5s).
+  useEffect(() => {
+    if (!user || user.role !== 'ADMIN') return
+    let stopped = false
+
+    const runMigration = async () => {
+      try {
+        // 남은 대상 확인
+        const chk = await authFetch('/api/admin/products/migrate-images')
+        const chkData = await chk.json().catch(() => null)
+        if (!chkData?.success || !chkData.pending) return
+
+        // 남은 게 있으면 배치로 조금씩 처리
+        let guard = 0
+        while (!stopped && guard < 60) {
+          guard++
+          const res = await authFetch('/api/admin/products/migrate-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ batch: 5 }),
+          })
+          const data = await res.json().catch(() => null)
+          if (!data?.success) break
+          if (data.done || data.pending === 0) break
+          // 다음 배치 전 잠깐 쉼(부하 완화)
+          await new Promise((r) => setTimeout(r, 1500))
+        }
+      } catch {
+        /* 자동 작업 실패는 조용히 무시 (사용자 경험 방해 안 함) */
+      }
+    }
+
+    // 페이지 진입 후 2초 뒤 시작(초기 로딩 방해 안 하도록)
+    const t = setTimeout(runMigration, 2000)
+    return () => { stopped = true; clearTimeout(t) }
+  }, [user])
+
   const fetchProducts = async () => {
     try {
       setLoading(true)
