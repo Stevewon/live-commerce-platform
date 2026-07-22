@@ -157,11 +157,23 @@ export async function GET(request: NextRequest) {
         orderBy = { createdAt: 'desc' };
     }
 
-    // 상품 조회 + 페이지네이션
-    const [products, totalCount] = await Promise.all([
+    // 상품 조회 + 페이지네이션 + 브랜드 목록 (병렬 실행)
+    // 목록에 필요한 필드만 select → 응답 크기/속도 개선
+    // (detailContent, detailImages, specifications 등 무거운 필드 제외)
+    const [products, totalCount, brands] = await Promise.all([
       prisma.product.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          price: true,
+          comparePrice: true,
+          stock: true,
+          thumbnail: true,
+          brand: true,
+          tags: true,
+          isFeatured: true,
           category: {
             select: { name: true, slug: true },
           },
@@ -171,14 +183,13 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       prisma.product.count({ where }),
+      // 사용 가능한 브랜드 목록 (필터 UI용)
+      prisma.product.findMany({
+        where: { isActive: true, brand: { not: null } },
+        select: { brand: true },
+        distinct: ['brand'],
+      }),
     ]);
-
-    // 사용 가능한 브랜드 목록 (필터 UI용)
-    const brands = await prisma.product.findMany({
-      where: { isActive: true, brand: { not: null } },
-      select: { brand: true },
-      distinct: ['brand'],
-    });
 
     return NextResponse.json({
       success: true,
@@ -191,6 +202,11 @@ export async function GET(request: NextRequest) {
       },
       filters: {
         brands: brands.map((b: any) => b.brand).filter(Boolean),
+      },
+    }, {
+      headers: {
+        // 짧은 캐시 + stale-while-revalidate로 반복 로딩 체감 속도 개선
+        'Cache-Control': 'public, max-age=30, s-maxage=60, stale-while-revalidate=120',
       },
     });
   } catch (error) {

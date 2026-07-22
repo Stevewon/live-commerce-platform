@@ -184,12 +184,31 @@ function createModelProxy(db: D1DB, tableName: string) {
         });
       }
       
-      // select 처리
+      // select 처리 (관계 필드 지원)
       if (args?.select) {
+        const relations = RELATIONS[tableName] || {};
         const selectKeys = Object.keys(args.select).filter(k => args.select[k]);
+        // 관계 키와 스칼라 키 분리
+        const relationSelectKeys = selectKeys.filter(k => relations[k]);
+        const scalarSelectKeys = selectKeys.filter(k => !relations[k]);
+
+        // 관계 필드는 include처럼 먼저 resolve (원본 row에 fk가 남아있어야 하므로 pick 전에 처리)
+        if (relationSelectKeys.length > 0) {
+          const relInclude: any = {};
+          for (const k of relationSelectKeys) {
+            // select 하위에 다시 select가 있으면 그대로 전달
+            relInclude[k] = args.select[k] === true ? true : args.select[k];
+          }
+          rows = await resolveIncludes(db, tableName, rows, relInclude);
+        }
+
+        // 스칼라 + 이미 resolve된 관계 필드만 남기고 나머지 컬럼 제거
         rows = rows.map((row: any) => {
           const picked: any = {};
-          for (const k of selectKeys) {
+          for (const k of scalarSelectKeys) {
+            if (k in row) picked[k] = row[k];
+          }
+          for (const k of relationSelectKeys) {
             if (k in row) picked[k] = row[k];
           }
           return picked;
