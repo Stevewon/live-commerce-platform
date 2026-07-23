@@ -175,7 +175,9 @@ export async function POST(req: NextRequest) {
       paymentMethod: rawPaymentMethod = 'KRW_BALANCE',
       shippingFee = 3000,
       couponCode,
-      // [병행결제] SPLIT_BALANCE 시 사용할 쿠키(QKEY) 개수 (나머지는 현금으로 자동 차감)
+      // [병행결제] SPLIT_BALANCE 시 사용자가 직접 정한 "현금(원)" 금액. 나머지는 쿠키로 자동 충당.
+      splitKrw: rawSplitKrw,
+      // (구버전 호환) 예전 클라이언트가 splitQkey 를 보내던 경우 참고값으로만 사용
       splitQkey: rawSplitQkey,
       // 비회원 전용 필드
       guestEmail,
@@ -390,9 +392,9 @@ export async function POST(req: NextRequest) {
     const usesFirebaseQkey: boolean = !!(qrchatUid && qrchatWallet && qrchatNick);
 
     // ── [병행결제] 서버측 분할 금액 산정 ──────────────────────────────────
-    //   ★ 사장님 확정 룰(단순): "현금부터 다 까고, 모자란 만큼만 쿠키로 깐다."
-    //     1) 현금(KRW) 을 있는 대로 최대한 먼저 사용
-    //     2) 남은 금액을 쿠키(QKEY)로 충당 (1 쿠키 = 10원, 올림)
+    //   ★ 사장님 확정 룰: "현금은 사용자가 직접 낼 금액을 정하고, 나머지를 쿠키로 채워 상품가를 맞춘다."
+    //     1) 현금(KRW) = 사용자가 입력한 splitKrw (보유 현금·결제금액 이하로 clamp)
+    //     2) 나머지 금액(상품가 - 현금)을 쿠키(QKEY)로 충당 (1 쿠키 = 10원, 올림)
     //   B 회원(QRChat 연동)은 쿠키 잔액이 로컬 D1 엔 항상 0 이고 실제 잔액은
     //   Firebase 에 있으므로, Firebase 실시간 잔액을 쿠키 상한으로 사용한다.
     let splitUsedKrw = 0;       // 이번 주문에서 쓸 현금(원)
@@ -415,9 +417,16 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 1) 현금 먼저: 보유 현금과 결제금액 중 작은 만큼 현금으로 낸다.
-      splitUsedKrw = Math.min(currentKrw, total);
-      // 2) 남은 금액을 쿠키로: 부족분을 쿠키(10원 단위, 올림)로 충당
+      // 1) 현금: 사용자가 입력한 금액(rawSplitKrw). (보유 현금)·(결제금액) 을 넘지 못하도록 clamp.
+      //    - splitKrw 미전송(구버전 클라이언트) 시엔 splitQkey 참고값으로 역산, 그것도 없으면 0.
+      let requestedKrw = Number(rawSplitKrw);
+      if (!Number.isFinite(requestedKrw)) {
+        // 구버전 호환: 쿠키 개수만 온 경우 (상품가 - 쿠키환산액) 을 현금으로 간주
+        const legacyQkey = Math.max(0, Math.floor(Number(rawSplitQkey) || 0));
+        requestedKrw = Math.max(0, total - legacyQkey * QKEY_TO_KRW);
+      }
+      splitUsedKrw = Math.max(0, Math.min(Math.floor(requestedKrw), currentKrw, total));
+      // 2) 나머지 금액을 쿠키로: (상품가 - 현금)을 쿠키(10원 단위, 올림)로 충당
       const afterCash = Math.max(0, total - splitUsedKrw);
       const neededQkey = Math.ceil(afterCash / QKEY_TO_KRW);
       splitUsedQkey = Math.min(neededQkey, availableQkey);
