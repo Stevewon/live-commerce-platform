@@ -3,6 +3,8 @@ import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 // [v1.0.22] KISPG PG 취소 제거 → 잔액 환불로 전환
 import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
+// [상품 스냅샷] 상품 삭제/변경돼도 주문 상세에 상품명 유지
+import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 
 // [v1.0.22] 주문 취소/환불 시 결제했던 잔액을 원자적으로 환불 (중복 방지)
 // - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE / SPLIT_BALANCE 인 주문만 환불
@@ -319,6 +321,9 @@ export async function GET(
       return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
     }
 
+    // [상품 스냅샷] 컬럼 보장 + 기존 주문 백필 (멱등)
+    try { await backfillOrderItemSnapshots(await getD1()); } catch { /* 실패해도 진행 */ }
+
     const order = await prisma.order.findUnique({
       where: { id },
       include: {
@@ -356,6 +361,16 @@ export async function GET(
 
     if (!order) {
       return NextResponse.json({ error: '주문을 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    // 주문 시점 스냅샷 우선 (상품 삭제/변경돼도 상품명 유지)
+    for (const item of ((order as any).items || [])) {
+      const snapName = item.productName || '';
+      if (!item.product) {
+        item.product = { id: item.productId || '', name: snapName || '주문 상품', slug: '', price: item.price || 0, images: null };
+      } else {
+        item.product.name = item.product.name || snapName || '주문 상품';
+      }
     }
 
     return NextResponse.json({ order });

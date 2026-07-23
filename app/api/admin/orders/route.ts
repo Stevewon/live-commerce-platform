@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { getD1 } from '@/lib/balance';
+import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 
 
 
@@ -17,6 +19,10 @@ export async function GET(req: NextRequest) {
     if (authResult.role !== 'ADMIN') {
       return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
     }
+
+    // [상품 스냅샷] 컬럼 보장 + 기존 주문 백필 (멱등, 프로세스당 1회)
+    //  → 어드민이 상품 삭제/변경 후에도 주문 상품명이 보여야 배송 가능
+    try { await backfillOrderItemSnapshots(await getD1()); } catch { /* 실패해도 조회는 진행 */ }
 
     // 쿼리 파라미터
     const { searchParams } = new URL(req.url);
@@ -130,6 +136,8 @@ export async function GET(req: NextRequest) {
               quantity: true,
               price: true,
               productId: true,
+              productName: true,
+              productThumbnail: true,
               product: {
                 select: {
                   name: true,
@@ -160,10 +168,14 @@ export async function GET(req: NextRequest) {
       if (!Array.isArray(order.items)) {
         order.items = [];
       }
-      // 각 item.product 가 null 인 경우 안전 fallback 객체 주입
+      // 각 item.product 가 null 인 경우, 주문 시점 스냅샷 상품명을 우선 사용
+      //  → 상품이 삭제/변경돼도 어드민이 실제 상품명 보고 배송 가능
       for (const item of order.items) {
+        const snapName = item.productName || '';
         if (!item.product) {
-          item.product = { name: '상품 정보 없음', price: item.price || 0 };
+          item.product = { name: snapName || '주문 상품', price: item.price || 0 };
+        } else {
+          item.product.name = item.product.name || snapName || '주문 상품';
         }
       }
     }

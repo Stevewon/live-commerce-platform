@@ -497,6 +497,12 @@ model OrderItem {
   variant     ProductVariant?  @relation(fields: [variantId], references: [id])
   optionValues String?   // JSON - 주문 시점 옵션값 스냅샷 {"색상": "빨강", "사이즈": "L"}
   
+  // ★ 주문 시점 상품 스냅샷 (상품이 삭제/변경돼도 주문내역/배송 유지)
+  //   - 정상 쇼핑몰(쿠팡/토스) 패턴: 주문 당시 상품명·썸네일을 복사 저장
+  //   - 조회 시 Product join 이 null 이어도 이 값으로 "상품 정보 없음" 방지
+  productName      String?   // 주문 당시 상품명 스냅샷
+  productThumbnail String?   // 주문 당시 썸네일 스냅샷
+  
   quantity    Int
   price       Float     // 구매 당시 가격
   

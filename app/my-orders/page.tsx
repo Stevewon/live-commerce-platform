@@ -13,6 +13,8 @@ interface OrderItem {
   id: string;
   quantity: number;
   price: number;
+  productName?: string | null;
+  productThumbnail?: string | null;
   product: {
     id: string;
     name: string;
@@ -199,9 +201,9 @@ export default function MyOrdersPage() {
                     ) : (
                       safeItems.map(item => {
                         const product = item?.product || null;
-                        const productName = product?.name || '상품 정보 없음';
+                        const productName = product?.name || item?.productName || '주문 상품';
                         const productSlug = product?.slug || '';
-                        const productThumb = product?.thumbnail || '';
+                        const productThumb = product?.thumbnail || item?.productThumbnail || '';
                         const itemPrice = Number(item?.price) || 0;
                         const itemQty = Number(item?.quantity) || 0;
                         return (

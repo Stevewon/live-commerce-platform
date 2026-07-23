@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { getD1 } from '@/lib/balance';
+import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 
 // GET /api/partner/orders - 파트너 주문 목록 조회
 export async function GET(req: NextRequest) {
@@ -70,6 +72,21 @@ export async function GET(req: NextRequest) {
         createdAt: 'desc',
       },
     });
+
+    // [상품 스냅샷] 백필 (멱등) + 스냅샷 우선 정규화 (상품 삭제/변경돼도 상품명 유지)
+    try { await backfillOrderItemSnapshots(await getD1()); } catch { /* 실패해도 진행 */ }
+    for (const order of (orders as any[])) {
+      for (const item of (order.items || [])) {
+        const snapName = item.productName || '';
+        const snapThumb = item.productThumbnail || '';
+        if (!item.product) {
+          item.product = { id: item.productId || '', name: snapName || '주문 상품', thumbnail: snapThumb || '', price: item.price || 0 };
+        } else {
+          item.product.name = item.product.name || snapName || '주문 상품';
+          item.product.thumbnail = item.product.thumbnail || snapThumb || '';
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -37,6 +37,8 @@ interface Order {
     id: string;
     quantity: number;
     price: number;
+    productName?: string | null;
+    productThumbnail?: string | null;
     product: {
       name: string;
       price: number;
@@ -704,7 +706,7 @@ export default function AdminOrdersPage() {
                         className="bg-white rounded-xl p-5 flex justify-between items-center border-2 border-purple-100 hover:border-purple-300 transition-all"
                       >
                         <div>
-                          <div className="font-black text-gray-900 text-lg">{item?.product?.name || '상품 정보 없음'}</div>
+                          <div className="font-black text-gray-900 text-lg">{item?.product?.name || item?.productName || '주문 상품'}</div>
                           <div className="text-sm text-gray-600 font-bold mt-1">
                             {formatCurrency(item?.price || 0)} × {item?.quantity || 0}개
                           </div>
