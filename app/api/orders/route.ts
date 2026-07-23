@@ -602,11 +602,17 @@ export async function POST(req: NextRequest) {
         await debitOneCurrency('krwBalance', 'KRW', splitKrwRemainder);
       }
 
-      // [QTA 적립] 구매 금액의 5% 를 QTA 로 적립 (100원 = 1 QTA)
+      // [QTA 적립] 현금(KRW) 100% 결제 시에만 구매 금액의 5% 를 QTA 로 적립 (100원 = 1 QTA)
+      // ── 사장님 확정 룰(2026-07-23): 현금으로 100% 상품 구매한 경우에만 적립.
+      //    · KRW_BALANCE  = 현금(원화) 100% 결제 → 적립 O
+      //    · QKEY_BALANCE = 쿠키(QKEY) 결제      → 적립 X
+      //    · SPLIT_BALANCE= 쿠키+현금 병행 결제   → 적립 X (현금 100% 가 아님)
       // ── 회원(userId 존재)만 적립. 예: 20,000원 → 5% = 1,000원 → ÷100 = 10 QTA
       //    같은 트랜잭션 내부 raw 실행으로 원자성 보장.
       //    적립 실패가 주문 자체를 막지 않도록 방어적으로 처리.
-      if (userId) {
+      //    취소/환불 시에는 BalanceLedger 의 이 주문 적립분을 그대로 회수(차감)한다.
+      const isCashOnlyPayment = paymentMethod === 'KRW_BALANCE';
+      if (userId && isCashOnlyPayment) {
         try {
           const qtaEarned = qtaFromKrw(total);
           if (qtaEarned > 0) {
