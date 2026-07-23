@@ -7,7 +7,7 @@ import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 // [QRChat 연동] B 회원(origin=QRCHAT) QKEY 는 Firebase 실쿠키에서 결제됨 →
 //   취소 시에도 Firebase 실쿠키로 되돌려줘야 함(로컬 D1 잔액 환불 아님).
-import { refundQkeyForQrlive } from '@/lib/qrchat-bridge';
+import { refundQkeyForQrlive, normWallet, normNick } from '@/lib/qrchat-bridge';
 
 // 주문 상세 조회 (GET) — 회원(token) + 비회원(guestOrderToken) 지원
 export async function GET(
@@ -163,9 +163,11 @@ export async function PATCH(
         .all();
       const uRow = (uRows?.results && uRows.results[0]) || (Array.isArray(uRows) ? uRows[0] : null);
       if (uRow) {
+        // ⚠️ 큐알쳇 HMAC 서명은 normWallet(trim+lowercase)/normNick(trim) 기준.
+        //    지갑을 lowercase 안 하면 서명 불일치로 refund 가 'bad request signature' 거부됨.
         const uid = String(uRow.qrchatUid || '').trim();
-        const wallet = String(uRow.securetQrUrl || '').trim();
-        const nick = String(uRow.nickname || uRow.name || '').trim();
+        const wallet = normWallet(uRow.securetQrUrl);
+        const nick = normNick(uRow.nickname || uRow.name);
         if (uid && wallet && nick) {
           qkeyUser = { uid, wallet, nick };
           usesFirebaseQkey = true;

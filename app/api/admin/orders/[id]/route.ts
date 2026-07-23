@@ -6,7 +6,7 @@ import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
 // [상품 스냅샷] 상품 삭제/변경돼도 주문 상세에 상품명 유지
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 // [QRChat 연동] B 회원 QKEY 는 Firebase 실쿠키에서 결제됨 → 취소 시 Firebase 로 되돌림.
-import { refundQkeyForQrlive } from '@/lib/qrchat-bridge';
+import { refundQkeyForQrlive, normWallet, normNick } from '@/lib/qrchat-bridge';
 
 // [v1.0.22] 주문 취소/환불 시 결제했던 잔액을 원자적으로 환불 (중복 방지)
 // - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE / SPLIT_BALANCE 인 주문만 환불
@@ -237,9 +237,11 @@ export async function PATCH(
           .all();
         const uRow = (uRows?.results && uRows.results[0]) || (Array.isArray(uRows) ? uRows[0] : null);
         if (uRow) {
+          // ⚠️ 큐알쳇 HMAC 서명은 normWallet(trim+lowercase)/normNick(trim) 기준.
+          //    지갑을 lowercase 안 하면 서명 불일치로 refund 가 'bad request signature' 거부됨.
           const uid = String(uRow.qrchatUid || '').trim();
-          const wallet = String(uRow.securetQrUrl || '').trim();
-          const nick = String(uRow.nickname || uRow.name || '').trim();
+          const wallet = normWallet(uRow.securetQrUrl);
+          const nick = normNick(uRow.nickname || uRow.name);
           if (uid && wallet && nick) qrchatUser = { uid, wallet, nick };
         }
       } catch (e) {
