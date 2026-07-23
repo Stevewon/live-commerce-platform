@@ -326,7 +326,7 @@ export async function PATCH(
                    ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
                  VALUES (?, ?, 'QKEY', ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`
               )
-              .bind(newId(), order.userId, fbQkey, Number((r as any).newBalance) || 0, `${refundReason}(QRChat QKEY)`, order.id)
+              .bind(newId(), order.userId, fbQkey, Number((r as any).newBalance) || 0, refundReason, order.id)
               .run();
           } catch (ledgerErr) {
             console.warn('[관리자취소-환불] Firebase QKEY 원장 기록 실패(무시):', ledgerErr);

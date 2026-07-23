@@ -776,7 +776,7 @@ export async function POST(req: NextRequest) {
           .prepare(
             `INSERT INTO "BalanceLedger"
                ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
-             VALUES (?, ?, 'QKEY', ?, ?, '주문 결제(QRChat QKEY)', ?, NULL, CURRENT_TIMESTAMP)`
+             VALUES (?, ?, 'QKEY', ?, ?, '주문 결제', ?, NULL, CURRENT_TIMESTAMP)`
           )
           .bind(
             newId(),
@@ -869,7 +869,7 @@ export async function POST(req: NextRequest) {
           .prepare(
             `INSERT INTO "BalanceLedger"
                ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
-             VALUES (?, ?, 'QKEY', ?, ?, '주문 결제(QRChat QKEY)', ?, NULL, CURRENT_TIMESTAMP)`
+             VALUES (?, ?, 'QKEY', ?, ?, '주문 결제', ?, NULL, CURRENT_TIMESTAMP)`
           )
           .bind(
             newId(),
