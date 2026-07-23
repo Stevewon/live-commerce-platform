@@ -13,7 +13,11 @@ export function isValidQuantariumWallet(address: string | null | undefined): boo
   return QUANTARIUM_WALLET_REGEX.test(address.trim());
 }
 
-/** 지갑주소 정규화(트림) */
-export function normalizeWalletAddress(address: string): string {
-  return (address || '').trim();
+/**
+ * 지갑주소 정규화(트림 + 소문자)
+ * - EVM 호환 주소는 대소문자를 구분하지 않으므로, 저장/비교 시 항상 소문자로 정규화한다.
+ * - 이를 통해 회원가입/조회 시 대소문자가 달라도 동일 주소로 취급된다.
+ */
+export function normalizeWalletAddress(address: string | null | undefined): string {
+  return (address || '').trim().toLowerCase();
 }

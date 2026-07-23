@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
+import { getD1 } from '@/lib/balance';
+import { normalizeWalletAddress } from '@/lib/utils/wallet';
 import { hashPassword } from '@/lib/auth/password';
 
 // POST /api/auth/reset-password - 퀀타리움 지갑주소로 비밀번호 재설정
@@ -9,7 +11,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { newPassword } = body;
     // 신규: quantariumWallet, 하위호환: securetQrUrl
-    const walletAddress = (body.quantariumWallet ?? body.securetQrUrl ?? '').trim();
+    // EVM 주소는 대소문자를 구분하지 않으므로 소문자로 정규화한다.
+    const walletAddress = normalizeWalletAddress(body.quantariumWallet ?? body.securetQrUrl ?? '');
     
     if (!walletAddress || !newPassword) {
       return NextResponse.json(
@@ -31,13 +34,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // 퀀타리움 지갑주소로 사용자 찾기
-    const user = await prisma.user.findFirst({
-      where: { securetQrUrl: walletAddress },
-      select: {
-        id: true,
-      },
-    });
+    // 퀀타리움 지갑주소로 사용자 찾기 (대소문자 무시)
+    // - 기존 DB 에 대소문자가 섞여 저장된 레코드까지 매칭되도록 LOWER() 로 비교한다.
+    const db = await getD1();
+    const user: any = await db
+      .prepare(`SELECT "id" FROM "User" WHERE LOWER("securetQrUrl") = LOWER(?) LIMIT 1`)
+      .bind(walletAddress)
+      .first();
     
     if (!user) {
       return NextResponse.json(
