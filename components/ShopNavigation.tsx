@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { authFetch } from '@/lib/auth/clientFetch';
 import LanguageSelector from '@/components/LanguageSelector';
 
 export default function ShopNavigation() {
@@ -12,6 +13,36 @@ export default function ShopNavigation() {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // 상단 바 QKEY 잔액 표시 (로그인 시). B 회원은 큐알쳇 실시간 잔액이 내려온다.
+  const [qkeyBalance, setQkeyBalance] = useState<number | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    if (!user) {
+      setQkeyBalance(null);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await authFetch('/api/my/balance');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (alive && json?.success && json?.data) {
+          setQkeyBalance(Number(json.data.qkeyBalance) || 0);
+        }
+      } catch {
+        /* 잔액 조회 실패는 무시 (네비게이션 자체는 계속 동작) */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // pathname 변경 시(결제/충전 후 이동 등) 잔액 갱신
+  }, [user, pathname]);
+
+  const qkeyLabel =
+    qkeyBalance != null ? `${qkeyBalance.toLocaleString()} QKEY` : '';
 
   const isActive = (path: string) => {
     return pathname === path ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-100';
@@ -77,9 +108,14 @@ export default function ShopNavigation() {
                 <Link
                   href="/my/balance"
                   prefetch={false}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${isActive('/my/balance')}`}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${isActive('/my/balance')}`}
                 >
-                  💰 잔액
+                  <span>💰 잔액</span>
+                  {qkeyLabel && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+                      🍪 {qkeyLabel}
+                    </span>
+                  )}
                 </Link>
               </>
             )}
@@ -208,9 +244,14 @@ export default function ShopNavigation() {
                   href="/my/balance"
                   prefetch={false}
                   onClick={() => setMenuOpen(false)}
-                  className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/my/balance')}`}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/my/balance')}`}
                 >
-                  💰 잔액 / 충전
+                  <span>💰 잔액 / 충전</span>
+                  {qkeyLabel && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+                      🍪 {qkeyLabel}
+                    </span>
+                  )}
                 </Link>
                 <Link
                   href="/my"
