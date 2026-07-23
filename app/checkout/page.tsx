@@ -1,7 +1,7 @@
 'use client';
 import { useAuth } from '@/lib/contexts/AuthContext'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 // [v1.0.22] KISPG PG 중단 → KRW/QKEY 잔액 결제로 전환
@@ -74,6 +74,23 @@ export default function CheckoutPage() {
   // 병행결제: 사용자가 쿠키(QKEY)를 얼마나 쓸지 (개수). 나머지는 현금(KRW) 잔액으로 자동 결제.
   // [병행결제] 사용자가 직접 입력하는 "현금(원)" 금액. 나머지는 쿠키로 자동 충당.
   const [splitKrw, setSplitKrw] = useState<number>(0);
+
+  // [모바일] 현금 입력칸이 키보드에 가려지지 않게 하기 위한 ref
+  const splitKrwInputRef = useRef<HTMLInputElement>(null);
+
+  // 입력칸 포커스 시, 키보드가 올라온 뒤 해당 입력칸을 화면 중앙으로 스크롤
+  //   (모바일 브라우저/인앱 웹뷰는 자동 스크롤을 보장하지 않아 키보드가 입력칸을 가림)
+  const scrollInputIntoView = (el: HTMLElement | null) => {
+    if (!el) return;
+    // 키보드 애니메이션(약 300ms)이 끝난 뒤 스크롤해야 실제 보이는 위치로 정확히 이동
+    setTimeout(() => {
+      try {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch {
+        el.scrollIntoView();
+      }
+    }, 350);
+  };
 
   // 파트너 스토어 경유 정보
   const [storePartnerId, setStorePartnerId] = useState<string | null>(null);
@@ -452,7 +469,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16 md:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-40 md:pb-0">
       <ShopNavigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div className="flex items-center gap-3 mb-4 sm:mb-8">
@@ -513,6 +530,7 @@ export default function CheckoutPage() {
                         Email <span className="text-gray-400">({t.checkout.emailForOrder})</span>
                       </label>
                       <input type="email" value={guestEmail} onChange={e => setGuestEmail(e.target.value)}
+                        onFocus={e => scrollInputIntoView(e.currentTarget)}
                         placeholder="example@email.com"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                     </div>
@@ -521,6 +539,7 @@ export default function CheckoutPage() {
                         {t.checkout.phone} <span className="text-red-500">*</span>
                       </label>
                       <input type="tel" value={guestPhone} onChange={e => setGuestPhone(e.target.value)}
+                        onFocus={e => scrollInputIntoView(e.currentTarget)}
                         placeholder="010-0000-0000"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
                       <p className="text-xs text-gray-500 mt-1">{t.checkout.guestLookupHint}</p>
@@ -540,6 +559,7 @@ export default function CheckoutPage() {
                       {t.checkout.receiver} <span className="text-red-500">*</span>
                     </label>
                     <input type="text" value={shippingName} onChange={e => setShippingName(e.target.value)}
+                      onFocus={e => scrollInputIntoView(e.currentTarget)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
                   </div>
                   <div>
@@ -547,6 +567,7 @@ export default function CheckoutPage() {
                       {t.checkout.phone} <span className="text-red-500">*</span>
                     </label>
                     <input type="tel" value={shippingPhone} onChange={e => setShippingPhone(e.target.value)}
+                      onFocus={e => scrollInputIntoView(e.currentTarget)}
                       placeholder="010-0000-0000"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
                   </div>
@@ -565,6 +586,7 @@ export default function CheckoutPage() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 mb-2" />
                     <input type="text" value={shippingAddressDetail}
                       onChange={e => setShippingAddressDetail(e.target.value)}
+                      onFocus={e => scrollInputIntoView(e.currentTarget)}
                       placeholder={t.checkout.detailAddressPlaceholder}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                   </div>
@@ -584,6 +606,7 @@ export default function CheckoutPage() {
                     </select>
                     {memoPreset === 'direct' && (
                       <textarea value={shippingMemo} onChange={e => setShippingMemo(e.target.value)}
+                        onFocus={e => scrollInputIntoView(e.currentTarget)}
                         rows={2} placeholder={t.checkout.memoPlaceholder}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                     )}
@@ -782,11 +805,15 @@ export default function CheckoutPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <input
+                            ref={splitKrwInputRef}
                             type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             min={0}
                             max={maxSplitKrw}
                             step={100}
                             value={splitKrw}
+                            onFocus={e => scrollInputIntoView(e.currentTarget)}
                             onChange={e => {
                               const v = Math.floor(Number(e.target.value) || 0);
                               setSplitKrw(Math.max(0, Math.min(v, maxSplitKrw)));
