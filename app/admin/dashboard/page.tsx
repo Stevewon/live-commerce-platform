@@ -253,6 +253,10 @@ export default function AdminDashboardPage() {
               <span className="text-2xl group-hover:scale-110 transition-transform">👥</span>
               <span>회원 관리</span>
             </Link>
+            <Link href="/admin/balance-requests" className="group px-8 py-4 text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200 shadow-lg">
+              <span className="text-2xl group-hover:scale-110 transition-transform">💳</span>
+              <span>무통장입금 승인</span>
+            </Link>
             <Link href="/admin/orders" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
               <span className="text-2xl group-hover:scale-110 transition-transform">📦</span>
               <span>주문 관리</span>
@@ -517,10 +521,10 @@ export default function AdminDashboardPage() {
             <p className="text-sm text-gray-500 mt-2">Sales Reports</p>
           </Link>
           
-          <Link href="/admin/reports" className="group bg-gradient-to-br from-white to-indigo-50 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all text-center border-2 border-transparent hover:border-indigo-300 hover:scale-105 duration-300">
-            <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">📈</div>
-            <h3 className="font-black text-xl text-gray-900">매출 리포트</h3>
-            <p className="text-sm text-gray-500 mt-2">Sales & Cancellation Reports</p>
+          <Link href="/admin/balance-requests" className="group bg-gradient-to-br from-green-500 to-emerald-600 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all text-center border-2 border-transparent hover:border-emerald-300 hover:scale-105 duration-300">
+            <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">💳</div>
+            <h3 className="font-black text-xl text-white">무통장입금 승인</h3>
+            <p className="text-sm text-emerald-50 mt-2">입금 확인 → 잔액 충전 승인</p>
           </Link>
         </div>
       </div>
