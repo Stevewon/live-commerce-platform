@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { getD1 } from '@/lib/balance';
+import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 
 // 관리자 통계 조회 (GET)
 export async function GET(req: NextRequest) {
@@ -17,6 +19,14 @@ export async function GET(req: NextRequest) {
         { success: false, error: '관리자 권한이 필요합니다' },
         { status: 403 }
       );
+    }
+
+    // 주문 상품명 스냅샷 보정 (상품 삭제/변경돼도 대시보드가 깨지지 않게)
+    try {
+      const d1 = await getD1();
+      if (d1) await backfillOrderItemSnapshots(d1);
+    } catch (e) {
+      console.error('스냅샷 보정 실패(무시):', e);
     }
 
     // 1. 전체 통계
@@ -111,7 +121,9 @@ export async function GET(req: NextRequest) {
           }
         },
         items: {
-          include: {
+          select: {
+            productName: true,
+            productThumbnail: true,
             product: {
               select: {
                 name: true,
@@ -123,6 +135,23 @@ export async function GET(req: NextRequest) {
       }
     });
 
+    // 최근 주문 정규화: 상품 스냅샷 우선, user/product null 안전 처리
+    const normalizedRecentOrders = (recentOrders as any[]).map((order) => ({
+      ...order,
+      user: order.user || { name: '비회원', email: '' },
+      items: (order.items || []).map((item: any) => {
+        const snapName = item.productName;
+        const snapThumb = item.productThumbnail;
+        return {
+          ...item,
+          product: {
+            name: item.product?.name || snapName || '주문 상품',
+            thumbnail: item.product?.thumbnail || snapThumb || null,
+          },
+        };
+      }),
+    }));
+
     // 4. 활성 파트너
     const activePartners = await prisma.partner.count({
       where: { isActive: true }
@@ -132,6 +161,20 @@ export async function GET(req: NextRequest) {
     const pendingSettlements = await prisma.settlement.count({
       where: { status: 'PENDING' }
     });
+
+    // 6. 대기 중인 충전 신청 (한눈에 보이도록)
+    let pendingBalanceRequests = 0;
+    try {
+      const d1 = await getD1();
+      if (d1) {
+        const row = (await d1
+          .prepare(`SELECT COUNT(*) AS c FROM "BalanceRequest" WHERE "status" = 'PENDING'`)
+          .first()) as { c?: number } | null;
+        pendingBalanceRequests = Number(row?.c || 0);
+      }
+    } catch (e) {
+      console.error('충전 신청 대기 건수 조회 실패(무시):', e);
+    }
 
     return NextResponse.json({
       success: true,
@@ -143,7 +186,8 @@ export async function GET(req: NextRequest) {
           totalProducts,
           totalRevenue: totalRevenue._sum.total || 0,
           activePartners,
-          pendingSettlements
+          pendingSettlements,
+          pendingBalanceRequests
         },
         orderStatus: {
           pending: pendingOrders,
@@ -155,7 +199,7 @@ export async function GET(req: NextRequest) {
           revenue: todayRevenue._sum.total || 0,
           users: todayUsers
         },
-        recentOrders
+        recentOrders: normalizedRecentOrders
       }
     });
 

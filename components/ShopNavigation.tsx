@@ -62,10 +62,10 @@ export default function ShopNavigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14 sm:h-16">
           {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/products" className="flex items-center space-x-2">
+          <div className="flex items-center shrink-0">
+            <Link href="/products" className="flex items-center space-x-1.5 sm:space-x-2">
               <span className="text-xl sm:text-2xl font-bold text-blue-600">🛍️</span>
-              <span className="text-base sm:text-xl font-bold text-gray-900">{t.nav.liveCommerce}</span>
+              <span className="text-base sm:text-xl font-bold text-gray-900 whitespace-nowrap">{t.nav.liveCommerce}</span>
             </Link>
           </div>
 
@@ -131,7 +131,7 @@ export default function ShopNavigation() {
           </div>
 
           {/* User Menu + Language Selector */}
-          <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             <LanguageSelector variant="compact" />
             
             {user ? (
@@ -157,7 +157,7 @@ export default function ShopNavigation() {
                 )}
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                  className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors whitespace-nowrap"
                 >
                   {t.nav.logout}
                 </button>
@@ -166,13 +166,13 @@ export default function ShopNavigation() {
               <>
                 <Link
                   href="/login"
-                  className="px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                  className="hidden sm:inline-block px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors whitespace-nowrap"
                 >
                   {t.nav.login}
                 </Link>
                 <Link
                   href="/register"
-                  className="px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+                  className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors whitespace-nowrap"
                 >
                   {t.nav.register}
                 </Link>
@@ -274,14 +274,32 @@ export default function ShopNavigation() {
               </>
             )}
             {!user && (
-              <Link
-                href="/cart"
-                prefetch={false}
-                onClick={() => setMenuOpen(false)}
-                className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/cart')}`}
-              >
-                🛒 {t.nav.cart}
-              </Link>
+              <>
+                <Link
+                  href="/cart"
+                  prefetch={false}
+                  onClick={() => setMenuOpen(false)}
+                  className={`block px-3 py-2.5 rounded-md text-sm font-medium ${isActive('/cart')}`}
+                >
+                  🛒 {t.nav.cart}
+                </Link>
+                <div className="pt-2 mt-2 border-t border-gray-200 space-y-1">
+                  <Link
+                    href="/login"
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-3 py-2.5 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    {t.nav.login}
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-3 py-2.5 rounded-md text-sm font-medium text-center text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    {t.nav.register}
+                  </Link>
+                </div>
+              </>
             )}
           </div>
         </div>

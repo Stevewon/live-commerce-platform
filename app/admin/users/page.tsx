@@ -216,6 +216,9 @@ export default function AdminUsersPage() {
             <Link href="/admin/orders" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
               📦 주문 관리
             </Link>
+            <Link href="/admin/balance-requests" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
+              💳 충전 신청
+            </Link>
             <Link href="/admin/partners" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
               🤝 파트너 관리
             </Link>
