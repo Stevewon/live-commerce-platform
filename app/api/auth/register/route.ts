@@ -3,6 +3,8 @@ import { cookies } from 'next/headers';
 import { getPrisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
+import { getD1 } from '@/lib/balance';
+import { normalizeWalletAddress } from '@/lib/utils/wallet';
 
 // POST /api/auth/register - 간편 회원가입 (닉네임 + 비밀번호 + 퀀타리움 지갑주소)
 export async function POST(request: NextRequest) {
@@ -25,7 +27,8 @@ export async function POST(request: NextRequest) {
     } = body;
     
     // 퀀타리움 지갑주소 (신규: quantariumWallet, 하위호환: securetQrUrl)
-    const walletAddress = (quantariumWallet ?? securetQrUrl ?? '').trim();
+    // EVM 주소는 대소문자를 구분하지 않으므로 항상 소문자로 정규화하여 저장/비교한다.
+    const walletAddress = normalizeWalletAddress(quantariumWallet ?? securetQrUrl ?? '');
 
     // 입력 검증
     if (!nickname || !password || !walletAddress) {
@@ -84,6 +87,40 @@ export async function POST(request: NextRequest) {
           error: '이미 사용 중인 닉네임입니다.',
         },
         { status: 409 }
+      );
+    }
+    
+    // 퀀타리움 지갑주소 중복 확인 (대소문자 무시)
+    // - EVM 주소는 대소문자를 구분하지 않으므로, 이미 등록된 주소면 대소문자가 달라도 무조건 튕겨낸다.
+    // - 기존 DB 에 대소문자가 섞여 저장된 레코드까지 매칭되도록 LOWER() 로 비교한다.
+    try {
+      const db = await getD1();
+      if (db) {
+        const dupRow: any = await db
+          .prepare(
+            `SELECT "id" FROM "User" WHERE LOWER("securetQrUrl") = LOWER(?) LIMIT 1`
+          )
+          .bind(walletAddress)
+          .first();
+        if (dupRow) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: '이미 등록된 지갑주소입니다.',
+            },
+            { status: 409 }
+          );
+        }
+      }
+    } catch (dupErr) {
+      console.error('[REGISTER_WALLET_DUP_CHECK_ERROR]', dupErr);
+      // 중복 검사 실패 시 안전하게 진행을 막는다 (지갑주소 유일성 보장 우선)
+      return NextResponse.json(
+        {
+          success: false,
+          error: '회원가입 처리 중 오류가 발생했습니다.',
+        },
+        { status: 500 }
       );
     }
     
