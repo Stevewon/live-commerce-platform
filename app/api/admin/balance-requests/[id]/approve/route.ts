@@ -68,7 +68,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         .prepare(
           `SELECT * FROM "User"
            WHERE "nickname" = ? AND UPPER(COALESCE("role",'USER')) NOT IN ('ADMIN','MANAGER')
-           LIMIT 2`
+           LIMIT 10`
         )
         .bind(depositorName)
         .all();
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
           .prepare(
             `SELECT * FROM "User"
              WHERE "name" = ? AND UPPER(COALESCE("role",'USER')) NOT IN ('ADMIN','MANAGER')
-             LIMIT 2`
+             LIMIT 10`
           )
           .bind(depositorName)
           .all();
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
             {
               success: false,
               error: `입금자명 "${depositorName}"(으)로 일치하는 회원이 여러 명입니다. 수동 확인이 필요합니다.`,
-              candidates: nameRows.map((u) => ({ id: u.id, nickname: u.nickname, name: u.name })),
+              candidates: nameRows.map((u) => ({ id: u.id, nickname: u.nickname, name: u.name, origin: u.origin, qrchatUid: u.qrchatUid, krwBalance: u.krwBalance, qkeyBalance: u.qkeyBalance })),
             },
             { status: 409 }
           );
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
           {
             success: false,
             error: `입금자명 "${depositorName}"(으)로 일치하는 회원이 여러 명입니다. 수동 확인이 필요합니다.`,
-            candidates: nickRows.map((u) => ({ id: u.id, nickname: u.nickname, name: u.name })),
+            candidates: nickRows.map((u) => ({ id: u.id, nickname: u.nickname, name: u.name, origin: u.origin, qrchatUid: u.qrchatUid, krwBalance: u.krwBalance, qkeyBalance: u.qkeyBalance })),
           },
           { status: 409 }
         );
