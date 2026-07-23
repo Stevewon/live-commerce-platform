@@ -8,6 +8,8 @@ import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notifica
 import { getD1, krwToQkey, QKEY_TO_KRW, newId, qtaFromKrw, ensureQtaColumn } from '@/lib/balance';
 // [병행결제] Order 테이블 결제 분할 기록 컬럼 자동 보정
 import { ensureOrderPaymentColumns, ensureUserQrchatColumns } from '@/lib/ensureProductColumns';
+// [상품 스냅샷] OrderItem 에 주문 시점 상품명/썸네일 저장 (상품 삭제/변경돼도 주문내역 유지)
+import { ensureOrderItemSnapshotColumns, backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 // [QRChat 연동] B 회원(origin=QRCHAT) QKEY 를 Firebase 에서 직접 차감
 import { spendQkeyForQrlive } from '@/lib/qrchat-bridge';
 // Cloudflare Workers compatible crypto
@@ -244,6 +246,8 @@ export async function POST(req: NextRequest) {
       productId: string;
       quantity: number;
       price: number;
+      productName: string;
+      productThumbnail: string | null;
     }> = [];
 
     // 파트너 스토어를 통한 주문인 경우 partnerId 확인
@@ -271,7 +275,10 @@ export async function POST(req: NextRequest) {
       validatedItems.push({
         productId: product.id,
         quantity: item.quantity,
-        price: product.price
+        price: product.price,
+        // ★ 주문 시점 상품 스냅샷 (상품 삭제/변경돼도 주문내역/배송 유지)
+        productName: product.name,
+        productThumbnail: (product as any).thumbnail || null,
       });
     }
 
@@ -351,6 +358,8 @@ export async function POST(req: NextRequest) {
     const d1 = await getD1();
     // [QRChat 연동] origin/qrchatUid 컬럼 보장 후, 출처 판별에 필요한 필드까지 조회
     try { await ensureUserQrchatColumns(d1); } catch { /* 보정 실패해도 진행 */ }
+    // [상품 스냅샷] OrderItem 에 productName/productThumbnail 컬럼 보장 (주문 생성 전 필수)
+    try { await ensureOrderItemSnapshotColumns(d1); } catch { /* 보정 실패해도 진행 */ }
     const userRow: any = await d1
       .prepare(
         `SELECT "krwBalance","qkeyBalance","origin","qrchatUid","nickname","name","securetQrUrl"
@@ -777,6 +786,30 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// 주문 아이템의 상품 정보를 스냅샷 우선으로 정규화 (상품 삭제/변경돼도 상품명 유지)
+function normalizeOrderItems(order: any): void {
+  if (!order) return;
+  if (!Array.isArray(order.items)) order.items = [];
+  for (const item of order.items) {
+    const snapName = item.productName || '';
+    const snapThumb = item.productThumbnail || '';
+    if (!item.product) {
+      item.product = {
+        id: item.productId || '',
+        name: snapName || '주문 상품',
+        slug: '',
+        thumbnail: snapThumb || '',
+        category: { name: '' },
+      };
+    } else {
+      item.product.name = item.product.name || snapName || '주문 상품';
+      item.product.slug = item.product.slug || '';
+      item.product.thumbnail = item.product.thumbnail || snapThumb || '';
+      if (!item.product.category) item.product.category = { name: '' };
+    }
+  }
+}
+
 // 주문 내역 조회 (GET) - 회원용 + 비회원 토큰 조회
 export async function GET(req: NextRequest) {
   const prisma = await getPrisma();
@@ -811,6 +844,7 @@ export async function GET(req: NextRequest) {
         );
       }
 
+      normalizeOrderItems(order);
       return NextResponse.json({
         success: true,
         data: [order]
@@ -846,6 +880,7 @@ export async function GET(req: NextRequest) {
         );
       }
 
+      normalizeOrderItems(order);
       return NextResponse.json({
         success: true,
         data: [order]
@@ -858,6 +893,9 @@ export async function GET(req: NextRequest) {
       return authResult;
     }
     const { userId } = authResult;
+
+    // [상품 스냅샷] 컬럼 보장 + 기존 주문 백필 (멱등, 프로세스당 1회)
+    try { await backfillOrderItemSnapshots(await getD1()); } catch { /* 실패해도 조회는 진행 */ }
 
     // 페이지네이션 파라미터
     const page = parseInt(searchParams.get('page') || '1');
@@ -906,6 +944,8 @@ export async function GET(req: NextRequest) {
               productId: true,
               quantity: true,
               price: true,
+              productName: true,
+              productThumbnail: true,
               product: {
                 select: {
                   id: true,
@@ -942,18 +982,22 @@ export async function GET(req: NextRequest) {
         order.items = [];
       }
       for (const item of order.items) {
+        // ★ 주문 시점 스냅샷 우선 사용 (상품 삭제/변경돼도 실제 상품명 표시)
+        const snapName = item.productName || '';
+        const snapThumb = item.productThumbnail || '';
         if (!item.product) {
           item.product = {
             id: item.productId || '',
-            name: '상품 정보 없음',
+            name: snapName || '주문 상품',
             slug: '',
-            thumbnail: '',
+            thumbnail: snapThumb || '',
             category: { name: '' }
           };
         } else {
-          item.product.name = item.product.name || '상품 정보 없음';
+          // 현재 상품이 존재해도, 이름이 비면 스냅샷으로 보강
+          item.product.name = item.product.name || snapName || '주문 상품';
           item.product.slug = item.product.slug || '';
-          item.product.thumbnail = item.product.thumbnail || '';
+          item.product.thumbnail = item.product.thumbnail || snapThumb || '';
           if (!item.product.category) {
             item.product.category = { name: '' };
           }

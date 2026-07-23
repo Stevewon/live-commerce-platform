@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { getD1 } from '@/lib/balance';
+import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: '대기중',
@@ -34,6 +36,9 @@ export async function GET(req: NextRequest) {
     if (authResult.role !== 'ADMIN') {
       return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
     }
+
+    // [상품 스냅샷] 컬럼 보장 + 기존 주문 백필 (배송 엑셀에 상품명 보장)
+    try { await backfillOrderItemSnapshots(await getD1()); } catch { /* 실패해도 진행 */ }
 
     // 쿼리 파라미터 (필터 유지)
     const { searchParams } = new URL(req.url);
@@ -226,7 +231,7 @@ export async function GET(req: NextRequest) {
             idx === 0 ? (order.shippingAddress || '') : '',
             idx === 0 ? (order.shippingZipCode || '') : '',
             idx === 0 ? (order.shippingMemo || '') : '',
-            item.product?.name || '삭제된 상품',
+            item.product?.name || item.productName || '주문 상품',
             item.quantity || 0,
             item.price || 0,
             (item.price || 0) * (item.quantity || 0),

@@ -3,6 +3,8 @@ import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
 // [v1.0.22] KISPG PG 취소 제거 → 잔액 환불로 전환
 import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
+// [상품 스냅샷] 상품 삭제/변경돼도 주문 상세에 상품명 유지
+import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 
 // 주문 상세 조회 (GET) — 회원(token) + 비회원(guestOrderToken) 지원
 export async function GET(
@@ -61,6 +63,20 @@ export async function GET(
         { success: false, error: '접근 권한이 없습니다' },
         { status: 403 }
       )
+    }
+
+    // [상품 스냅샷] 백필 (멱등) + 스냅샷 우선 정규화 (상품 삭제/변경돼도 상품명 유지)
+    try { await backfillOrderItemSnapshots(await getD1()); } catch { /* 실패해도 진행 */ }
+    for (const item of ((order as any).items || [])) {
+      const snapName = item.productName || '';
+      const snapThumb = item.productThumbnail || '';
+      if (!item.product) {
+        item.product = { id: item.productId || '', name: snapName || '주문 상품', slug: '', thumbnail: snapThumb || '', category: { name: '' } };
+      } else {
+        item.product.name = item.product.name || snapName || '주문 상품';
+        item.product.thumbnail = item.product.thumbnail || snapThumb || '';
+        if (!item.product.category) item.product.category = { name: '' };
+      }
     }
 
     return NextResponse.json({
