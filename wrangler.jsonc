@@ -43,7 +43,13 @@
     "NEXT_PUBLIC_API_URL": "https://qrlive.io",
     "KISPG_MODE": "production",
     "KISPG_MID": "quanta001m",
-    "KISPG_MERCHANT_KEY": "Vme+so0frfyol4Fx1qRVuegbtUezBuTEZuBWGQVFyCCgisZgU4UhepUiGQyypnP/NFv9uwaoCPymfu4KXx31jw=="
+    "KISPG_MERCHANT_KEY": "Vme+so0frfyol4Fx1qRVuegbtUezBuTEZuBWGQVFyCCgisZgU4UhepUiGQyypnP/NFv9uwaoCPymfu4KXx31jw==",
+    // [QRChat 연동] 브릿지 시크릿 — QRChat functions/qrlive_bridge.js 와 반드시 동일값!
+    //   QRLIVE_BRIDGE_SECRET: 쇼핑몰 서버 ↔ Functions HMAC 서명 공유키
+    //   QRCHAT_FUNCTIONS_BASE_URL: Functions 배포 베이스 URL
+    "QRLIVE_BRIDGE_SECRET": "b5b5a4399206f67cdee8367ca0e57d15ecc1b98f02a150f63b0d8f83722a08eb",
+    "QRLIVE_APP_BRIDGE_KEY": "b51336e52f66591a2c0446b671d9de1727d07c94e1d2f2917e9fa57777888899",
+    "QRCHAT_FUNCTIONS_BASE_URL": "https://asia-northeast3-qrchat-b7a67.cloudfunctions.net"
   }
   // [2026-05-11 MED 3 패치] PENDING 30분 자동 취소 cron
   // OpenNext(.open-next/worker.js) 는 scheduled() 핸들러를 자동 생성하지 않으므로
