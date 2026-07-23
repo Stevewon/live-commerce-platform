@@ -180,6 +180,13 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // [주문목록 최신순 보장] DB orderBy 가 wrapper/타임스탬프 이슈로 흔들려도
+    //   항상 createdAt 내림차순(최신 먼저)으로 재정렬한다.
+    (orders as any[]).sort(
+      (a, b) =>
+        new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
+    );
+
     return NextResponse.json(
       {
         orders,

@@ -11,7 +11,7 @@ import { ensureOrderPaymentColumns, ensureUserQrchatColumns } from '@/lib/ensure
 // [상품 스냅샷] OrderItem 에 주문 시점 상품명/썸네일 저장 (상품 삭제/변경돼도 주문내역 유지)
 import { ensureOrderItemSnapshotColumns, backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 // [QRChat 연동] B 회원(origin=QRCHAT) QKEY 를 Firebase 에서 직접 차감
-import { spendQkeyForQrlive } from '@/lib/qrchat-bridge';
+import { spendQkeyForQrlive, getQrchatQkeyBalance } from '@/lib/qrchat-bridge';
 // Cloudflare Workers compatible crypto
 
 // ─── 휴대전화번호 정규화 (KR) ───
@@ -392,11 +392,33 @@ export async function POST(req: NextRequest) {
     // ── [병행결제] 서버측 분할 금액 산정 (신뢰: 클라이언트 splitQkey 는 참고값, 서버에서 재검증) ──
     // splitUsedQkey: 실제 사용할 쿠키 개수. 다음 세 값 중 최솟값으로 clamp.
     //   (1) 클라이언트 요청 개수, (2) 보유 쿠키 잔액, (3) 결제금액을 쿠키로 환산(내림)
+    //
+    // ⚠️ [핵심 버그 수정 2026-07-23]
+    //   B 회원(QRChat 연동)은 쿠키(QKEY) 잔액이 로컬 D1 에는 항상 0 이고 실제 잔액은
+    //   Firebase(QRChat) 에 있다. 기존 SPLIT 경로는 로컬 currentQkey(=0) 만 보고
+    //   쿠키를 한 개도 못 써서 "현금 전액 필요 → 현금 부족" 402 로 튕겼다.
+    //   → SPLIT 이고 usesFirebaseQkey 면 Firebase 실시간 쿠키 잔액을 상한으로 사용한다.
     let splitUsedQkey = 0;
     let splitKrwRemainder = 0;
+    // 병행결제 시 쿠키를 Firebase 에서 차감해야 하는지 (커밋 후 spendQkeyForQrlive 사용)
+    let splitUsesFirebaseQkey = false;
     if (paymentMethod === 'SPLIT_BALANCE') {
+      // 쿠키 사용 가능 상한(개수). 기본은 로컬 잔액.
+      let availableQkey = currentQkey;
+      if (usesFirebaseQkey) {
+        // B 회원(또는 지갑연결 A 회원): Firebase 실시간 잔액을 상한으로 사용
+        try {
+          const live = await getQrchatQkeyBalance(qrchatUid as string);
+          if (live.ok && typeof live.qkeyBalance === 'number') {
+            availableQkey = Math.max(0, Math.floor(live.qkeyBalance));
+            splitUsesFirebaseQkey = true;
+          }
+        } catch (e) {
+          console.error('[orders POST] split firebase qkey balance fetch failed:', e);
+        }
+      }
       const requested = Math.max(0, Math.floor(Number(rawSplitQkey) || 0));
-      const maxByBalance = currentQkey;
+      const maxByBalance = availableQkey;
       const maxByTotal = Math.floor(total / QKEY_TO_KRW); // 결제금액 초과 사용 방지
       splitUsedQkey = Math.min(requested, maxByBalance, maxByTotal);
       if (splitUsedQkey < 0) splitUsedQkey = 0;
@@ -453,7 +475,10 @@ export async function POST(req: NextRequest) {
     } else {
       // SPLIT_BALANCE: 쿠키 usedQkey 개 + 나머지 현금 splitKrwRemainder 원
       // 쿠키 보유 확인 (splitUsedQkey 는 이미 잔액 이하로 clamp 되었지만 방어)
-      if (currentQkey < splitUsedQkey) {
+      //   ⚠️ B 회원(splitUsesFirebaseQkey)은 로컬 currentQkey 가 항상 0 이므로 로컬 잔액으로
+      //      검증하면 안 된다. 실제 쿠키 차감은 커밋 후 spendQkeyForQrlive(Firebase)에서
+      //      원자적으로 이뤄지고, 잔액 부족은 그 단계에서 402 로 처리한다.
+      if (!splitUsesFirebaseQkey && currentQkey < splitUsedQkey) {
         return NextResponse.json(
           {
             success: false,
@@ -610,9 +635,17 @@ export async function POST(req: NextRequest) {
         await debitOneCurrency('qkeyBalance', 'QKEY', Math.ceil(total / QKEY_TO_KRW));
       } else {
         // [병행결제] SPLIT_BALANCE: 쿠키(splitUsedQkey개) + 나머지 현금(splitKrwRemainder원)
-        // 두 차감이 같은 트랜잭션 안에서 실행되어 원자성 보장 (하나라도 실패하면 전체 롤백).
-        await debitOneCurrency('qkeyBalance', 'QKEY', splitUsedQkey);
-        await debitOneCurrency('krwBalance', 'KRW', splitKrwRemainder);
+        //   현금(KRW)은 항상 로컬 D1 에서 차감한다.
+        //   쿠키(QKEY)는:
+        //     · 일반 회원        → 로컬 D1 qkeyBalance 에서 차감
+        //     · B 회원(Firebase) → 로컬 차감 생략, 커밋 후 spendQkeyForQrlive 로 Firebase 차감
+        //   → 트랜잭션 안에서는 로컬 차감만, 외부 HTTP(Firebase)는 커밋 후 보상방식.
+        if (!splitUsesFirebaseQkey && splitUsedQkey > 0) {
+          await debitOneCurrency('qkeyBalance', 'QKEY', splitUsedQkey);
+        }
+        if (splitKrwRemainder > 0) {
+          await debitOneCurrency('krwBalance', 'KRW', splitKrwRemainder);
+        }
       }
 
       // [QTA 적립] 현금(KRW) 100% 결제 시에만 구매 금액의 5% 를 QTA 로 적립 (100원 = 1 QTA)
@@ -771,6 +804,99 @@ export async function POST(req: NextRequest) {
           .run();
       } catch (ledgerErr) {
         console.warn('[QRChat QKEY 원장 기록 실패(무시)]', ledgerErr);
+      }
+    }
+
+    // ── [병행결제 × QRChat] B 회원 SPLIT 결제: 쿠키(splitUsedQkey개)를 Firebase 에서 차감 ──
+    //   현금(splitKrwRemainder원)은 이미 위 D1 트랜잭션에서 로컬 차감 완료.
+    //   여기서 Firebase 쿠키 차감이 실패하면 → 주문 삭제 + 방금 차감한 현금까지 환원(보상).
+    //   idemKey = order.id (주문당 멱등).
+    if (paymentMethod === 'SPLIT_BALANCE' && splitUsesFirebaseQkey && splitUsedQkey > 0) {
+      let spend;
+      try {
+        spend = await spendQkeyForQrlive({
+          uid: qrchatUid as string,
+          wallet: qrchatWallet,
+          nick: qrchatNick,
+          amountQkey: splitUsedQkey,
+          orderId: order.id,
+          idemKey: order.id,
+        });
+      } catch (e: any) {
+        spend = { ok: false, error: 'bridge_error' } as any;
+      }
+
+      if (!spend || !spend.ok) {
+        // 보상 1) 이미 로컬에서 차감한 현금(splitKrwRemainder) 을 되돌린다.
+        if (splitKrwRemainder > 0) {
+          try {
+            const balRow: any = await d1
+              .prepare(`SELECT "krwBalance" AS bal FROM "User" WHERE "id" = ? LIMIT 1`)
+              .bind(userId)
+              .first();
+            const curKrw = Number(balRow?.bal) || 0;
+            const restored = curKrw + splitKrwRemainder;
+            await d1
+              .prepare(`UPDATE "User" SET "krwBalance" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
+              .bind(restored, userId)
+              .run();
+            // 원장에 환원 기록 (사용자 노출 안전 문구)
+            await d1
+              .prepare(
+                `INSERT INTO "BalanceLedger"
+                   ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+                 VALUES (?, ?, 'KRW', ?, ?, '주문 결제 취소', ?, NULL, CURRENT_TIMESTAMP)`
+              )
+              .bind(newId(), userId, splitKrwRemainder, restored, order.id)
+              .run();
+          } catch (refundErr) {
+            console.error('[SPLIT QRChat spend 실패 후 현금 환원 실패]', refundErr);
+          }
+        }
+        // 보상 2) 방금 만든 주문 삭제
+        try {
+          await d1.prepare(`DELETE FROM "Order" WHERE "id" = ?`).bind(order.id).run();
+          await d1.prepare(`DELETE FROM "OrderItem" WHERE "orderId" = ?`).bind(order.id).run();
+        } catch (delErr) {
+          console.error('[SPLIT QRChat spend 실패 후 주문 롤백 실패]', delErr);
+        }
+        const err = String((spend as any)?.error || 'spend_failed');
+        const status =
+          err === 'insufficient_balance' ? 402
+          : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? 409
+          : err === 'user_not_found' ? 404
+          : err === 'banned' ? 403
+          : 502;
+        const msg =
+          err === 'insufficient_balance' ? '쿠키 잔액이 부족합니다. QRChat 앱에서 잔액을 확인해주세요.'
+          : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? '본인확인 정보가 일치하지 않아 결제할 수 없습니다.'
+          : err === 'banned' ? '이용이 제한된 계정입니다.'
+          : err === 'user_not_found' ? 'QRChat 사용자 정보를 찾을 수 없습니다.'
+          : '병행결제 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        return NextResponse.json(
+          { success: false, error: msg, code: 'QRCHAT_QKEY_SPEND_FAILED', detail: err },
+          { status }
+        );
+      }
+
+      // 성공: 로컬 BalanceLedger 에 쿠키 결제 기록 (표시용, 로컬 잔액은 건드리지 않음)
+      try {
+        await d1
+          .prepare(
+            `INSERT INTO "BalanceLedger"
+               ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+             VALUES (?, ?, 'QKEY', ?, ?, '주문 결제(QRChat QKEY)', ?, NULL, CURRENT_TIMESTAMP)`
+          )
+          .bind(
+            newId(),
+            userId,
+            -splitUsedQkey,
+            Number((spend as any).newBalance) || 0,
+            order.id
+          )
+          .run();
+      } catch (ledgerErr) {
+        console.warn('[SPLIT QRChat QKEY 원장 기록 실패(무시)]', ledgerErr);
       }
     }
 
@@ -1032,6 +1158,13 @@ export async function GET(req: NextRequest) {
       order.orderNumber = order.orderNumber || '';
       order.createdAt = order.createdAt || new Date().toISOString();
     }
+
+    // [주문목록 최신순 보장] DB orderBy 가 wrapper/타임스탬프 이슈로 흔들려도
+    //   항상 createdAt 내림차순(최신 먼저)으로 재정렬한다.
+    (orders as any[]).sort(
+      (a, b) =>
+        new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
+    );
 
     return NextResponse.json({
       success: true,

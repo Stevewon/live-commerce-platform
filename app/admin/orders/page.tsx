@@ -126,7 +126,12 @@ export default function AdminOrdersPage() {
       if (!res.ok) throw new Error('주문 목록 로드 실패');
 
       const data = await res.json();
-      setOrders(data.orders || []);
+      // [주문목록 최신순 보장] 서버가 정렬해 주지만, 클라이언트에서도 createdAt 내림차순으로 한 번 더 정렬
+      const sortedOrders = [...(data.orders || [])].sort(
+        (a: any, b: any) =>
+          new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
+      );
+      setOrders(sortedOrders);
       if (data.pagination) setPagination(data.pagination);
     } catch (error) {
       console.error('Load orders error:', error);
