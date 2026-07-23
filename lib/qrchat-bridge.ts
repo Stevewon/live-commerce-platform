@@ -213,3 +213,30 @@ export async function qrchatDirectLogin(
   const sig = await hmacHex(getBridgeSecret(), `${n}|${p}`);
   return postJson('qrchatDirectSso', { nickname: n, password: p, sig });
 }
+
+// ---------------------------------------------------------------------------
+// 5) QRChat 실시간 QKEY 잔액 조회 (마이페이지 표시용)
+//    sig = HMAC(BRIDGE_SECRET, uid)
+//    반환: { ok, uid, nickname, walletAddress, qkeyBalance, banned }
+//    B 회원(origin=QRCHAT)의 실제 잔액은 큐알쳇 Firebase 에 있으므로,
+//    쇼핑몰 마이페이지가 이 값을 읽어와 표시한다.
+// ---------------------------------------------------------------------------
+export interface QkeyBalanceResult {
+  ok: boolean;
+  uid?: string;
+  nickname?: string;
+  walletAddress?: string;
+  qkeyBalance?: number;
+  banned?: boolean;
+  error?: string;
+  status?: number;
+}
+
+export async function getQrchatQkeyBalance(
+  uid: string
+): Promise<QkeyBalanceResult> {
+  const u = String(uid || '').trim();
+  if (!u) return { ok: false, error: 'invalid_params' };
+  const sig = await hmacHex(getBridgeSecret(), u);
+  return postJson('getQrchatQkeyBalance', { uid: u, sig });
+}
