@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { getPrisma } from '@/lib/prisma';
-import { hashPassword } from '@/lib/auth/password';
-import { generateToken } from '@/lib/auth/jwt';
-import { verifyQrliveSso, normWallet, normNick } from '@/lib/qrchat-bridge';
-import { ensureUserQrchatColumns } from '@/lib/ensureProductColumns';
+import { verifyQrliveSso } from '@/lib/qrchat-bridge';
+import { loginQrchatIdentity } from '@/lib/qrchat-login';
 
 /**
  * POST /api/auth/sso — QRChat SSO 자동로그인
@@ -37,87 +33,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const qrchatUid = String(v.uid);
-    const nickname = normNick(v.nickname);
-    const wallet = normWallet(v.walletAddress);
-
-    if (!nickname || !wallet) {
+    // 2~4) 공통 헬퍼: B 회원 조회/생성 + JWT 쿠키 세팅
+    const out = await loginQrchatIdentity({
+      uid: String(v.uid),
+      nickname: v.nickname,
+      walletAddress: v.walletAddress,
+    });
+    if (!out.ok) {
       return NextResponse.json(
-        { success: false, error: 'QRChat 사용자 정보(닉네임/지갑) 누락' },
-        { status: 422 }
+        { success: false, error: out.error },
+        { status: out.status }
       );
     }
 
-    const prisma = await getPrisma();
-    await ensureUserQrchatColumns();
-
-    // 2) B 회원 조회 — qrchatUid 우선 (가장 강한 키)
-    let user = await prisma.user.findFirst({
-      where: { qrchatUid },
-    });
-
-    // 3) 없으면 자동 생성 (origin=QRCHAT). A 회원과 병합 금지.
-    if (!user) {
-      // 닉네임 충돌 회피: B 회원 네임스페이스에 접미사(_qc) 부여
-      //  → A 회원 닉네임 유니크 제약과 충돌하지 않도록. 실제 표시용은 name 에 원본 유지.
-      let uniqueNickname = nickname;
-      const clash = await prisma.user.findUnique({ where: { nickname } });
-      if (clash) {
-        uniqueNickname = `${nickname}_qc_${qrchatUid.slice(-6)}`;
-      }
-
-      // 결제는 QRChat 잔액을 직접 차감하므로 로컬 password 는 임의값(로그인 불가용)
-      const randomPw = await hashPassword(
-        `qrchat_sso_${qrchatUid}_${crypto.randomUUID()}`
-      );
-
-      user = await prisma.user.create({
-        data: {
-          nickname: uniqueNickname,
-          name: nickname,
-          password: randomPw,
-          role: 'CUSTOMER',
-          securetQrUrl: wallet, // 지갑주소 저장 (본인확인 식별자)
-          origin: 'QRCHAT', // ★ 출처 구분: 절대 A(QRLIVE)와 병합 안 함
-          qrchatUid, // ★ QKEY 직접 차감 매칭 키
-          krwBalance: 0,
-          qkeyBalance: 0, // 쇼핑몰 자체 QKEY 지급 없음 — 결제는 Firebase 직접 차감
-          qtaBalance: 0,
-        },
-      });
-    } else if (user.origin !== 'QRCHAT') {
-      // qrchatUid 가 A 회원(QRLIVE)에 매핑된 경우 = 지갑연결한 A 회원.
-      // 그대로 로그인시키되 origin 은 유지 (A 정체성 보존).
-    }
-
-    // 4) JWT 발급 + 쿠키 세팅 (login route 와 동일)
-    const token = generateToken({
-      userId: user.id,
-      nickname: user.nickname || user.name || user.id,
-      role: user.role,
-      name: user.name,
-    });
-
-    const cookieStore = await cookies();
-    cookieStore.set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    });
-    cookieStore.set('user-role', user.role, {
-      httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    });
-
-    const { password: _pw, ...userSafe } = user as any;
     return NextResponse.json({
       success: true,
-      data: { user: userSafe, token },
+      data: { user: out.user, token: out.token },
       message: 'QRChat 자동로그인 성공',
     });
   } catch (error) {

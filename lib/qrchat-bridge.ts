@@ -183,3 +183,33 @@ export async function linkQrchatWallet(
   const sig = await hmacHex(getBridgeSecret(), `${w}|${n}`);
   return postJson('linkQrchatWallet', { wallet: w, nick: n, sig });
 }
+
+// ---------------------------------------------------------------------------
+// 4) QRChat 직접 로그인 (쇼핑몰 웹 로그인창에 큐알쳇 닉/비번 그대로 입력)
+//    sig = HMAC(BRIDGE_SECRET, `${nickname}|${password}`)
+//    반환: { ok, uid, nickname, walletAddress, qkeyBalance, origin }
+//    (계정없음→account_not_found 404, 비번틀림→password_mismatch 401,
+//     차단→banned 403, 지갑/닉없음→wallet_or_nickname_missing 422)
+//    ⚠️ 비번이 전송되므로 서버(Route Handler)에서만 호출.
+// ---------------------------------------------------------------------------
+export interface DirectLoginResult {
+  ok: boolean;
+  uid?: string;
+  nickname?: string;
+  walletAddress?: string;
+  qkeyBalance?: number;
+  origin?: string;
+  error?: string;
+  status?: number;
+}
+
+export async function qrchatDirectLogin(
+  nickname: string,
+  password: string
+): Promise<DirectLoginResult> {
+  const n = normNick(nickname);
+  const p = String(password != null ? password : '');
+  if (!n || !p) return { ok: false, error: 'invalid_params' };
+  const sig = await hmacHex(getBridgeSecret(), `${n}|${p}`);
+  return postJson('qrchatDirectSso', { nickname: n, password: p, sig });
+}
