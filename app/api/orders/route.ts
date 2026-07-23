@@ -389,24 +389,21 @@ export async function POST(req: NextRequest) {
     // QKEY 를 Firebase 에서 차감해야 하는 회원인지: qrchatUid + 지갑 존재 (B 회원 또는 지갑연결 A 회원)
     const usesFirebaseQkey: boolean = !!(qrchatUid && qrchatWallet && qrchatNick);
 
-    // ── [병행결제] 서버측 분할 금액 산정 (신뢰: 클라이언트 splitQkey 는 참고값, 서버에서 재검증) ──
-    // splitUsedQkey: 실제 사용할 쿠키 개수. 다음 세 값 중 최솟값으로 clamp.
-    //   (1) 클라이언트 요청 개수, (2) 보유 쿠키 잔액, (3) 결제금액을 쿠키로 환산(내림)
-    //
-    // ⚠️ [핵심 버그 수정 2026-07-23]
-    //   B 회원(QRChat 연동)은 쿠키(QKEY) 잔액이 로컬 D1 에는 항상 0 이고 실제 잔액은
-    //   Firebase(QRChat) 에 있다. 기존 SPLIT 경로는 로컬 currentQkey(=0) 만 보고
-    //   쿠키를 한 개도 못 써서 "현금 전액 필요 → 현금 부족" 402 로 튕겼다.
-    //   → SPLIT 이고 usesFirebaseQkey 면 Firebase 실시간 쿠키 잔액을 상한으로 사용한다.
-    let splitUsedQkey = 0;
-    let splitKrwRemainder = 0;
+    // ── [병행결제] 서버측 분할 금액 산정 ──────────────────────────────────
+    //   ★ 사장님 확정 룰(단순): "현금부터 다 까고, 모자란 만큼만 쿠키로 깐다."
+    //     1) 현금(KRW) 을 있는 대로 최대한 먼저 사용
+    //     2) 남은 금액을 쿠키(QKEY)로 충당 (1 쿠키 = 10원, 올림)
+    //   B 회원(QRChat 연동)은 쿠키 잔액이 로컬 D1 엔 항상 0 이고 실제 잔액은
+    //   Firebase 에 있으므로, Firebase 실시간 잔액을 쿠키 상한으로 사용한다.
+    let splitUsedKrw = 0;       // 이번 주문에서 쓸 현금(원)
+    let splitUsedQkey = 0;      // 이번 주문에서 쓸 쿠키(개)
+    let splitKrwRemainder = 0;  // (호환용) 쿠키로 못 메운 잔여 현금 부족분
     // 병행결제 시 쿠키를 Firebase 에서 차감해야 하는지 (커밋 후 spendQkeyForQrlive 사용)
     let splitUsesFirebaseQkey = false;
     if (paymentMethod === 'SPLIT_BALANCE') {
       // 쿠키 사용 가능 상한(개수). 기본은 로컬 잔액.
       let availableQkey = currentQkey;
       if (usesFirebaseQkey) {
-        // B 회원(또는 지갑연결 A 회원): Firebase 실시간 잔액을 상한으로 사용
         try {
           const live = await getQrchatQkeyBalance(qrchatUid as string);
           if (live.ok && typeof live.qkeyBalance === 'number') {
@@ -417,25 +414,15 @@ export async function POST(req: NextRequest) {
           console.error('[orders POST] split firebase qkey balance fetch failed:', e);
         }
       }
-      const requested = Math.max(0, Math.floor(Number(rawSplitQkey) || 0));
-      const maxByBalance = availableQkey;
-      const maxByTotal = Math.floor(total / QKEY_TO_KRW); // 결제금액 초과 사용 방지
-      splitUsedQkey = Math.min(requested, maxByBalance, maxByTotal);
-      if (splitUsedQkey < 0) splitUsedQkey = 0;
-      splitKrwRemainder = Math.max(0, total - splitUsedQkey * QKEY_TO_KRW);
 
-      // [병행결제 자동 보정] 남은 현금이 현금 잔액보다 많아 결제가 불가능하지만,
-      //   쿠키(QKEY)를 더 써서 부족한 현금분을 메울 수 있다면 자동으로 쿠키 사용량을 늘린다.
-      //   → 사용자가 쿠키를 적게(또는 0으로) 요청해서 "현금 부족" 으로 튕기던 문제 방지.
-      if (splitKrwRemainder > currentKrw) {
-        const cashShortfall = splitKrwRemainder - currentKrw;           // 더 메워야 하는 현금
-        const extraQkeyNeeded = Math.ceil(cashShortfall / QKEY_TO_KRW); // 그만큼 필요한 추가 쿠키(올림)
-        const bumpedQkey = Math.min(splitUsedQkey + extraQkeyNeeded, maxByBalance, maxByTotal);
-        if (bumpedQkey > splitUsedQkey) {
-          splitUsedQkey = bumpedQkey;
-          splitKrwRemainder = Math.max(0, total - splitUsedQkey * QKEY_TO_KRW);
-        }
-      }
+      // 1) 현금 먼저: 보유 현금과 결제금액 중 작은 만큼 현금으로 낸다.
+      splitUsedKrw = Math.min(currentKrw, total);
+      // 2) 남은 금액을 쿠키로: 부족분을 쿠키(10원 단위, 올림)로 충당
+      const afterCash = Math.max(0, total - splitUsedKrw);
+      const neededQkey = Math.ceil(afterCash / QKEY_TO_KRW);
+      splitUsedQkey = Math.min(neededQkey, availableQkey);
+      // 쿠키로도 다 못 메운 잔여 부족분 (있으면 결제 불가 → 아래 검증에서 402)
+      splitKrwRemainder = Math.max(0, afterCash - splitUsedQkey * QKEY_TO_KRW);
     }
 
     // 필요 금액 검증
@@ -473,31 +460,19 @@ export async function POST(req: NextRequest) {
         );
       }
     } else {
-      // SPLIT_BALANCE: 쿠키 usedQkey 개 + 나머지 현금 splitKrwRemainder 원
-      // 쿠키 보유 확인 (splitUsedQkey 는 이미 잔액 이하로 clamp 되었지만 방어)
-      //   ⚠️ B 회원(splitUsesFirebaseQkey)은 로컬 currentQkey 가 항상 0 이므로 로컬 잔액으로
-      //      검증하면 안 된다. 실제 쿠키 차감은 커밋 후 spendQkeyForQrlive(Firebase)에서
-      //      원자적으로 이뤄지고, 잔액 부족은 그 단계에서 402 로 처리한다.
-      if (!splitUsesFirebaseQkey && currentQkey < splitUsedQkey) {
+      // SPLIT_BALANCE: [현금 먼저 → 모자란 만큼 쿠키] 로 이미 산정됨.
+      //   splitUsedKrw(=min(현금잔액,결제금액)) 는 항상 현금 잔액 이하 → 현금 부족은 발생 안 함.
+      //   유일한 실패 조건: 현금 + 보유 쿠키를 다 써도 결제금액을 못 채우는 경우(splitKrwRemainder > 0).
+      if (splitKrwRemainder > 0) {
+        // 총 부족액(원) = 쿠키로도 못 메운 금액. 사용자에게는 현금+쿠키 합산 부족으로 안내.
+        const shortInKrw = splitKrwRemainder;
         return NextResponse.json(
           {
             success: false,
-            error: `쿠키 잔액이 부족합니다 (현재: ${currentQkey.toLocaleString()} 쿠키)`,
+            error: `잔액이 부족합니다. 현금 ${currentKrw.toLocaleString()}원 + 쿠키 ${(splitUsesFirebaseQkey ? splitUsedQkey : currentQkey).toLocaleString()}개를 모두 사용해도 ${shortInKrw.toLocaleString()}원이 부족합니다. 잔액을 충전해주세요.`,
             code: 'INSUFFICIENT_BALANCE',
             balance: { krw: currentKrw, qkey: currentQkey },
-          },
-          { status: 402 }
-        );
-      }
-      // 나머지 현금 잔액 확인
-      if (currentKrw < splitKrwRemainder) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `현금 잔액이 부족합니다 (현재: ${currentKrw.toLocaleString()}원, 필요: ${splitKrwRemainder.toLocaleString()}원). 쿠키 사용량을 늘리거나 잔액을 충전해주세요.`,
-            code: 'INSUFFICIENT_BALANCE',
-            balance: { krw: currentKrw, qkey: currentQkey },
-            required: { krw: splitKrwRemainder, qkey: splitUsedQkey },
+            required: { krw: shortInKrw, qkey: splitUsedQkey },
           },
           { status: 402 }
         );
@@ -523,7 +498,7 @@ export async function POST(req: NextRequest) {
       : 0;
     const paidKrw =
       paymentMethod === 'KRW_BALANCE' ? total
-      : paymentMethod === 'SPLIT_BALANCE' ? splitKrwRemainder
+      : paymentMethod === 'SPLIT_BALANCE' ? splitUsedKrw
       : 0;
 
     // 주문 생성 (트랜잭션)
@@ -634,17 +609,17 @@ export async function POST(req: NextRequest) {
         // QKEY 는 올림 환산 (사전 확인과 동일 규칙)
         await debitOneCurrency('qkeyBalance', 'QKEY', Math.ceil(total / QKEY_TO_KRW));
       } else {
-        // [병행결제] SPLIT_BALANCE: 쿠키(splitUsedQkey개) + 나머지 현금(splitKrwRemainder원)
+        // [병행결제] SPLIT_BALANCE: [현금 먼저 splitUsedKrw원] + [모자란 만큼 쿠키 splitUsedQkey개]
         //   현금(KRW)은 항상 로컬 D1 에서 차감한다.
         //   쿠키(QKEY)는:
         //     · 일반 회원        → 로컬 D1 qkeyBalance 에서 차감
         //     · B 회원(Firebase) → 로컬 차감 생략, 커밋 후 spendQkeyForQrlive 로 Firebase 차감
         //   → 트랜잭션 안에서는 로컬 차감만, 외부 HTTP(Firebase)는 커밋 후 보상방식.
+        if (splitUsedKrw > 0) {
+          await debitOneCurrency('krwBalance', 'KRW', splitUsedKrw);
+        }
         if (!splitUsesFirebaseQkey && splitUsedQkey > 0) {
           await debitOneCurrency('qkeyBalance', 'QKEY', splitUsedQkey);
-        }
-        if (splitKrwRemainder > 0) {
-          await debitOneCurrency('krwBalance', 'KRW', splitKrwRemainder);
         }
       }
 
@@ -808,7 +783,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── [병행결제 × QRChat] B 회원 SPLIT 결제: 쿠키(splitUsedQkey개)를 Firebase 에서 차감 ──
-    //   현금(splitKrwRemainder원)은 이미 위 D1 트랜잭션에서 로컬 차감 완료.
+    //   현금(splitUsedKrw원)은 이미 위 D1 트랜잭션에서 로컬 차감 완료.
     //   여기서 Firebase 쿠키 차감이 실패하면 → 주문 삭제 + 방금 차감한 현금까지 환원(보상).
     //   idemKey = order.id (주문당 멱등).
     if (paymentMethod === 'SPLIT_BALANCE' && splitUsesFirebaseQkey && splitUsedQkey > 0) {
@@ -827,15 +802,15 @@ export async function POST(req: NextRequest) {
       }
 
       if (!spend || !spend.ok) {
-        // 보상 1) 이미 로컬에서 차감한 현금(splitKrwRemainder) 을 되돌린다.
-        if (splitKrwRemainder > 0) {
+        // 보상 1) 이미 로컬에서 차감한 현금(splitUsedKrw) 을 되돌린다.
+        if (splitUsedKrw > 0) {
           try {
             const balRow: any = await d1
               .prepare(`SELECT "krwBalance" AS bal FROM "User" WHERE "id" = ? LIMIT 1`)
               .bind(userId)
               .first();
             const curKrw = Number(balRow?.bal) || 0;
-            const restored = curKrw + splitKrwRemainder;
+            const restored = curKrw + splitUsedKrw;
             await d1
               .prepare(`UPDATE "User" SET "krwBalance" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
               .bind(restored, userId)
@@ -847,7 +822,7 @@ export async function POST(req: NextRequest) {
                    ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
                  VALUES (?, ?, 'KRW', ?, ?, '주문 결제 취소', ?, NULL, CURRENT_TIMESTAMP)`
               )
-              .bind(newId(), userId, splitKrwRemainder, restored, order.id)
+              .bind(newId(), userId, splitUsedKrw, restored, order.id)
               .run();
           } catch (refundErr) {
             console.error('[SPLIT QRChat spend 실패 후 현금 환원 실패]', refundErr);
