@@ -206,23 +206,23 @@ export default function AdminUsersPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 프리미엄 네비게이션 */}
         <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-2 inline-flex space-x-2">
-            <Link href="/admin" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
+          <div className="bg-white rounded-2xl shadow-lg p-2 flex flex-wrap gap-2">
+            <Link href="/admin" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
               📊 대시보드
             </Link>
-            <Link href="/admin/users" className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl shadow-md font-medium">
+            <Link href="/admin/users" className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl shadow-md font-semibold text-sm whitespace-nowrap">
               👥 회원 관리
             </Link>
-            <Link href="/admin/orders" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
+            <Link href="/admin/orders" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
               📦 주문 관리
             </Link>
-            <Link href="/admin/balance-requests" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
+            <Link href="/admin/balance-requests" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
               💳 충전 신청
             </Link>
-            <Link href="/admin/partners" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
+            <Link href="/admin/partners" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
               🤝 파트너 관리
             </Link>
-            <Link href="/admin/products" className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition-all font-medium">
+            <Link href="/admin/products" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
               🛍️ 상품 관리
             </Link>
           </div>

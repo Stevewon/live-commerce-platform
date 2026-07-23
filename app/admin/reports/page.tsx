@@ -178,21 +178,21 @@ export default function AdminReportsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation */}
         <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-2xl p-3 inline-flex space-x-2 border border-gray-200 flex-wrap">
-            <Link href="/admin" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">📊</span>
+          <div className="bg-white rounded-2xl shadow-2xl p-3 flex flex-wrap gap-2 border border-gray-200 flex-wrap">
+            <Link href="/admin" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">📊</span>
               <span>대시보드</span>
             </Link>
-            <Link href="/admin/orders" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">📦</span>
+            <Link href="/admin/orders" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">📦</span>
               <span>주문 관리</span>
             </Link>
-            <Link href="/admin/partners" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">🤝</span>
+            <Link href="/admin/partners" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">🤝</span>
               <span>파트너 관리</span>
             </Link>
-            <Link href="/admin/reports" className="group px-8 py-4 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white rounded-xl shadow-xl font-bold flex items-center space-x-2 ring-4 ring-indigo-200 scale-105">
-              <span className="text-2xl">📈</span>
+            <Link href="/admin/reports" className="group px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white rounded-xl shadow-xl font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
+              <span className="text-lg">📈</span>
               <span>매출 리포트</span>
             </Link>
           </div>
@@ -204,7 +204,7 @@ export default function AdminReportsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => { setActiveTab('monthly'); setCancelPage(1); }}
-                className={`px-8 py-4 rounded-2xl font-black transition-all duration-300 shadow-lg flex items-center space-x-2 ${
+                className={`px-4 py-2.5 rounded-2xl font-black transition-all duration-300 shadow-lg flex items-center space-x-2 ${
                   activeTab === 'monthly'
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-indigo-300 scale-110 ring-4 ring-indigo-200'
                     : 'bg-gray-100 text-gray-700 hover:bg-indigo-50 hover:scale-105'
@@ -215,7 +215,7 @@ export default function AdminReportsPage() {
               </button>
               <button
                 onClick={() => { setActiveTab('cancellations'); setCancelPage(1); }}
-                className={`px-8 py-4 rounded-2xl font-black transition-all duration-300 shadow-lg flex items-center space-x-2 ${
+                className={`px-4 py-2.5 rounded-2xl font-black transition-all duration-300 shadow-lg flex items-center space-x-2 ${
                   activeTab === 'cancellations'
                     ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-red-300 scale-110 ring-4 ring-red-200'
                     : 'bg-gray-100 text-gray-700 hover:bg-red-50 hover:scale-105'
