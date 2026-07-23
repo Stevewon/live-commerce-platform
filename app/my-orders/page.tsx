@@ -100,9 +100,15 @@ export default function MyOrdersPage() {
     }
   };
 
+  // [주문목록 최신순 보장] createdAt 내림차순(최신 먼저)으로 정렬한 뒤 상태 필터 적용
+  const sortedOrders = [...orders].sort(
+    (a, b) =>
+      new Date((b as any)?.createdAt || 0).getTime() -
+      new Date((a as any)?.createdAt || 0).getTime()
+  );
   const filteredOrders = statusFilter === 'ALL'
-    ? orders
-    : orders.filter(o => (o.status || '') === statusFilter);
+    ? sortedOrders
+    : sortedOrders.filter(o => (o.status || '') === statusFilter);
 
   const statusTabs = [
     { value: 'ALL', label: '전체' },
