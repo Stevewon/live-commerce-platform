@@ -15,6 +15,7 @@ interface Stats {
     totalRevenue: number;
     activePartners: number;
     pendingSettlements: number;
+    pendingBalanceRequests?: number;
   };
   orderStatus: {
     pending: number;
@@ -129,6 +130,45 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-gray-900">관리자 대시보드</h1>
           <p className="mt-2 text-gray-600">플랫폼 전체 통계 및 관리</p>
         </div>
+
+        {/* 💳 대기 중인 충전 신청 — 한눈에 보이는 알림 배너 */}
+        {(stats.overview.pendingBalanceRequests ?? 0) > 0 ? (
+          <Link
+            href="/admin/balance-requests?status=PENDING"
+            className="mb-8 flex items-center justify-between rounded-2xl border-2 border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 px-6 py-5 shadow-md hover:shadow-lg transition-shadow"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500 text-2xl text-white shadow">
+                💳
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-700">확인이 필요한 충전 신청</p>
+                <p className="text-2xl font-bold text-amber-900">
+                  {stats.overview.pendingBalanceRequests}건 대기 중
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">
+              지금 확인하기 →
+            </span>
+          </Link>
+        ) : (
+          <Link
+            href="/admin/balance-requests"
+            className="mb-8 flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-6 py-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-xl">
+                💳
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">충전 신청 관리</p>
+                <p className="text-base font-semibold text-gray-800">대기 중인 신청이 없습니다</p>
+              </div>
+            </div>
+            <span className="text-sm font-medium text-purple-600 hover:text-purple-700">전체 보기 →</span>
+          </Link>
+        )}
 
         {/* 네비게이션 */}
         <div className="mb-8 flex flex-wrap gap-4">
@@ -297,12 +337,12 @@ export default function AdminDashboard() {
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{order.orderNumber}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {order.user.name}<br />
-                      <span className="text-xs text-gray-400">{order.user.email}</span>
+                      {order.user?.name || '비회원'}<br />
+                      <span className="text-xs text-gray-400">{order.user?.email || ''}</span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {order.items[0]?.product.name}
-                      {order.items.length > 1 && ` 외 ${order.items.length - 1}건`}
+                      {order.items?.[0]?.product?.name || order.items?.[0]?.productName || '주문 상품'}
+                      {(order.items?.length || 0) > 1 && ` 외 ${order.items.length - 1}건`}
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatPrice(order.total)}</td>
                     <td className="px-6 py-4">

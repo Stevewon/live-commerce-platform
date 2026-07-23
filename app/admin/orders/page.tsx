@@ -288,6 +288,10 @@ export default function AdminOrdersPage() {
               <span className="text-2xl">📦</span>
               <span>주문 관리</span>
             </Link>
+            <Link href="/admin/balance-requests" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
+              <span className="text-2xl group-hover:scale-110 transition-transform">💳</span>
+              <span>충전 신청</span>
+            </Link>
             <Link href="/admin/partners" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
               <span className="text-2xl group-hover:scale-110 transition-transform">🤝</span>
               <span>파트너 관리</span>
