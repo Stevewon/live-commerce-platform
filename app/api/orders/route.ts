@@ -391,6 +391,23 @@ export async function POST(req: NextRequest) {
     // QKEY 를 Firebase 에서 차감해야 하는 회원인지: qrchatUid + 지갑 존재 (B 회원 또는 지갑연결 A 회원)
     const usesFirebaseQkey: boolean = !!(qrchatUid && qrchatWallet && qrchatNick);
 
+    // ── [잔액 불일치 방지] B 회원(origin=QRCHAT) 인데 지갑/닉 누락으로 Firebase 차감이 불가능한 경우 ──
+    //   이런 계정은 쿠키(QKEY)를 로컬 D1 에서 차감하면 안 된다.
+    //   (조회는 큐알쳇 실시간, 차감은 로컬 → 큐톡/라이브 잔액이 어긋나는 사고 발생)
+    //   → 쿠키가 관여하는 결제(QKEY_BALANCE/SPLIT_BALANCE)는 명확히 막고 재로그인(연동복구)을 유도한다.
+    const originIsQrchat = String(userRow.origin || '').toUpperCase() === 'QRCHAT';
+    const qkeyInvolved = paymentMethod === 'QKEY_BALANCE' || paymentMethod === 'SPLIT_BALANCE';
+    if (originIsQrchat && qkeyInvolved && !usesFirebaseQkey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '큐알쳇 연동 정보가 확인되지 않아 쿠키 결제를 진행할 수 없습니다. 앱에서 다시 로그인한 뒤 시도해주세요.',
+          code: 'QRCHAT_LINK_INCOMPLETE',
+        },
+        { status: 409 }
+      );
+    }
+
     // ── [병행결제] 서버측 분할 금액 산정 ──────────────────────────────────
     //   ★ 사장님 확정 룰: "현금은 사용자가 직접 낼 금액을 정하고, 나머지를 쿠키로 채워 상품가를 맞춘다."
     //     1) 현금(KRW) = 사용자가 입력한 splitKrw (보유 현금·결제금액 이하로 clamp)
