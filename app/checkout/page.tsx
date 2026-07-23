@@ -291,7 +291,25 @@ export default function CheckoutPage() {
 
     // [v1.0.22] 잔액 부족 사전 차단 (서버에서도 재검증됨)
     if (!selectedEnough) {
-      const label = paymentMethod === 'KRW_BALANCE' ? t.checkout.krwBalance : t.checkout.qkeyBalance;
+      // [병행결제 유도] KRW 현금이 부족한데 쿠키(QKEY) 잔액이 있으면
+      //   → 무조건 충전페이지로 보내지 말고, 쿠키+현금 병행결제로 전환을 먼저 제안한다.
+      const hasCookies = (balance?.qkeyBalance ?? 0) > 0;
+      if (paymentMethod === 'KRW_BALANCE' && hasCookies) {
+        // 보유 쿠키를 최대한 쓰고 나머지를 현금으로 냈을 때 결제가 가능한지 계산
+        const coverableByCookie = maxSplitQkey * QKEY_RATE; // 쿠키로 낼 수 있는 최대 금액
+        const cashNeededAfterCookie = Math.max(0, finalAmount - coverableByCookie);
+        const canPayWithSplit = (balance?.krwBalance ?? 0) >= cashNeededAfterCookie;
+        if (canPayWithSplit) {
+          if (confirm(`현금 잔액이 부족합니다.\n보유하신 쿠키 ${maxSplitQkey.toLocaleString()}개(₩${coverableByCookie.toLocaleString()})와 현금 ₩${cashNeededAfterCookie.toLocaleString()}으로 병행결제하시겠습니까?`)) {
+            setPaymentMethod('SPLIT_BALANCE');
+            setSplitQkey(maxSplitQkey);
+          }
+          return;
+        }
+      }
+      const label = paymentMethod === 'KRW_BALANCE' ? t.checkout.krwBalance
+        : paymentMethod === 'QKEY_BALANCE' ? t.checkout.qkeyBalance
+        : '잔액';
       if (confirm(`${label}${t.checkout.insufficientConfirm}`)) {
         router.push('/my/balance');
       }
@@ -336,7 +354,12 @@ export default function CheckoutPage() {
 
       // [병행결제] SPLIT_BALANCE 인 경우 사용할 쿠키 개수 전달
       if (paymentMethod === 'SPLIT_BALANCE') {
-        orderData.splitQkey = usedQkey; // 서버가 나머지는 현금으로 자동 차감
+        // 방어: submit 시점 기준으로 실제 사용 가능한 쿠키를 재계산해 전달한다.
+        //   (usedQkey 가 어떤 이유로 0 이면 병행결제가 사실상 현금 100% 로 처리되어
+        //    "현금 부족" 으로 튕기는 문제를 원천 차단)
+        const safeUsedQkey = Math.max(0, Math.min(splitQkey || 0, maxSplitQkey));
+        const finalUsedQkey = safeUsedQkey > 0 ? safeUsedQkey : maxSplitQkey;
+        orderData.splitQkey = finalUsedQkey; // 서버가 나머지는 현금으로 자동 차감
       }
 
       // 쿠폰 적용

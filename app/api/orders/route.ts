@@ -401,6 +401,19 @@ export async function POST(req: NextRequest) {
       splitUsedQkey = Math.min(requested, maxByBalance, maxByTotal);
       if (splitUsedQkey < 0) splitUsedQkey = 0;
       splitKrwRemainder = Math.max(0, total - splitUsedQkey * QKEY_TO_KRW);
+
+      // [병행결제 자동 보정] 남은 현금이 현금 잔액보다 많아 결제가 불가능하지만,
+      //   쿠키(QKEY)를 더 써서 부족한 현금분을 메울 수 있다면 자동으로 쿠키 사용량을 늘린다.
+      //   → 사용자가 쿠키를 적게(또는 0으로) 요청해서 "현금 부족" 으로 튕기던 문제 방지.
+      if (splitKrwRemainder > currentKrw) {
+        const cashShortfall = splitKrwRemainder - currentKrw;           // 더 메워야 하는 현금
+        const extraQkeyNeeded = Math.ceil(cashShortfall / QKEY_TO_KRW); // 그만큼 필요한 추가 쿠키(올림)
+        const bumpedQkey = Math.min(splitUsedQkey + extraQkeyNeeded, maxByBalance, maxByTotal);
+        if (bumpedQkey > splitUsedQkey) {
+          splitUsedQkey = bumpedQkey;
+          splitKrwRemainder = Math.max(0, total - splitUsedQkey * QKEY_TO_KRW);
+        }
+      }
     }
 
     // 필요 금액 검증
