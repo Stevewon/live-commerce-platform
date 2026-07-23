@@ -5,17 +5,22 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
 // [상품 스냅샷] 상품 삭제/변경돼도 주문 상세에 상품명 유지
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
+// [QRChat 연동] B 회원 QKEY 는 Firebase 실쿠키에서 결제됨 → 취소 시 Firebase 로 되돌림.
+import { refundQkeyForQrlive } from '@/lib/qrchat-bridge';
 
 // [v1.0.22] 주문 취소/환불 시 결제했던 잔액을 원자적으로 환불 (중복 방지)
 // - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE / SPLIT_BALANCE 인 주문만 환불
 // - order.refundedAt 이 이미 있으면 재환불하지 않음 (멱등)
 // - Prisma 트랜잭션 tx 컨텍스트 내부에서 raw 로 처리하여 원자성 보장
 // - [병행결제] SPLIT_BALANCE 는 주문에 기록된 paidQkey/paidKrw 를 각각 되돌려준다.
+// - [QRChat 연동] B 회원(qrchatUser 전달) 의 QKEY 는 로컬 환불을 건너뛰고
+//   pendingFirebaseQkey 로 반환 → 호출부가 커밋 후 Firebase 로 재적립.
 async function refundOrderBalance(
   tx: any,
   order: { id: string; userId: string | null; paymentMethod: string | null; total: number; refundedAt: any; paidQkey?: number; paidKrw?: number },
-  reason: string
-): Promise<{ refunded: boolean; currency?: 'KRW' | 'QKEY' | 'SPLIT'; amount?: number; qkey?: number; krw?: number }> {
+  reason: string,
+  qrchatUser?: { uid: string; wallet: string; nick: string } | null
+): Promise<{ refunded: boolean; currency?: 'KRW' | 'QKEY' | 'SPLIT'; amount?: number; qkey?: number; krw?: number; pendingFirebaseQkey?: number }> {
   const method = order.paymentMethod || '';
   const isKrw = method === 'KRW_BALANCE';
   const isQkey = method === 'QKEY_BALANCE';
@@ -60,16 +65,23 @@ async function refundOrderBalance(
     );
   };
 
-  await refundOne('qkeyBalance', 'QKEY', refundQkey);
+  // [QRChat 연동] B 회원 QKEY 는 로컬 환불 건너뛰고 Firebase 재적립 대상으로 반환.
+  let pendingFirebaseQkey = 0;
+  if (qrchatUser && refundQkey > 0) {
+    pendingFirebaseQkey = refundQkey;
+  } else {
+    await refundOne('qkeyBalance', 'QKEY', refundQkey);
+  }
   await refundOne('krwBalance', 'KRW', refundKrw);
 
   if (isSplit) {
-    return { refunded: true, currency: 'SPLIT', amount: order.total, qkey: refundQkey, krw: refundKrw };
+    return { refunded: true, currency: 'SPLIT', amount: order.total, qkey: refundQkey, krw: refundKrw, pendingFirebaseQkey };
   }
   return {
     refunded: true,
     currency: isKrw ? 'KRW' : 'QKEY',
     amount: isKrw ? refundKrw : refundQkey,
+    pendingFirebaseQkey,
   };
 }
 
@@ -214,8 +226,29 @@ export async function PATCH(
       try { await ensureQtaColumn(await getD1()); } catch { /* 무시 */ }
     }
 
+    // [QRChat 연동] 취소/환불 시 이 주문 회원이 B 회원(qrchatUid+지갑+닉)인지 판정.
+    //   B 회원의 QKEY 는 Firebase 실쿠키에서 결제됐으므로 로컬 대신 Firebase 로 되돌린다.
+    let qrchatUser: { uid: string; wallet: string; nick: string } | null = null;
+    if ((isCancelling || isRefunding) && order.userId) {
+      try {
+        const uRows: any = await (await getD1())
+          .prepare(`SELECT "qrchatUid","securetQrUrl","nickname","name" FROM "User" WHERE "id" = ? LIMIT 1`)
+          .bind(order.userId)
+          .all();
+        const uRow = (uRows?.results && uRows.results[0]) || (Array.isArray(uRows) ? uRows[0] : null);
+        if (uRow) {
+          const uid = String(uRow.qrchatUid || '').trim();
+          const wallet = String(uRow.securetQrUrl || '').trim();
+          const nick = String(uRow.nickname || uRow.name || '').trim();
+          if (uid && wallet && nick) qrchatUser = { uid, wallet, nick };
+        }
+      } catch (e) {
+        console.warn('[관리자취소-환불] B회원 판정 조회 실패(로컬환불로 폴백):', e);
+      }
+    }
+
     // [v1.0.22] 재고 복구 + 잔액 환불 + 상태 변경을 하나의 트랜잭션으로 원자 처리
-    let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY' | 'SPLIT'; amount?: number; qkey?: number; krw?: number } = { refunded: false };
+    let refundResult: { refunded: boolean; currency?: 'KRW' | 'QKEY' | 'SPLIT'; amount?: number; qkey?: number; krw?: number; pendingFirebaseQkey?: number } = { refunded: false };
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
       // 1) 취소 시 재고 복구 (batch CASE WHEN — N+1 제거)
@@ -245,7 +278,8 @@ export async function PATCH(
             paidQkey: (order as any).paidQkey,
             paidKrw: (order as any).paidKrw,
           },
-          refundReason
+          refundReason,
+          qrchatUser
         );
         if (refundResult.refunded) {
           updateData.refundedAt = new Date().toISOString();
@@ -271,6 +305,39 @@ export async function PATCH(
         },
       });
     });
+
+    // [QRChat 연동] 커밋 후 B 회원 QKEY 를 Firebase 실쿠키로 되돌린다 (멱등: refund:orderId).
+    if ((isCancelling || isRefunding) && qrchatUser && (refundResult.pendingFirebaseQkey || 0) > 0) {
+      const fbQkey = refundResult.pendingFirebaseQkey as number;
+      try {
+        const r = await refundQkeyForQrlive({
+          uid: qrchatUser.uid,
+          wallet: qrchatUser.wallet,
+          nick: qrchatUser.nick,
+          amountQkey: fbQkey,
+          orderId: order.id,
+          idemKey: `refund:${order.id}`,
+        });
+        if (r && r.ok) {
+          try {
+            await (await getD1())
+              .prepare(
+                `INSERT INTO "BalanceLedger"
+                   ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+                 VALUES (?, ?, 'QKEY', ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`
+              )
+              .bind(newId(), order.userId, fbQkey, Number((r as any).newBalance) || 0, `${refundReason}(QRChat QKEY)`, order.id)
+              .run();
+          } catch (ledgerErr) {
+            console.warn('[관리자취소-환불] Firebase QKEY 원장 기록 실패(무시):', ledgerErr);
+          }
+        } else {
+          console.error('[관리자취소-환불] Firebase QKEY 재적립 실패:', (r as any)?.error);
+        }
+      } catch (e) {
+        console.error('[관리자취소-환불] refundQkeyForQrlive 예외:', e);
+      }
+    }
 
     const responseData: any = {
       success: true,

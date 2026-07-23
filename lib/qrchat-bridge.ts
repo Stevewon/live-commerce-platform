@@ -158,6 +158,36 @@ export async function spendQkeyForQrlive(p: SpendQkeyParams): Promise<SpendQkeyR
 }
 
 // ---------------------------------------------------------------------------
+// 2-B) QKEY 재적립 (주문 취소/환불 — Firebase 잔액으로 되돌림)
+//    spend 와 동일한 서명 규칙: HMAC(BRIDGE_SECRET, `${uid}|${wallet}|${nick}|${amountQkey}|${orderId}|${idemKey}`)
+//    ⚠️ 결제 시 Firebase 실쿠키에서 뺀 B 회원은 취소 시 반드시 이 함수로 되돌려야 한다.
+//    반환: { ok, newBalance, txId, idempotent }
+// ---------------------------------------------------------------------------
+export async function refundQkeyForQrlive(p: SpendQkeyParams): Promise<SpendQkeyResult> {
+  const uid = String(p.uid || '').trim();
+  const wallet = normWallet(p.wallet);
+  const nick = normNick(p.nick);
+  const amountQkey = Math.trunc(Number(p.amountQkey) || 0);
+  const orderId = String(p.orderId || '').trim();
+  const idemKey = String(p.idemKey || '').trim();
+
+  if (!uid || !wallet || !nick || amountQkey <= 0 || !orderId || !idemKey) {
+    return { ok: false, error: 'invalid_params' };
+  }
+  const signMsg = `${uid}|${wallet}|${nick}|${amountQkey}|${orderId}|${idemKey}`;
+  const sig = await hmacHex(getBridgeSecret(), signMsg);
+  return postJson('refundQkeyForQrlive', {
+    uid,
+    wallet,
+    nick,
+    amountQkey,
+    orderId,
+    idemKey,
+    sig,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 3) A 회원 지갑연결: 지갑+닉네임으로 QRChat uid 조회
 //    sig = HMAC(BRIDGE_SECRET, `${wallet}|${nick}`)
 //    반환: { ok, uid, nickname, walletAddress, qkeyBalance }
