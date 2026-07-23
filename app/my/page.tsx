@@ -303,6 +303,20 @@ export default function MyPage() {
               <div className="text-base sm:text-lg font-semibold text-purple-600">{t.myPage.settings} →</div>
             </div>
           </Link>
+
+          {/* QRChat 지갑 연결 (QKEY 결제) */}
+          <Link href="/my/link-qrchat" className="group">
+            <div className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl p-6 sm:p-8 hover:border-amber-500 hover:shadow-lg transition-all">
+              <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">🍪</div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 group-hover:text-amber-600 transition">
+                QRChat 지갑 연결
+              </h2>
+              <p className="text-gray-500 mb-3 sm:mb-4 text-sm sm:text-base">
+                QRChat 쿠키(QKEY)로 결제하기
+              </p>
+              <div className="text-base sm:text-lg font-semibold text-amber-600">연결하기 →</div>
+            </div>
+          </Link>
         </div>
 
         {/* Recent Orders */}

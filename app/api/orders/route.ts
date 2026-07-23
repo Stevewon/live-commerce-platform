@@ -7,7 +7,9 @@ import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notifica
 // [v1.0.22] 잔액 결제 시스템 통합
 import { getD1, krwToQkey, QKEY_TO_KRW, newId, qtaFromKrw, ensureQtaColumn } from '@/lib/balance';
 // [병행결제] Order 테이블 결제 분할 기록 컬럼 자동 보정
-import { ensureOrderPaymentColumns } from '@/lib/ensureProductColumns';
+import { ensureOrderPaymentColumns, ensureUserQrchatColumns } from '@/lib/ensureProductColumns';
+// [QRChat 연동] B 회원(origin=QRCHAT) QKEY 를 Firebase 에서 직접 차감
+import { spendQkeyForQrlive } from '@/lib/qrchat-bridge';
 // Cloudflare Workers compatible crypto
 
 // ─── 휴대전화번호 정규화 (KR) ───
@@ -347,8 +349,13 @@ export async function POST(req: NextRequest) {
     // [v1.0.22] 잔액 사전 확인 (트랜잭션 진입 전 빠른 실패)
     // 실제 차감은 트랜잭션 안에서 다시 원자적으로 수행
     const d1 = await getD1();
+    // [QRChat 연동] origin/qrchatUid 컬럼 보장 후, 출처 판별에 필요한 필드까지 조회
+    try { await ensureUserQrchatColumns(d1); } catch { /* 보정 실패해도 진행 */ }
     const userRow: any = await d1
-      .prepare(`SELECT "krwBalance","qkeyBalance" FROM "User" WHERE "id" = ? LIMIT 1`)
+      .prepare(
+        `SELECT "krwBalance","qkeyBalance","origin","qrchatUid","nickname","name","securetQrUrl"
+         FROM "User" WHERE "id" = ? LIMIT 1`
+      )
       .bind(userId)
       .first();
     if (!userRow) {
@@ -359,6 +366,19 @@ export async function POST(req: NextRequest) {
     }
     const currentKrw = Number(userRow.krwBalance) || 0;
     const currentQkey = Number(userRow.qkeyBalance) || 0;
+
+    // ── [QRChat 연동] B 회원 판별 ──────────────────────────────────────────
+    // 사장님 확정: origin="QRCHAT" 이고 qrchatUid+지갑(securetQrUrl)이 있으면
+    //   QKEY 는 쇼핑몰 자체 잔액이 아니라 QRChat(Firebase) 에서 "직접 차감((가))".
+    //   → 이 경우 로컬 qkeyBalance 대신 spendQkeyForQrlive 로 결제.
+    //   ⚠️ A 회원(origin=QRLIVE)은 지갑연결(qrchatUid 있음)이라도 origin 으로 구분되어
+    //      절대 다른 사람 QKEY 를 차감하지 않음. 단, A 회원이 명시적으로 지갑연결한
+    //      경우도 qrchatUid 로 본인 QRChat 잔액을 차감할 수 있음(사장님 답변 (2)).
+    const qrchatUid: string | null = userRow.qrchatUid || null;
+    const qrchatWallet: string = String(userRow.securetQrUrl || '').trim().toLowerCase();
+    const qrchatNick: string = String(userRow.nickname || userRow.name || '').trim();
+    // QKEY 를 Firebase 에서 차감해야 하는 회원인지: qrchatUid + 지갑 존재 (B 회원 또는 지갑연결 A 회원)
+    const usesFirebaseQkey: boolean = !!(qrchatUid && qrchatWallet && qrchatNick);
 
     // ── [병행결제] 서버측 분할 금액 산정 (신뢰: 클라이언트 splitQkey 는 참고값, 서버에서 재검증) ──
     // splitUsedQkey: 실제 사용할 쿠키 개수. 다음 세 값 중 최솟값으로 clamp.
@@ -388,6 +408,11 @@ export async function POST(req: NextRequest) {
           { status: 402 } // Payment Required
         );
       }
+    } else if (paymentMethod === 'QKEY_BALANCE' && usesFirebaseQkey) {
+      // [QRChat 연동] B 회원(또는 지갑연결 A 회원) → 로컬 잔액 대신 Firebase 잔액 사전 확인.
+      //   실제 차감은 주문 생성 후 spendQkeyForQrlive 트랜잭션에서 원자적으로 수행.
+      //   여기서는 사전 실패를 위해 link/verify 없이 스킵하고, 차감 단계에서 402 처리.
+      //   (Firebase 는 spend 시 잔액 부족을 insufficient_balance 로 반환)
     } else if (paymentMethod === 'QKEY_BALANCE') {
       // QKEY_BALANCE: total(KRW) 을 QKEY 로 환산 (올림하여 사용자 손해 방지)
       const requiredQkey = Math.ceil(total / QKEY_TO_KRW);
@@ -554,6 +579,10 @@ export async function POST(req: NextRequest) {
 
       if (paymentMethod === 'KRW_BALANCE') {
         await debitOneCurrency('krwBalance', 'KRW', total);
+      } else if (paymentMethod === 'QKEY_BALANCE' && usesFirebaseQkey) {
+        // [QRChat 연동] 로컬 QKEY 차감을 하지 않는다.
+        //   → 트랜잭션 커밋 후 spendQkeyForQrlive 로 Firebase 잔액에서 직접 차감.
+        //   (외부 HTTP 는 D1 트랜잭션 내부에서 부를 수 없으므로 커밋 후 보상방식 처리)
       } else if (paymentMethod === 'QKEY_BALANCE') {
         // QKEY 는 올림 환산 (사전 확인과 동일 규칙)
         await debitOneCurrency('qkeyBalance', 'QKEY', Math.ceil(total / QKEY_TO_KRW));
@@ -647,6 +676,75 @@ export async function POST(req: NextRequest) {
 
       return newOrder;
     });
+
+    // ── [QRChat 연동] B 회원 QKEY 결제: Firebase 잔액에서 직접 차감 ((가) 방식) ──
+    //   D1 트랜잭션 커밋 후 외부 HTTP 로 spendQkeyForQrlive 호출.
+    //   idemKey = order.id (주문당 1회) → 재시도/중복요청 안전.
+    //   실패 시 방금 생성한 주문을 삭제(보상)하고 402/409 로 반환.
+    //   ⚠️ 사장님 확정: uid+지갑+닉네임 3중 검증 후에만 차감 (다른 사람 QKEY 차감 방지).
+    if (paymentMethod === 'QKEY_BALANCE' && usesFirebaseQkey) {
+      const requiredQkey = Math.ceil(total / QKEY_TO_KRW);
+      let spend;
+      try {
+        spend = await spendQkeyForQrlive({
+          uid: qrchatUid as string,
+          wallet: qrchatWallet,
+          nick: qrchatNick,
+          amountQkey: requiredQkey,
+          orderId: order.id,
+          idemKey: order.id, // 주문당 멱등 키
+        });
+      } catch (e: any) {
+        spend = { ok: false, error: 'bridge_error' } as any;
+      }
+
+      if (!spend || !spend.ok) {
+        // 보상: 방금 만든 주문 롤백 (재고/쿠폰은 실패 확률 낮으나 주문 삭제로 표시)
+        try {
+          await d1.prepare(`DELETE FROM "Order" WHERE "id" = ?`).bind(order.id).run();
+          await d1.prepare(`DELETE FROM "OrderItem" WHERE "orderId" = ?`).bind(order.id).run();
+        } catch (delErr) {
+          console.error('[QRChat QKEY spend 실패 후 주문 롤백 실패]', delErr);
+        }
+        const err = String((spend as any)?.error || 'spend_failed');
+        const status =
+          err === 'insufficient_balance' ? 402
+          : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? 409
+          : err === 'user_not_found' ? 404
+          : err === 'banned' ? 403
+          : 502;
+        const msg =
+          err === 'insufficient_balance' ? 'QKEY 잔액이 부족합니다. QRChat 앱에서 잔액을 확인해주세요.'
+          : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? '본인확인 정보가 일치하지 않아 결제할 수 없습니다.'
+          : err === 'banned' ? '이용이 제한된 계정입니다.'
+          : err === 'user_not_found' ? 'QRChat 사용자 정보를 찾을 수 없습니다.'
+          : 'QKEY 결제 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        return NextResponse.json(
+          { success: false, error: msg, code: 'QRCHAT_QKEY_SPEND_FAILED', detail: err },
+          { status }
+        );
+      }
+
+      // 성공: 로컬 BalanceLedger 에 결제 기록 (표시용, 로컬 잔액은 건드리지 않음)
+      try {
+        await d1
+          .prepare(
+            `INSERT INTO "BalanceLedger"
+               ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
+             VALUES (?, ?, 'QKEY', ?, ?, '주문 결제(QRChat QKEY)', ?, NULL, CURRENT_TIMESTAMP)`
+          )
+          .bind(
+            newId(),
+            userId,
+            -requiredQkey,
+            Number((spend as any).newBalance) || 0,
+            order.id
+          )
+          .run();
+      } catch (ledgerErr) {
+        console.warn('[QRChat QKEY 원장 기록 실패(무시)]', ledgerErr);
+      }
+    }
 
     // 주문 확인 알림 전송
     sendOrderNotifications(order, userId || undefined, guestEmail || '', guestPhone || shippingPhone || '').catch(err => {

@@ -9,6 +9,7 @@
 let _supplyPriceColumnEnsured = false;
 let _productIndexesEnsured = false;
 let _orderPaymentColumnsEnsured = false;
+let _userQrchatColumnsEnsured = false;
 
 // D1 바인딩을 가져오는 함수 (lib/prisma.ts 와 동일 패턴)
 async function getD1(): Promise<any> {
@@ -114,5 +115,56 @@ export async function ensureOrderPaymentColumns(db?: any): Promise<void> {
     console.warn('[ensureOrderPaymentColumns] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
   } finally {
     _orderPaymentColumnsEnsured = true;
+  }
+}
+
+/**
+ * [QRChat 연동] User 테이블에 origin / qrchatUid 컬럼 보장.
+ *   - origin:    가입 출처 ("QRLIVE" | "QRCHAT"). 기본값 "QRLIVE" (기존 A 회원 보호).
+ *   - qrchatUid: QRChat 측 UID. B 회원 매칭 + A 회원 지갑연결에 사용. UNIQUE.
+ * 프로세스 당 1회만 시도. 이미 있으면 duplicate 에러를 무시한다. (멱등)
+ * ⚠️ 기존 A 회원은 origin 이 자동으로 "QRLIVE" 로 채워져 로그인/결제에 영향 없음.
+ */
+export async function ensureUserQrchatColumns(db?: any): Promise<void> {
+  if (_userQrchatColumnsEnsured) return;
+  const d1 = db || (await getD1());
+  if (!d1) return;
+  try {
+    const cols: any = await d1.prepare(`PRAGMA table_info("User")`).all();
+    const rows: any[] = cols?.results || cols || [];
+    const names = new Set((Array.isArray(rows) ? rows : []).map((r) => r && r.name));
+    const toAdd: string[] = [];
+    if (!names.has('origin')) {
+      toAdd.push(`ALTER TABLE "User" ADD COLUMN "origin" TEXT NOT NULL DEFAULT 'QRLIVE'`);
+    }
+    if (!names.has('qrchatUid')) {
+      // UNIQUE 제약은 ALTER 로 못 붙이므로 컬럼 추가 후 UNIQUE INDEX 로 보장
+      toAdd.push(`ALTER TABLE "User" ADD COLUMN "qrchatUid" TEXT`);
+    }
+    for (const sql of toAdd) {
+      try {
+        await d1.prepare(sql).run();
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (!/duplicate column|already exists/i.test(msg)) {
+          console.warn('[ensureUserQrchatColumns] ALTER 실패(무시):', msg);
+        }
+      }
+    }
+    // qrchatUid UNIQUE 인덱스 (NULL 은 SQLite 에서 UNIQUE 충돌 안 남)
+    try {
+      await d1
+        .prepare(`CREATE UNIQUE INDEX IF NOT EXISTS "User_qrchatUid_key" ON "User" ("qrchatUid")`)
+        .run();
+    } catch (e: any) {
+      const msg = String(e?.message || e || '');
+      if (!/already exists/i.test(msg)) {
+        console.warn('[ensureUserQrchatColumns] UNIQUE 인덱스 생성 실패(무시):', msg);
+      }
+    }
+  } catch (e: any) {
+    console.warn('[ensureUserQrchatColumns] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
+  } finally {
+    _userQrchatColumnsEnsured = true;
   }
 }
