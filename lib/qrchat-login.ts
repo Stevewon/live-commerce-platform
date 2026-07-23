@@ -16,6 +16,7 @@ import { cookies } from 'next/headers';
 import { getPrisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
+import { getD1 } from '@/lib/balance';
 import { normWallet, normNick } from '@/lib/qrchat-bridge';
 import { ensureUserQrchatColumns } from '@/lib/ensureProductColumns';
 
@@ -58,11 +59,70 @@ export async function loginQrchatIdentity(
   const prisma = await getPrisma();
   await ensureUserQrchatColumns();
 
-  // qrchatUid 우선 (가장 강한 키)
-  let user = await prisma.user.findFirst({ where: { qrchatUid } });
+  // ───────────────────────────────────────────────────────────────
+  // 계정 조회 — 사장님 확정 매칭키: "지갑주소(securetQrUrl) + 닉네임 동시일치".
+  //   같은 사람이 여러 번 로그인해도 항상 "동일 계정 1개"로 귀결되어야 한다.
+  //   (절대 중복 생성 금지 — 충전잔액이 딴 계정에 꽂히는 사고 방지)
+  //
+  // 조회 순서(모두 같은 사람으로 수렴):
+  //   1) qrchatUid 일치 (이미 연결된 계정)
+  //   2) 지갑(securetQrUrl) + 닉네임 동시일치 (매칭키)  ← 핵심
+  //   3) 지갑(securetQrUrl) 단독 일치 (닉만 바뀐 경우까지 흡수, 중복생성 방지)
+  // ───────────────────────────────────────────────────────────────
+  const db = await getD1();
 
-  // 없으면 자동 생성 (origin=QRCHAT). A 회원과 병합 금지.
-  if (!user) {
+  let row: any = null;
+  // 1) qrchatUid
+  row = await db
+    .prepare(`SELECT * FROM "User" WHERE "qrchatUid" = ? LIMIT 1`)
+    .bind(qrchatUid)
+    .first();
+
+  // 2) 지갑 + 닉네임 동시일치 (매칭키). securetQrUrl 에 지갑주소 저장됨.
+  if (!row) {
+    row = await db
+      .prepare(
+        `SELECT * FROM "User" WHERE LOWER("securetQrUrl") = ? AND "nickname" = ? LIMIT 1`
+      )
+      .bind(wallet, nickname)
+      .first();
+  }
+  // 2-b) name 필드에 원본 닉이 저장된 케이스(B회원 접미사 처리 흔적) 흡수
+  if (!row) {
+    row = await db
+      .prepare(
+        `SELECT * FROM "User" WHERE LOWER("securetQrUrl") = ? AND "name" = ? LIMIT 1`
+      )
+      .bind(wallet, nickname)
+      .first();
+  }
+  // 3) 지갑 단독 일치 (같은 지갑이면 동일인 — 중복 계정 생성 금지)
+  if (!row) {
+    row = await db
+      .prepare(`SELECT * FROM "User" WHERE LOWER("securetQrUrl") = ? LIMIT 1`)
+      .bind(wallet)
+      .first();
+  }
+
+  let user: any = row;
+
+  // 찾았으면: qrchatUid 가 비어있을 때만 채워 연결 안정화 (기존 잔액/origin 보존)
+  if (user) {
+    if (!user.qrchatUid) {
+      try {
+        await db
+          .prepare(
+            `UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`
+          )
+          .bind(qrchatUid, user.id)
+          .run();
+        user.qrchatUid = qrchatUid;
+      } catch {
+        /* qrchatUid unique 충돌 등은 무시 (이미 다른 곳에 연결) */
+      }
+    }
+  } else {
+    // 정말로 처음 보는 사람일 때만 신규 생성 (origin=QRCHAT)
     let uniqueNickname = nickname;
     const clash = await prisma.user.findUnique({ where: { nickname } });
     if (clash) {
