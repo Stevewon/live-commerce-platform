@@ -275,33 +275,33 @@ export default function AdminOrdersPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Premium Navigation */}
         <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-2xl p-3 inline-flex space-x-2 border border-gray-200">
-            <Link href="/admin" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">📊</span>
+          <div className="bg-white rounded-2xl shadow-2xl p-3 flex flex-wrap gap-2 border border-gray-200">
+            <Link href="/admin" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">📊</span>
               <span>대시보드</span>
             </Link>
-            <Link href="/admin/users" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">👥</span>
+            <Link href="/admin/users" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">👥</span>
               <span>회원 관리</span>
             </Link>
-            <Link href="/admin/orders" className="group px-8 py-4 bg-gradient-to-r from-blue-600 via-blue-700 to-cyan-700 text-white rounded-xl shadow-xl font-bold flex items-center space-x-2 ring-4 ring-blue-200 scale-105">
-              <span className="text-2xl">📦</span>
+            <Link href="/admin/orders" className="group px-4 py-2.5 bg-gradient-to-r from-blue-600 via-blue-700 to-cyan-700 text-white rounded-xl shadow-xl font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
+              <span className="text-lg">📦</span>
               <span>주문 관리</span>
             </Link>
-            <Link href="/admin/balance-requests" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">💳</span>
+            <Link href="/admin/balance-requests" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">💳</span>
               <span>충전 신청</span>
             </Link>
-            <Link href="/admin/partners" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">🤝</span>
+            <Link href="/admin/partners" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">🤝</span>
               <span>파트너 관리</span>
             </Link>
-            <Link href="/admin/products" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">🛍️</span>
+            <Link href="/admin/products" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">🛍️</span>
               <span>상품 관리</span>
             </Link>
-            <Link href="/admin/reports" className="group px-8 py-4 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-bold flex items-center space-x-2 hover:scale-105 duration-200">
-              <span className="text-2xl group-hover:scale-110 transition-transform">📈</span>
+            <Link href="/admin/reports" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
+              <span className="text-lg">📈</span>
               <span>매출 리포트</span>
             </Link>
           </div>
@@ -353,7 +353,7 @@ export default function AdminOrdersPage() {
                   setStatusFilter(status);
                   setPagination({ ...pagination, page: 1 });
                 }}
-                className={`px-8 py-4 rounded-2xl font-black transition-all duration-300 shadow-lg flex items-center space-x-2 ${
+                className={`px-4 py-2.5 rounded-2xl font-black transition-all duration-300 shadow-lg flex items-center space-x-2 ${
                   statusFilter === status
                     ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-cyan-700 text-white shadow-blue-300 scale-110 ring-4 ring-blue-200'
                     : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 hover:from-blue-50 hover:to-blue-100 hover:scale-105'
