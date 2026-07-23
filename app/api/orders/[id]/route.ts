@@ -346,7 +346,7 @@ export async function PATCH(
               .prepare(
                 `INSERT INTO "BalanceLedger"
                    ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
-                 VALUES (?, ?, 'QKEY', ?, ?, '주문 취소 환불(QRChat QKEY)', ?, NULL, CURRENT_TIMESTAMP)`
+                 VALUES (?, ?, 'QKEY', ?, ?, '주문 취소 환불', ?, NULL, CURRENT_TIMESTAMP)`
               )
               .bind(newId(), order.userId, firebaseRefundQkey, Number((r as any).newBalance) || 0, order.id)
               .run();
