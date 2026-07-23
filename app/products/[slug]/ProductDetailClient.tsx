@@ -360,8 +360,29 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
           </div>
         )}
 
-        {/* Breadcrumb */}
-        <nav className="text-sm text-gray-500 mb-4 flex items-center gap-2">
+        {/* Breadcrumb — 모바일: 컴팩트(뒤로+카테고리만), 데스크톱: 전체 경로 */}
+        {/* 모바일 전용: 상품명까지 넣으면 좁은 화면에서 줄이 밀려 상단이 지저분해짐 → 뒤로가기 + 카테고리만 */}
+        <nav className="sm:hidden mb-3 flex items-center gap-1.5 text-sm text-gray-600">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1 px-2 py-1 -ml-2 rounded-md hover:bg-gray-100 active:bg-gray-200 shrink-0"
+            aria-label="뒤로"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <Link
+            href={`/products?category=${product.category.slug}`}
+            className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 font-medium truncate max-w-[60%]"
+          >
+            {tr(product.category.name)}
+          </Link>
+        </nav>
+
+        {/* 데스크톱 전용: 전체 경로 */}
+        <nav className="hidden sm:flex text-sm text-gray-500 mb-4 items-center gap-2">
           <Link href="/products" className="hover:text-gray-700">홈</Link>
           <span>/</span>
           <Link href="/products" className="hover:text-gray-700">전체상품</Link>
