@@ -191,29 +191,38 @@ export async function GET(request: NextRequest) {
     }
 
     // 정렬 옵션 매핑
-    let orderBy: any = { createdAt: 'desc' }; // 기본: 최신순
+    // 사용자가 선택한 2차 정렬 기준(추천 고정 노출과 무관한 tie-breaker)
+    let secondaryOrder: any = { createdAt: 'desc' }; // 기본: 최신순
     switch (sort) {
       case 'price-low':
-        orderBy = { price: 'asc' };
+        secondaryOrder = { price: 'asc' };
         break;
       case 'price-high':
-        orderBy = { price: 'desc' };
+        secondaryOrder = { price: 'desc' };
         break;
       case 'newest':
-        orderBy = { createdAt: 'desc' };
+        secondaryOrder = { createdAt: 'desc' };
         break;
       case 'popular':
-        orderBy = { isFeatured: 'desc' }; // 추천 상품 우선 + 최신순
+        secondaryOrder = { createdAt: 'desc' }; // 추천 우선은 아래 공통 로직에서 처리, 그다음 최신순
         break;
       case 'discount':
-        orderBy = { comparePrice: 'desc' };
+        secondaryOrder = { comparePrice: 'desc' };
         break;
       case 'name':
-        orderBy = { name: 'asc' };
+        secondaryOrder = { name: 'asc' };
         break;
       default:
-        orderBy = { createdAt: 'desc' };
+        secondaryOrder = { createdAt: 'desc' };
     }
+
+    // [추천 상품 상단 고정] 관리자가 '추천 상품 (메인 노출)'을 체크한 상품은
+    // 어떤 정렬을 선택하더라도 항상 목록 최상단에 노출된다.
+    // (단, 이미 추천만 필터링한 경우 isFeatured 정렬은 의미 없으므로 2차 정렬만 사용)
+    const orderBy: any =
+      featured === 'true'
+        ? secondaryOrder
+        : [{ isFeatured: 'desc' }, secondaryOrder];
 
     // 브랜드 목록(필터 UI용)은 페이지/필터와 무관 → 프로세스 메모리 캐시 사용.
     // 캐시가 살아있으면 이 요청에선 distinct 쿼리를 아예 실행하지 않는다.
