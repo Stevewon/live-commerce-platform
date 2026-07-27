@@ -64,7 +64,17 @@ export async function GET(
         ...pp.product,
         customPrice: pp.customPrice,
         partnerProductId: pp.id,
-      }));
+      }))
+      // [추천 상품 상단 고정] '추천 상품 (메인 노출)' 체크된 상품을 항상 최상단에,
+      // 그 안에서는 최신순으로 노출한다.
+      .sort((a: any, b: any) => {
+        const fa = a.isFeatured ? 1 : 0;
+        const fb = b.isFeatured ? 1 : 0;
+        if (fa !== fb) return fb - fa; // 추천 상품 우선
+        const ta = new Date(a.createdAt || 0).getTime();
+        const tb = new Date(b.createdAt || 0).getTime();
+        return tb - ta; // 최신순
+      });
 
     return NextResponse.json({
       success: true,
