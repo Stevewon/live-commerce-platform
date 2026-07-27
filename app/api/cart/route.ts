@@ -24,6 +24,9 @@ export async function GET(request: NextRequest) {
               },
             },
           },
+          variant: {
+            select: { id: true, optionValues: true, price: true },
+          },
         },
         orderBy: {
           createdAt: 'desc',
@@ -55,6 +58,7 @@ export async function POST(request: NextRequest) {
       const userId = req.user!.userId;
       const body = await req.json();
       const { productId, quantity = 1 } = body;
+      const variantId: string | null = body.variantId || null;
       
       if (!productId) {
         return NextResponse.json(
@@ -66,9 +70,10 @@ export async function POST(request: NextRequest) {
         );
       }
       
-      // 상품 존재 확인
+      // 상품 존재 확인 (옵션 필수 검증을 위해 변형까지 조회)
       const product = await prisma.product.findUnique({
         where: { id: productId },
+        include: { variants: true },
       });
       
       if (!product) {
@@ -80,13 +85,31 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
+
+      // [옵션 필수] 옵션이 있는 상품은 반드시 옵션(변형)을 선택해야 장바구니 담기 가능
+      const productVariants: any[] = Array.isArray((product as any).variants) ? (product as any).variants : [];
+      const optionRequired = !!(product as any).hasOptions && productVariants.length > 0;
+      if (optionRequired) {
+        if (!variantId) {
+          return NextResponse.json(
+            { success: false, error: '옵션을 선택해주세요.', code: 'OPTION_REQUIRED' },
+            { status: 400 }
+          );
+        }
+        if (!productVariants.some((v) => v.id === variantId)) {
+          return NextResponse.json(
+            { success: false, error: '선택한 옵션을 찾을 수 없습니다.', code: 'OPTION_INVALID' },
+            { status: 400 }
+          );
+        }
+      }
       
-      // 이미 장바구니에 있는지 확인
+      // 이미 장바구니에 있는지 확인 (같은 상품+같은 옵션이면 수량 합산)
       const existingItem = await prisma.cartItem.findFirst({
         where: {
           userId,
           productId,
-          variantId: null,
+          variantId: variantId,
         },
       });
       
@@ -111,6 +134,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId,
             productId,
+            variantId,
             quantity,
           },
           include: {

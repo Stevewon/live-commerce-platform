@@ -240,7 +240,8 @@ export async function POST(req: NextRequest) {
     // 상품 가격 검증
     const productIds = items.map((item: any) => item.productId);
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds } }
+      where: { id: { in: productIds } },
+      include: { variants: true }, // [옵션] 옵션 필수 검증 + 변형가/옵션 스냅샷용
     });
 
     let subtotal = 0;
@@ -250,6 +251,8 @@ export async function POST(req: NextRequest) {
       price: number;
       productName: string;
       productThumbnail: string | null;
+      variantId?: string | null;
+      optionValues?: string | null;
     }> = [];
 
     // 파트너 스토어를 통한 주문인 경우 partnerId 확인
@@ -264,23 +267,51 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (product.stock < item.quantity) {
+      // ── [옵션 필수] 옵션이 있는 상품은 반드시 옵션(변형)을 선택해야 주문 가능 ──
+      //   서버측에서도 강제(클라이언트 우회 방지). 사장님 요청사항.
+      const productVariants: any[] = Array.isArray((product as any).variants) ? (product as any).variants : [];
+      const optionRequired = !!(product as any).hasOptions && productVariants.length > 0;
+      let chosenVariant: any = null;
+      if (optionRequired) {
+        if (!item.variantId) {
+          return NextResponse.json(
+            { success: false, error: `${product.name}의 옵션을 선택해주세요.`, code: 'OPTION_REQUIRED' },
+            { status: 400 }
+          );
+        }
+        chosenVariant = productVariants.find((v) => v.id === item.variantId) || null;
+        if (!chosenVariant) {
+          return NextResponse.json(
+            { success: false, error: `${product.name}의 선택한 옵션을 찾을 수 없습니다.`, code: 'OPTION_INVALID' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // 재고 확인: 옵션(변형) 선택 시 변형 재고, 아니면 상품 재고
+      const availableStock = chosenVariant ? Number(chosenVariant.stock) || 0 : product.stock;
+      if (availableStock < item.quantity) {
         return NextResponse.json(
           { success: false, error: `${product.name}의 재고가 부족합니다` },
           { status: 400 }
         );
       }
 
-      const itemTotal = product.price * item.quantity;
+      // 단가: 옵션(변형)에 별도 가격이 있으면 그 가격, 없으면 상품 기본가
+      const unitPrice = chosenVariant && chosenVariant.price != null ? Number(chosenVariant.price) : product.price;
+      const itemTotal = unitPrice * item.quantity;
       subtotal += itemTotal;
 
       validatedItems.push({
         productId: product.id,
         quantity: item.quantity,
-        price: product.price,
+        price: unitPrice,
         // ★ 주문 시점 상품 스냅샷 (상품 삭제/변경돼도 주문내역/배송 유지)
         productName: product.name,
         productThumbnail: (product as any).thumbnail || null,
+        // [옵션] 변형 ID + 주문 시점 옵션값 스냅샷 (주문서 엑셀/배송에 옵션 표시용)
+        variantId: chosenVariant ? chosenVariant.id : null,
+        optionValues: chosenVariant ? (chosenVariant.optionValues || null) : null,
       });
     }
 
@@ -724,6 +755,29 @@ export async function POST(req: NextRequest) {
         // WHERE 절에 동일 productIds 바인딩
         const sql = `UPDATE "Product" SET stock = CASE id ${caseParts.join(' ')} ELSE stock END, "updatedAt" = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`;
         await tx.$executeRawUnsafe(sql, ...params, ...productIds);
+      }
+
+      // [옵션] 변형(ProductVariant) 재고도 차감 — 옵션 선택 주문의 경우
+      const variantDecrementMap = new Map<string, number>();
+      for (const item of validatedItems) {
+        const qty = Number(item.quantity);
+        if (!item.variantId || !Number.isFinite(qty) || qty <= 0) continue;
+        variantDecrementMap.set(
+          item.variantId,
+          (variantDecrementMap.get(item.variantId) || 0) + qty
+        );
+      }
+      if (variantDecrementMap.size > 0) {
+        const vIds = Array.from(variantDecrementMap.keys());
+        const vCaseParts: string[] = [];
+        const vParams: any[] = [];
+        for (const [vid, qty] of variantDecrementMap.entries()) {
+          vCaseParts.push(`WHEN ? THEN stock - ?`);
+          vParams.push(vid, qty);
+        }
+        const vPlaceholders = vIds.map(() => '?').join(',');
+        const vSql = `UPDATE "ProductVariant" SET stock = CASE id ${vCaseParts.join(' ')} ELSE stock END, "updatedAt" = CURRENT_TIMESTAMP WHERE id IN (${vPlaceholders})`;
+        await tx.$executeRawUnsafe(vSql, ...vParams, ...vIds);
       }
 
       // 쿠폰 사용 횟수 증가
