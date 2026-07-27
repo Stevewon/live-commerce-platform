@@ -18,6 +18,8 @@ interface CartItem {
   id: string;
   productId: string;
   quantity: number;
+  variantId?: string | null;      // [옵션] 선택한 변형 ID
+  optionLabel?: string | null;    // [옵션] 화면 표시용 옵션 라벨 (예: "색상: 빨강 / 사이즈: L")
   product: {
     id: string;
     name: string;
@@ -36,6 +38,23 @@ interface CouponData {
   minAmount: number | null;
   maxDiscount: number | null;
   discountAmount: number;
+}
+
+// [옵션] 변형 optionValues JSON 을 "색상: 빨강 / 사이즈: L" 라벨로 변환
+function buildOptionLabel(raw: any): string | null {
+  if (!raw) return null;
+  try {
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      const parts = Object.entries(obj)
+        .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+        .map(([k, v]) => `${k}: ${v}`);
+      return parts.length ? parts.join(' / ') : null;
+    }
+    return String(obj) || null;
+  } catch {
+    return typeof raw === 'string' ? raw : null;
+  }
 }
 
 export default function CheckoutPage() {
@@ -155,6 +174,8 @@ export default function CheckoutPage() {
             id: 'buynow-0',
             productId: buyNowItem.productId,
             quantity: buyNowItem.quantity,
+            variantId: buyNowItem.variantId || null,
+            optionLabel: buyNowItem.optionLabel || null,
             product: buyNowItem.product,
           }]);
           sessionStorage.removeItem('buyNowItem');
@@ -197,7 +218,13 @@ export default function CheckoutPage() {
       const res = await authFetch('/api/cart');
       if (res.ok) {
         const data = await res.json();
-        const serverItems = data.data || [];
+        const rawItems = data.data || [];
+        // [옵션] 서버 카트 아이템의 variant 를 화면 표시용 라벨로 변환
+        const serverItems = rawItems.map((it: any) => ({
+          ...it,
+          variantId: it.variantId || it.variant?.id || null,
+          optionLabel: buildOptionLabel(it.variant?.optionValues),
+        }));
         setCartItems(serverItems);
         if (serverItems.length === 0) {
           const guestItems = getGuestCart();
@@ -356,6 +383,7 @@ export default function CheckoutPage() {
           productId: item.productId,
           quantity: item.quantity,
           price: item.product.price,
+          variantId: item.variantId || null, // [옵션] 선택한 변형 ID (서버가 가격/재고/스냅샷 처리)
         })),
         shippingName,
         shippingPhone,
@@ -633,6 +661,9 @@ export default function CheckoutPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-gray-900 line-clamp-2">{tr(item.product.name)}</h3>
+                        {item.optionLabel && (
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">옵션: {item.optionLabel}</p>
+                        )}
                         <p className="text-sm text-gray-600">₩{item.product.price.toLocaleString()} x {item.quantity}{t.checkout.itemsCount}</p>
                       </div>
                       <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">

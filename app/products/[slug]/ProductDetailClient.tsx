@@ -245,8 +245,21 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     ? (safeReviews.reduce((s, r) => s + (r.rating || 0), 0) / safeReviews.length).toFixed(1)
     : null;
 
+  // 옵션이 있는 상품인지 (옵션 선택 필수 판정)
+  const optionRequired = !!(product.hasOptions && Array.isArray(product.variants) && product.variants.length > 0);
+
   const handleAddToCart = async () => {
     if (currentStock <= 0) return;
+    // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 담기/구매 가능
+    if (optionRequired && !selectedVariant) {
+      setCartMessage('옵션을 선택해주세요.');
+      setTimeout(() => setCartMessage(''), 3000);
+      // 옵션 영역으로 스크롤 (사용자가 어디를 골라야 하는지 바로 보이도록)
+      if (typeof document !== 'undefined') {
+        document.getElementById('product-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
     setAddingToCart(true);
     setCartMessage('');
 
@@ -306,11 +319,31 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   };
 
   const handleBuyNow = async () => {
+    // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 구매 가능
+    if (optionRequired && !selectedVariant) {
+      setCartMessage('옵션을 선택해주세요.');
+      setTimeout(() => setCartMessage(''), 3000);
+      if (typeof document !== 'undefined') {
+        document.getElementById('product-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
     // 바로구매: 장바구니에 넣지 않고 sessionStorage에 바로구매 상품만 저장 후 checkout으로 이동
+    let optionLabel: string | null = null;
+    if (selectedVariant) {
+      try {
+        const ov = JSON.parse(selectedVariant.optionValues);
+        optionLabel = Object.entries(ov)
+          .filter(([, v]) => v != null && String(v).trim() !== '')
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(' / ') || null;
+      } catch { optionLabel = null; }
+    }
     const buyNowItem = {
       productId: product.id,
       quantity,
       variantId: selectedVariant?.id || null,
+      optionLabel,
       product: {
         id: product.id,
         name: product.name,
@@ -513,8 +546,13 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
 
             {/* Product Variants / Options */}
             {product.hasOptions && product.variants && product.variants.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700">옵션 선택</h3>
+              <div id="product-options" className="space-y-3 scroll-mt-20">
+                <h3 className="text-sm font-semibold text-gray-700">
+                  옵션 선택 <span className="text-red-500">*</span>
+                  {optionRequired && !selectedVariant && (
+                    <span className="ml-2 text-xs font-normal text-red-500">옵션을 선택해주세요</span>
+                  )}
+                </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {product.variants.map((variant) => {
                     let optVals: Record<string, string> = {};

@@ -24,6 +24,48 @@ function escapeCsvCell(value: string | number | null | undefined): string {
   return str;
 }
 
+// 연락처를 010-1234-5678 형태로 포맷 (숫자만 추출 후 하이픈 삽입)
+//   - Excel 이 앞 0 을 떼먹지 않도록 하이픈 포함 문자열로 내보낸다.
+//   - 자릿수가 예상과 다르면(대표번호/국제번호 등) 원본을 그대로 반환한다.
+function formatPhone(value: string | null | undefined): string {
+  if (!value) return '';
+  const digits = String(value).replace(/[^0-9]/g, '');
+  if (!digits) return String(value);
+  // 휴대폰 010/011 등 11자리: 3-4-4
+  if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  // 10자리: 지역번호(02) 서울 → 2-4-4, 그 외 → 3-3-4
+  if (digits.length === 10) {
+    if (digits.startsWith('02')) return `${digits.slice(0, 2)}-${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  // 서울 02 국번 9자리: 2-3-4
+  if (digits.length === 9 && digits.startsWith('02')) {
+    return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`;
+  }
+  // 그 외 자릿수는 원본(숫자) 그대로
+  return digits;
+}
+
+// OrderItem 의 옵션값 스냅샷(JSON) 을 "색상: 빨강 / 사이즈: L" 형태 문자열로 변환
+function formatOptionValues(item: any): string {
+  const raw = item?.optionValues;
+  if (!raw) return '';
+  try {
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      const parts = Object.entries(obj)
+        .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+        .map(([k, v]) => `${k}: ${v}`);
+      return parts.join(' / ');
+    }
+    // 객체가 아니면(문자열 등) 그대로 표시
+    return String(obj);
+  } catch {
+    // JSON 이 아니면 원본 문자열 그대로
+    return String(raw);
+  }
+}
+
 // GET /api/admin/orders/export - 주문 목록 엑셀(CSV) 다운로드
 export async function GET(req: NextRequest) {
   const prisma = await getPrisma();
@@ -141,6 +183,7 @@ export async function GET(req: NextRequest) {
       '우편번호',
       '배송메모',
       '상품명',
+      '옵션',
       '상품수량',
       '상품단가',
       '상품소계',
@@ -188,15 +231,16 @@ export async function GET(req: NextRequest) {
           STATUS_LABELS[order.status] || order.status,
           customerName,
           customerEmail,
-          customerPhone,
+          formatPhone(customerPhone),
           order.guestEmail || '',
-          order.guestPhone || '',
+          formatPhone(order.guestPhone),
           order.shippingName || '',
-          order.shippingPhone || '',
+          formatPhone(order.shippingPhone),
           order.shippingAddress || '',
           order.shippingZipCode || '',
           order.shippingMemo || '',
           '', // 상품명
+          '', // 옵션
           '', // 수량
           '', // 단가
           '', // 소계
@@ -223,15 +267,16 @@ export async function GET(req: NextRequest) {
             idx === 0 ? (STATUS_LABELS[order.status] || order.status) : '',
             idx === 0 ? customerName : '',
             idx === 0 ? customerEmail : '',
-            idx === 0 ? customerPhone : '',
+            idx === 0 ? formatPhone(customerPhone) : '',
             idx === 0 ? (order.guestEmail || '') : '',
-            idx === 0 ? (order.guestPhone || '') : '',
+            idx === 0 ? formatPhone(order.guestPhone) : '',
             idx === 0 ? (order.shippingName || '') : '',
-            idx === 0 ? (order.shippingPhone || '') : '',
+            idx === 0 ? formatPhone(order.shippingPhone) : '',
             idx === 0 ? (order.shippingAddress || '') : '',
             idx === 0 ? (order.shippingZipCode || '') : '',
             idx === 0 ? (order.shippingMemo || '') : '',
             item.product?.name || item.productName || '주문 상품',
+            formatOptionValues(item),
             item.quantity || 0,
             item.price || 0,
             (item.price || 0) * (item.quantity || 0),
