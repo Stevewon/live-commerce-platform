@@ -30,11 +30,13 @@ interface Balance {
   krwBalance: number;
   qkeyBalance: number;
   qkeyBalanceInKrw: number;
+  qtaBalance: number;
+  qtaBalanceInKrw: number;
 }
 
 interface LedgerRow {
   id: string;
-  currency: 'KRW' | 'QKEY';
+  currency: 'KRW' | 'QKEY' | 'QTA';
   amount: number;
   balanceAfter: number;
   reason: string;
@@ -210,8 +212,8 @@ export default function BalancePage() {
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">💰 {t.balance.title}</h1>
 
-        {/* 잔액 카드 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        {/* 잔액 카드 (모바일: 세로 1열 / PC: 3열) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
             <div className="text-sm text-gray-500 mb-1">{t.balance.krwBalance}</div>
             <div className="text-3xl font-bold text-blue-600">
@@ -225,6 +227,19 @@ export default function BalancePage() {
             </div>
             {!loading && (
               <div className="text-xs text-gray-400 mt-1">≈ ₩{(balance?.qkeyBalanceInKrw ?? 0).toLocaleString()} ({t.checkout.qkeyRate})</div>
+            )}
+          </div>
+          {/* QTA 적립 보유량 카드 (구매 적립 현황) */}
+          <div className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-6 border border-amber-200 shadow-sm">
+            <div className="text-sm text-amber-700 mb-1 flex items-center gap-1">
+              <span>🎁</span>
+              <span>{t.balance.qtaBalance}</span>
+            </div>
+            <div className="text-3xl font-bold text-amber-600">
+              {loading ? '...' : `${(balance?.qtaBalance ?? 0).toLocaleString()} QTA`}
+            </div>
+            {!loading && (
+              <div className="text-xs text-amber-500/80 mt-1">≈ ₩{(balance?.qtaBalanceInKrw ?? 0).toLocaleString()} ({t.balance.qtaRate})</div>
             )}
           </div>
         </div>
