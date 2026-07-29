@@ -261,6 +261,10 @@ export default function AdminDashboardPage() {
               <span className="text-lg">📦</span>
               <span>주문 관리</span>
             </Link>
+            <Link href="/admin/inquiries" className="group px-4 py-2.5 text-white bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
+              <span className="text-lg">💬</span>
+              <span>고객 문의</span>
+            </Link>
             <Link href="/admin/partners" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
               <span className="text-lg">🤝</span>
               <span>파트너 관리</span>
@@ -525,6 +529,12 @@ export default function AdminDashboardPage() {
             <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">💳</div>
             <h3 className="font-black text-xl text-white">무통장입금 승인</h3>
             <p className="text-sm text-emerald-50 mt-2">입금 확인 → 잔액 충전 승인</p>
+          </Link>
+
+          <Link href="/admin/inquiries" className="group bg-gradient-to-br from-rose-500 to-pink-600 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all text-center border-2 border-transparent hover:border-pink-300 hover:scale-105 duration-300">
+            <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">💬</div>
+            <h3 className="font-black text-xl text-white">고객 문의</h3>
+            <p className="text-sm text-pink-50 mt-2">문의 확인 → 답변 작성</p>
           </Link>
         </div>
       </div>
