@@ -4,11 +4,9 @@
  * - POST : 문의 작성 (회원/비회원 모두 가능)
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getD1, ensureInquiryTable } from '@/lib/balance';
-
-const prisma = new PrismaClient();
 
 // 로그인 사용자 식별(옵셔널). 토큰 없거나 무효면 null 반환(에러 아님).
 async function getOptionalUser(req: NextRequest) {
@@ -24,6 +22,7 @@ async function getOptionalUser(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     await ensureInquiryTable(await getD1());
+    const prisma = await getPrisma();
 
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get('productId');
@@ -96,6 +95,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await ensureInquiryTable(await getD1());
+    const prisma = await getPrisma();
 
     const body = await req.json().catch(() => ({}));
     const productId: string | null = body.productId || null;
