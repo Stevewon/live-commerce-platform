@@ -4,11 +4,9 @@
  * - PATCH : 답변 작성/수정 (status → ANSWERED)
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getD1, ensureInquiryTable } from '@/lib/balance';
-
-const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,6 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     await ensureInquiryTable(await getD1());
+    const prisma = await getPrisma();
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status'); // PENDING | ANSWERED | (all)
@@ -90,6 +89,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     await ensureInquiryTable(await getD1());
+    const prisma = await getPrisma();
 
     const body = await req.json().catch(() => ({}));
     const id = String(body.id || '').trim();

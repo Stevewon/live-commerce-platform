@@ -135,7 +135,8 @@ function convertRow(row: any): any {
   for (const [key, value] of Object.entries(row)) {
     // SQLite stores booleans as 0/1
     if (key === 'isActive' || key === 'isFeatured' || key === 'isLive' || 
-        key === 'isRead' || key === 'isDeleted' || key === 'isReported' || key === 'hasOptions') {
+        key === 'isRead' || key === 'isDeleted' || key === 'isReported' || key === 'hasOptions' ||
+        key === 'isSecret') {
       result[key] = value === 1 || value === true;
     } else {
       result[key] = value;
@@ -628,6 +629,7 @@ const RELATIONS: Record<string, Record<string, { table: string; foreignKey: stri
     orders: { table: 'Order', foreignKey: 'userId', type: 'many' },
     cartItems: { table: 'CartItem', foreignKey: 'userId', type: 'many' },
     notifications: { table: 'Notification', foreignKey: 'userId', type: 'many' },
+    inquiries: { table: 'Inquiry', foreignKey: 'userId', type: 'many' },
   },
   Product: {
     category: { table: 'Category', foreignKey: 'categoryId', type: 'one' },
@@ -635,6 +637,7 @@ const RELATIONS: Record<string, Record<string, { table: string; foreignKey: stri
     partnerProducts: { table: 'PartnerProduct', foreignKey: 'productId', type: 'many' },
     reviews: { table: 'Review', foreignKey: 'productId', type: 'many' },
     orderItems: { table: 'OrderItem', foreignKey: 'productId', type: 'many' },
+    inquiries: { table: 'Inquiry', foreignKey: 'productId', type: 'many' },
   },
   ProductVariant: {
     product: { table: 'Product', foreignKey: 'productId', type: 'one' },
@@ -697,6 +700,10 @@ const RELATIONS: Record<string, Record<string, { table: string; foreignKey: stri
   },
   Coupon: {
     orders: { table: 'Order', foreignKey: 'couponId', type: 'many' },
+  },
+  Inquiry: {
+    product: { table: 'Product', foreignKey: 'productId', type: 'one' },
+    user: { table: 'User', foreignKey: 'userId', type: 'one' },
   },
 };
 
@@ -840,6 +847,7 @@ function createDbProxy(db: D1DB) {
     liveChat: 'LiveChat',
     productVariant: 'ProductVariant',
     siteSetting: 'SiteSetting',
+    inquiry: 'Inquiry',
   };
   
   const proxy: any = {
