@@ -265,6 +265,10 @@ export default function AdminDashboardPage() {
               <span className="text-lg">💬</span>
               <span>고객 문의</span>
             </Link>
+            <Link href="/admin/japan-shipping" className="group px-4 py-2.5 text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
+              <span className="text-lg">🚢</span>
+              <span>일본 배송비</span>
+            </Link>
             <Link href="/admin/partners" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
               <span className="text-lg">🤝</span>
               <span>파트너 관리</span>
@@ -535,6 +539,12 @@ export default function AdminDashboardPage() {
             <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">💬</div>
             <h3 className="font-black text-xl text-white">고객 문의</h3>
             <p className="text-sm text-pink-50 mt-2">문의 확인 → 답변 작성</p>
+          </Link>
+
+          <Link href="/admin/japan-shipping" className="group bg-gradient-to-br from-sky-500 to-blue-600 rounded-3xl shadow-xl p-8 hover:shadow-2xl transition-all text-center border-2 border-transparent hover:border-blue-300 hover:scale-105 duration-300">
+            <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">🚢</div>
+            <h3 className="font-black text-xl text-white">일본 배송비</h3>
+            <p className="text-sm text-blue-50 mt-2">도도부현별 해외배송비 관리</p>
           </Link>
         </div>
       </div>

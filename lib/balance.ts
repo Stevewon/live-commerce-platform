@@ -278,3 +278,35 @@ export async function ensureInquiryTable(db: any): Promise<void> {
     _inquiryTableEnsured = true;
   }
 }
+
+let _japanShippingTableEnsured = false;
+/**
+ * JapanShippingFee(일본 도도부현별 해외배송비) 테이블 보장 (없으면 CREATE TABLE).
+ * 어드민이 원(KRW)으로 현별 배송비를 저장한다. prefectureCode 는 lib/japan-prefectures 의 code(01~47).
+ * (프로덕션 D1 런타임 멱등 생성)
+ */
+export async function ensureJapanShippingTable(db: any): Promise<void> {
+  if (_japanShippingTableEnsured) return;
+  if (!db) return;
+  try {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS "JapanShippingFee" (
+          "id" TEXT PRIMARY KEY,
+          "prefectureCode" TEXT NOT NULL UNIQUE,
+          "prefectureKo" TEXT NOT NULL,
+          "prefectureJa" TEXT NOT NULL,
+          "feeKrw" INTEGER NOT NULL DEFAULT 0,
+          "isActive" INTEGER NOT NULL DEFAULT 1,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`
+      )
+      .run();
+    try { await db.prepare(`CREATE INDEX IF NOT EXISTS "JapanShippingFee_prefectureCode_idx" ON "JapanShippingFee" ("prefectureCode")`).run(); } catch {}
+  } catch (e: any) {
+    console.warn('[ensureJapanShippingTable] CREATE TABLE 실패(무시):', String(e?.message || e || ''));
+  } finally {
+    _japanShippingTableEnsured = true;
+  }
+}

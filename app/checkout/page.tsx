@@ -77,6 +77,14 @@ export default function CheckoutPage() {
   const [shippingZipCode, setShippingZipCode] = useState('');
   const [shippingMemo, setShippingMemo] = useState('');
 
+  // [해외배송] 배송 국가 (KR=국내 무료 / JP=일본 해외배송)
+  const [shippingCountry, setShippingCountry] = useState<'KR' | 'JP'>('KR');
+  const [shippingPrefecture, setShippingPrefecture] = useState<string>(''); // 일본 도도부현 코드(01~47)
+  const [jpPrefectures, setJpPrefectures] = useState<
+    Array<{ code: string; ko: string; ja: string; region: string; feeKrw: number; feeJpy: number }>
+  >([]);
+  const [jpRate, setJpRate] = useState<number>(0.11);
+
   // 비회원 추가 정보
   const [guestEmail, setGuestEmail] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
@@ -139,6 +147,20 @@ export default function CheckoutPage() {
       })
       .catch(() => {});
   }, []);
+
+  // [해외배송] 일본 도도부현 목록 로드 (일본 선택 시)
+  useEffect(() => {
+    if (shippingCountry !== 'JP' || jpPrefectures.length > 0) return;
+    fetch('/api/settings/japan-shipping')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setJpPrefectures(data.data.prefectures || []);
+          setJpRate(data.data.rate || 0.11);
+        }
+      })
+      .catch(() => {});
+  }, [shippingCountry, jpPrefectures.length]);
 
   // [v1.0.22] 로그인 사용자 잔액 로드 (KRW / QKEY)
   useEffect(() => {
@@ -278,8 +300,12 @@ export default function CheckoutPage() {
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity, 0
   );
-  // [정책] 전 상품 무조건 무료배송 — 가격과 무관하게 배송비 항상 0원
-  const shippingFee = 0;
+  // [정책] 국내(KR)는 전 상품 무조건 무료배송. 일본(JP)은 선택한 도도부현의 해외배송비 부과.
+  const selectedJpPref = jpPrefectures.find((p) => p.code === shippingPrefecture) || null;
+  const shippingFee =
+    shippingCountry === 'JP' && selectedJpPref ? selectedJpPref.feeKrw : 0;
+  const shippingFeeJpy =
+    shippingCountry === 'JP' && selectedJpPref ? selectedJpPref.feeJpy : 0;
   const couponDiscount = appliedCoupon?.discountAmount || 0;
   const finalAmount = Math.max(0, totalAmount + shippingFee - couponDiscount);
 
@@ -329,6 +355,11 @@ export default function CheckoutPage() {
 
     if (!shippingName || !shippingPhone || !shippingAddress) {
       alert(t.checkout.fillShipping);
+      return;
+    }
+    // [해외배송] 일본 선택 시 지역(도도부현) 필수
+    if (shippingCountry === 'JP' && !shippingPrefecture) {
+      alert('일본 배송 지역(도도부현)을 선택해주세요.');
       return;
     }
     if (cartItems.length === 0) {
@@ -393,6 +424,9 @@ export default function CheckoutPage() {
         // [v1.0.22] 잔액 결제수단: KRW_BALANCE | QKEY_BALANCE | SPLIT_BALANCE
         paymentMethod,
         shippingFee,
+        // [해외배송] 배송 국가/지역. 서버가 이 값으로 배송비를 재계산·검증한다.
+        shippingCountry,
+        shippingPrefecture: shippingCountry === 'JP' ? shippingPrefecture : null,
       };
 
       // [병행결제] SPLIT_BALANCE: 사용자가 직접 정한 "현금 금액" 을 서버로 보낸다.
@@ -582,6 +616,68 @@ export default function CheckoutPage() {
                   <span>🚚</span> {t.checkout.deliveryInfo}
                 </h2>
                 <div className="space-y-4">
+                  {/* [해외배송] 배송 국가 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      배송 국가 <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <button type="button"
+                        onClick={() => { setShippingCountry('KR'); setShippingPrefecture(''); }}
+                        className={`flex-1 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
+                          shippingCountry === 'KR'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}>
+                        🇰🇷 국내 (무료배송)
+                      </button>
+                      <button type="button"
+                        onClick={() => setShippingCountry('JP')}
+                        className={`flex-1 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
+                          shippingCountry === 'JP'
+                            ? 'bg-sky-600 text-white border-sky-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        }`}>
+                        🇯🇵 일본 (해외배송)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* [해외배송] 일본 도도부현 선택 */}
+                  {shippingCountry === 'JP' && (
+                    <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sky-700 text-sm font-semibold">
+                        <span className="px-2 py-0.5 rounded-full bg-sky-600 text-white text-xs">🚢 해외배송</span>
+                        <span>일본 배송 지역을 선택하세요</span>
+                      </div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        배송 지역 (都道府県) <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={shippingPrefecture}
+                        onChange={e => setShippingPrefecture(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 text-gray-700 bg-white"
+                        required
+                      >
+                        <option value="">지역을 선택하세요</option>
+                        {jpPrefectures.map(p => (
+                          <option key={p.code} value={p.code}>
+                            {p.ko} ({p.ja}) — {p.feeJpy.toLocaleString()}엔 / {p.feeKrw.toLocaleString()}원
+                          </option>
+                        ))}
+                      </select>
+                      {selectedJpPref && (
+                        <div className="flex items-center justify-between rounded-lg bg-white border border-sky-200 px-3 py-2 text-sm">
+                          <span className="text-gray-600">해외배송비</span>
+                          <span className="font-bold text-sky-700">
+                            {shippingFeeJpy.toLocaleString()}엔
+                            <span className="text-gray-400 font-normal ml-1">({shippingFee.toLocaleString()}원)</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {t.checkout.receiver} <span className="text-red-500">*</span>
@@ -749,7 +845,14 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>{t.checkout.shippingFee}</span>
-                    <span className="text-green-600 font-medium">{t.checkout.free}</span>
+                    {shippingCountry === 'JP' && shippingFee > 0 ? (
+                      <span className="text-sky-700 font-semibold">
+                        {shippingFeeJpy.toLocaleString()}엔
+                        <span className="text-gray-400 font-normal ml-1">(₩{shippingFee.toLocaleString()})</span>
+                      </span>
+                    ) : (
+                      <span className="text-green-600 font-medium">{t.checkout.free}</span>
+                    )}
                   </div>
                   {couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600">
@@ -757,8 +860,12 @@ export default function CheckoutPage() {
                       <span className="font-medium">-₩{couponDiscount.toLocaleString()}</span>
                     </div>
                   )}
-                  {totalAmount > 0 && (
-                    <p className="text-xs text-green-600 font-semibold">{t.checkout.freeShippingApplied}</p>
+                  {shippingCountry === 'JP' ? (
+                    <p className="text-xs text-sky-600 font-semibold">🚢 일본 해외배송 — 지역별 배송비가 부과됩니다.</p>
+                  ) : (
+                    totalAmount > 0 && (
+                      <p className="text-xs text-green-600 font-semibold">{t.checkout.freeShippingApplied}</p>
+                    )
                   )}
                   <div className="border-t pt-3 flex justify-between text-xl font-bold text-gray-900">
                     <span>{t.checkout.finalAmount}</span>

@@ -723,6 +723,21 @@ model SiteSetting {
   @@index([key])
 }
 
+// 일본 도도부현별 해외배송비 (어드민이 원화로 관리)
+model JapanShippingFee {
+  id             String   @id @default(uuid())
+  prefectureCode String   @unique  // 01~47 (lib/japan-prefectures)
+  prefectureKo   String            // 한글 표기
+  prefectureJa   String            // 일본어 표기
+  feeKrw         Int      @default(0) // 배송비 (원)
+  isActive       Boolean  @default(true)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([prefectureCode])
+}
+
 // 라이브 채팅
 model LiveChat {
   id            String      @id @default(uuid())
