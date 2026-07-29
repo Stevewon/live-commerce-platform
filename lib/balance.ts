@@ -235,3 +235,46 @@ export async function ensureQtaColumn(db: any): Promise<void> {
     _qtaColumnEnsured = true;
   }
 }
+
+let _inquiryTableEnsured = false;
+/**
+ * Inquiry(고객 문의) 테이블이 존재하도록 보장 (없으면 CREATE TABLE).
+ * D1 바인딩(db)을 인자로 받는다. 프로세스 당 1회만 실제 시도.
+ * (프로덕션 D1 에 별도 마이그레이션을 돌릴 수 없으므로 런타임 멱등 생성)
+ */
+export async function ensureInquiryTable(db: any): Promise<void> {
+  if (_inquiryTableEnsured) return;
+  if (!db) return;
+  try {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS "Inquiry" (
+          "id" TEXT PRIMARY KEY,
+          "productId" TEXT,
+          "userId" TEXT,
+          "authorName" TEXT NOT NULL,
+          "authorEmail" TEXT,
+          "authorPhone" TEXT,
+          "title" TEXT NOT NULL,
+          "content" TEXT NOT NULL,
+          "isSecret" INTEGER NOT NULL DEFAULT 0,
+          "status" TEXT NOT NULL DEFAULT 'PENDING',
+          "answer" TEXT,
+          "answeredBy" TEXT,
+          "answeredAt" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`
+      )
+      .run();
+    // 인덱스 (멱등)
+    try { await db.prepare(`CREATE INDEX IF NOT EXISTS "Inquiry_productId_idx" ON "Inquiry" ("productId")`).run(); } catch {}
+    try { await db.prepare(`CREATE INDEX IF NOT EXISTS "Inquiry_userId_idx" ON "Inquiry" ("userId")`).run(); } catch {}
+    try { await db.prepare(`CREATE INDEX IF NOT EXISTS "Inquiry_status_idx" ON "Inquiry" ("status")`).run(); } catch {}
+    try { await db.prepare(`CREATE INDEX IF NOT EXISTS "Inquiry_createdAt_idx" ON "Inquiry" ("createdAt")`).run(); } catch {}
+  } catch (e: any) {
+    console.warn('[ensureInquiryTable] CREATE TABLE 실패(무시):', String(e?.message || e || ''));
+  } finally {
+    _inquiryTableEnsured = true;
+  }
+}

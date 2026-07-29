@@ -8,6 +8,7 @@ import { authFetch } from '@/lib/auth/clientFetch';
 import { addToGuestCart } from '@/lib/utils/guestCart';
 import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
+import ProductQnA from '@/components/ProductQnA';
 import { krwToQkeyDisplay } from '@/lib/utils/qkey';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
@@ -844,21 +845,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
 
             {/* Q&A tab */}
             {activeTab === 'qna' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-gray-900">상품 Q&A</h2>
-                </div>
-                <div className="text-center py-12 text-gray-400">
-                  <span className="text-5xl block mb-4">💬</span>
-                  <p className="text-lg font-medium text-gray-500 mb-2">등록된 Q&A가 없습니다</p>
-                  <p className="text-sm mb-6">상품에 대한 궁금한 점은 고객센터로 문의해주세요.</p>
-                  <div className="bg-gray-50 rounded-lg p-4 max-w-sm mx-auto text-left">
-                    <p className="text-sm font-medium text-gray-700 mb-2">📞 고객센터</p>
-                    <p className="text-sm text-gray-600">전화: 02-1551-4220</p>
-                    <p className="text-xs text-gray-400 mt-1">평일 10:00 ~ 18:00 (점심 12:00 ~ 13:00)</p>
-                  </div>
-                </div>
-              </div>
+              <ProductQnA productId={product.id} />
             )}
           </div>
         </div>
