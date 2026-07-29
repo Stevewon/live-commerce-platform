@@ -5,7 +5,8 @@ import { orderConfirmationEmail, sendEmail } from '@/lib/email'
 import { orderConfirmationSMS, sendSMS } from '@/lib/sms'
 import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
 // [v1.0.22] 잔액 결제 시스템 통합
-import { getD1, krwToQkey, QKEY_TO_KRW, newId, qtaFromKrw, ensureQtaColumn } from '@/lib/balance';
+import { getD1, krwToQkey, QKEY_TO_KRW, newId, qtaFromKrw, ensureQtaColumn, ensureJapanShippingTable } from '@/lib/balance';
+import { JAPAN_PREFECTURE_MAP, JP_DEFAULT_SHIPPING_FEE } from '@/lib/japan-prefectures';
 // [병행결제] Order 테이블 결제 분할 기록 컬럼 자동 보정
 import { ensureOrderPaymentColumns, ensureUserQrchatColumns } from '@/lib/ensureProductColumns';
 // [상품 스냅샷] OrderItem 에 주문 시점 상품명/썸네일 저장 (상품 삭제/변경돼도 주문내역 유지)
@@ -174,6 +175,9 @@ export async function POST(req: NextRequest) {
       shippingMemo,
       paymentMethod: rawPaymentMethod = 'KRW_BALANCE',
       shippingFee = 3000,
+      // [해외배송] 배송 국가(KR|JP)/일본 도도부현 코드
+      shippingCountry: rawShippingCountry = 'KR',
+      shippingPrefecture: rawShippingPrefecture = null,
       couponCode,
       // [병행결제] SPLIT_BALANCE 시 사용자가 직접 정한 "현금(원)" 금액. 나머지는 쿠키로 자동 충당.
       splitKrw: rawSplitKrw,
@@ -331,10 +335,40 @@ export async function POST(req: NextRequest) {
     }
 
     // 서버사이드 배송비 계산
-    // [정책] 가격을 떠나 전 상품 무조건 무료배송 — 배송비는 항상 0원.
-    //  (기존 임계금액/기본배송비 설정은 무시하고 강제로 무료 처리)
-    const serverShippingFee = 0;
-    // (참고용으로 남겨둔 설정값 — 계산에는 사용하지 않음)
+    // [정책] 국내(KR)는 가격과 무관하게 무조건 무료배송(0원).
+    //        일본(JP)은 선택한 도도부현의 해외배송비를 서버가 DB에서 직접 조회해 적용.
+    //        (클라이언트가 보낸 shippingFee 는 신뢰하지 않고 서버가 재계산)
+    const shippingCountry: 'KR' | 'JP' = rawShippingCountry === 'JP' ? 'JP' : 'KR';
+    let serverShippingFee = 0;
+    let shippingPrefectureCode: string | null = null;
+
+    if (shippingCountry === 'JP') {
+      const prefCode = String(rawShippingPrefecture || '').trim();
+      const pref = JAPAN_PREFECTURE_MAP[prefCode];
+      if (!pref) {
+        return NextResponse.json(
+          { success: false, error: '일본 배송 지역(도도부현)을 선택해주세요.' },
+          { status: 400 }
+        );
+      }
+      shippingPrefectureCode = prefCode;
+      // 현별 배송비 조회 (미설정/비활성 시 기본 해외배송비)
+      try {
+        await ensureJapanShippingTable(await getD1());
+        const row = await prisma.japanShippingFee.findUnique({ where: { prefectureCode: prefCode } });
+        // 기본 해외배송비 설정값(SiteSetting) 조회
+        let defaultFee = JP_DEFAULT_SHIPPING_FEE;
+        try {
+          const ds = await prisma.siteSetting.findUnique({ where: { key: 'JP_DEFAULT_SHIPPING_FEE' } });
+          if (ds) { const v = parseInt(ds.value); if (!isNaN(v) && v >= 0) defaultFee = v; }
+        } catch { /* 기본값 */ }
+        serverShippingFee = row && row.isActive ? row.feeKrw : defaultFee;
+      } catch (e) {
+        console.error('[orders] 일본 배송비 조회 실패, 기본값 적용:', e);
+        serverShippingFee = JP_DEFAULT_SHIPPING_FEE;
+      }
+    }
+    // (참고용으로 남겨둔 국내 설정값 — 국내 무료 정책이라 계산엔 미사용)
     void configShippingFee; void configFreeThreshold;
 
     // 쿠폰 처리

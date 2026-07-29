@@ -848,6 +848,7 @@ function createDbProxy(db: D1DB) {
     productVariant: 'ProductVariant',
     siteSetting: 'SiteSetting',
     inquiry: 'Inquiry',
+    japanShippingFee: 'JapanShippingFee',
   };
   
   const proxy: any = {
