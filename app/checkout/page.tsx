@@ -638,7 +638,15 @@ export default function CheckoutPage() {
                     </label>
                     <div className="flex gap-2">
                       <button type="button"
-                        onClick={() => { setShippingCountry('KR'); setShippingPrefecture(''); }}
+                        onClick={() => {
+                          if (shippingCountry === 'KR') return;
+                          // JP→KR 전환: 일본 자유입력 주소를 초기화(국내 우편번호 검색으로 다시 채움)
+                          setShippingCountry('KR');
+                          setShippingPrefecture('');
+                          setShippingZipCode('');
+                          setShippingAddress('');
+                          setShippingAddressDetail('');
+                        }}
                         className={`flex-1 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
                           shippingCountry === 'KR'
                             ? 'bg-blue-600 text-white border-blue-600'
@@ -647,7 +655,14 @@ export default function CheckoutPage() {
                         🇰🇷 국내 (무료배송)
                       </button>
                       <button type="button"
-                        onClick={() => setShippingCountry('JP')}
+                        onClick={() => {
+                          if (shippingCountry === 'JP') return;
+                          // KR→JP 전환: 국내 우편번호 검색으로 채운 주소를 초기화(일본 주소 자유입력)
+                          setShippingCountry('JP');
+                          setShippingZipCode('');
+                          setShippingAddress('');
+                          setShippingAddressDetail('');
+                        }}
                         className={`flex-1 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
                           shippingCountry === 'JP'
                             ? 'bg-sky-600 text-white border-sky-600'
@@ -721,25 +736,72 @@ export default function CheckoutPage() {
                       placeholder="010-0000-0000"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.checkout.address} <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex gap-2 mb-2">
-                      <input type="text" value={shippingZipCode} readOnly
-                        placeholder={t.checkout.zipCode}
-                        className="w-32 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700" />
-                      <AddressSearch onComplete={handleAddressComplete} />
+                  {shippingCountry === 'KR' ? (
+                    /* [국내] 다음 우편번호 API 연동 (readOnly + 검색버튼) */
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {t.checkout.address} <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex gap-2 mb-2">
+                        <input type="text" value={shippingZipCode} readOnly
+                          placeholder={t.checkout.zipCode}
+                          className="w-32 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700" />
+                        <AddressSearch onComplete={handleAddressComplete} />
+                      </div>
+                      <input type="text" value={shippingAddress} readOnly
+                        placeholder={t.checkout.addressSearchHint}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 mb-2" />
+                      <input type="text" value={shippingAddressDetail}
+                        onChange={e => setShippingAddressDetail(e.target.value)}
+                        onFocus={e => scrollInputIntoView(e.currentTarget)}
+                        placeholder={t.checkout.detailAddressPlaceholder}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                     </div>
-                    <input type="text" value={shippingAddress} readOnly
-                      placeholder={t.checkout.addressSearchHint}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 mb-2" />
-                    <input type="text" value={shippingAddressDetail}
-                      onChange={e => setShippingAddressDetail(e.target.value)}
-                      onFocus={e => scrollInputIntoView(e.currentTarget)}
-                      placeholder={t.checkout.detailAddressPlaceholder}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-                  </div>
+                  ) : (
+                    /* [일본 해외배송] 일본어/영문 자유 입력 폼 (한·일 병기 라벨) */
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        주소 <span className="text-gray-400 font-normal">/ 住所 (ご住所)</span> <span className="text-red-500">*</span>
+                      </label>
+                      <p className="text-xs text-sky-700 bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+                        日本の住所を日本語または英語でご入力ください。<br />
+                        <span className="text-gray-500">일본 주소를 일본어 또는 영문으로 입력해주세요.</span>
+                      </p>
+                      {/* 우편번호 (郵便番号) - 자유 입력 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          우편번호 <span className="text-gray-400">/ 郵便番号</span>
+                        </label>
+                        <input type="text" value={shippingZipCode}
+                          onChange={e => setShippingZipCode(e.target.value)}
+                          onFocus={e => scrollInputIntoView(e.currentTarget)}
+                          placeholder="例) 100-0001"
+                          className="w-40 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500" />
+                      </div>
+                      {/* 주소 (住所) - 자유 입력 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          주소 <span className="text-gray-400">/ 住所 (都道府県・市区町村・番地)</span> <span className="text-red-500">*</span>
+                        </label>
+                        <input type="text" value={shippingAddress}
+                          onChange={e => setShippingAddress(e.target.value)}
+                          onFocus={e => scrollInputIntoView(e.currentTarget)}
+                          placeholder="例) 東京都千代田区千代田1-1"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required />
+                      </div>
+                      {/* 상세주소 (建物名・部屋番号) - 자유 입력 */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          상세주소 <span className="text-gray-400">/ 建物名・部屋番号</span>
+                        </label>
+                        <input type="text" value={shippingAddressDetail}
+                          onChange={e => setShippingAddressDetail(e.target.value)}
+                          onFocus={e => scrollInputIntoView(e.currentTarget)}
+                          placeholder="例) ○○マンション 101号室 / Apt 101"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500" />
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">{t.checkout.memo}</label>
                     <select
