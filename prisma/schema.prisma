@@ -289,6 +289,7 @@ model Product {
   // 제품 상태
   isActive      Boolean   @default(true)
   isFeatured    Boolean   @default(false)
+  overseasBlocked Boolean @default(false)  // 해외배송 불가 (true 시 일본/해외 구매에서 제외)
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

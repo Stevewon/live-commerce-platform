@@ -136,7 +136,7 @@ function convertRow(row: any): any {
     // SQLite stores booleans as 0/1
     if (key === 'isActive' || key === 'isFeatured' || key === 'isLive' || 
         key === 'isRead' || key === 'isDeleted' || key === 'isReported' || key === 'hasOptions' ||
-        key === 'isSecret') {
+        key === 'isSecret' || key === 'overseasBlocked') {
       result[key] = value === 1 || value === true;
     } else {
       result[key] = value;

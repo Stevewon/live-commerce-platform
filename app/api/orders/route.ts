@@ -271,6 +271,19 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // ── [해외배송 불가] 일본(해외) 주문인데 해외배송 불가 상품이 담겨 있으면 거부 ──
+      //   관리자가 "해외배송 불가" 체크한 상품은 일본 구매에서 제외. (서버측 강제)
+      if (rawShippingCountry === 'JP' && (product as any).overseasBlocked === true) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `${product.name}은(는) 해외배송이 불가능한 상품입니다. 해외배송 불가 상품을 제외하고 주문해주세요.`,
+            code: 'OVERSEAS_BLOCKED',
+          },
+          { status: 400 }
+        );
+      }
+
       // ── [옵션 필수] 옵션이 있는 상품은 반드시 옵션(변형)을 선택해야 주문 가능 ──
       //   서버측에서도 강제(클라이언트 우회 방지). 사장님 요청사항.
       const productVariants: any[] = Array.isArray((product as any).variants) ? (product as any).variants : [];

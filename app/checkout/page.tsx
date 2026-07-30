@@ -300,6 +300,12 @@ export default function CheckoutPage() {
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity, 0
   );
+  // [해외배송 불가] 일본 선택 시, 장바구니에 담긴 해외배송 불가 상품 목록
+  const blockedItems = shippingCountry === 'JP'
+    ? cartItems.filter((it: any) => it?.product?.overseasBlocked === true)
+    : [];
+  const hasBlockedItems = blockedItems.length > 0;
+
   // [정책] 국내(KR)는 전 상품 무조건 무료배송. 일본(JP)은 선택한 도도부현의 해외배송비 부과.
   const selectedJpPref = jpPrefectures.find((p) => p.code === shippingPrefecture) || null;
   const shippingFee =
@@ -360,6 +366,15 @@ export default function CheckoutPage() {
     // [해외배송] 일본 선택 시 지역(도도부현) 필수
     if (shippingCountry === 'JP' && !shippingPrefecture) {
       alert('일본 배송 지역(도도부현)을 선택해주세요.');
+      return;
+    }
+    // [해외배송 불가] 일본 배송인데 해외배송 불가 상품이 담겨 있으면 차단
+    if (shippingCountry === 'JP' && hasBlockedItems) {
+      alert(
+        '해외배송이 불가능한 상품이 있습니다.\n\n' +
+        blockedItems.map((it: any) => `• ${it.product?.name || '상품'}`).join('\n') +
+        '\n\n해당 상품을 장바구니에서 제외하거나 국내 배송으로 변경해주세요.'
+      );
       return;
     }
     if (cartItems.length === 0) {
@@ -673,6 +688,17 @@ export default function CheckoutPage() {
                             {shippingFeeJpy.toLocaleString()}엔
                             <span className="text-gray-400 font-normal ml-1">({shippingFee.toLocaleString()}원)</span>
                           </span>
+                        </div>
+                      )}
+                      {hasBlockedItems && (
+                        <div className="rounded-lg bg-red-50 border border-red-300 px-3 py-2 text-sm text-red-700">
+                          <p className="font-semibold">🚫 해외배송 불가 상품이 있습니다</p>
+                          <ul className="mt-1 list-disc list-inside">
+                            {blockedItems.map((it: any) => (
+                              <li key={it.id || it.productId}>{it.product?.name || '상품'}</li>
+                            ))}
+                          </ul>
+                          <p className="mt-1 text-xs">해당 상품을 제외하거나 국내 배송을 선택해주세요.</p>
                         </div>
                       )}
                     </div>
