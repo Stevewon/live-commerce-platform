@@ -45,6 +45,7 @@ interface ProductFormData {
   categoryId: string
   isActive: boolean
   isFeatured: boolean
+  overseasBlocked: boolean
   // 새 필드
   origin: string
   manufacturer: string
@@ -109,6 +110,7 @@ export default function ProductForm({ mode, initialData }: Props) {
     categoryId: '',
     isActive: true,
     isFeatured: false,
+    overseasBlocked: false,
     origin: '',
     manufacturer: '',
     brand: '',
@@ -159,6 +161,7 @@ export default function ProductForm({ mode, initialData }: Props) {
         categoryId: initialData.categoryId || '',
         isActive: initialData.isActive ?? true,
         isFeatured: initialData.isFeatured ?? false,
+        overseasBlocked: initialData.overseasBlocked ?? false,
         origin: (initialData as any).origin || '',
         manufacturer: (initialData as any).manufacturer || '',
         brand: (initialData as any).brand || '',
@@ -449,6 +452,7 @@ export default function ProductForm({ mode, initialData }: Props) {
         categoryId: form.categoryId,
         isActive: form.isActive,
         isFeatured: form.isFeatured,
+        overseasBlocked: form.overseasBlocked,
         origin: form.origin.trim() || null,
         manufacturer: form.manufacturer.trim() || null,
         brand: form.brand.trim() || null,
@@ -1028,6 +1032,15 @@ export default function ProductForm({ mode, initialData }: Props) {
                     className="w-4 h-4 text-yellow-500 rounded focus:ring-yellow-500"
                   />
                   <span className="text-sm text-gray-700">추천 상품 (메인 노출)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.overseasBlocked}
+                    onChange={(e) => setForm(prev => ({ ...prev, overseasBlocked: e.target.checked }))}
+                    className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500"
+                  />
+                  <span className="text-sm text-gray-700">🚫 해외배송 불가 (일본/해외 상품에서 제외)</span>
                 </label>
               </div>
             </div>

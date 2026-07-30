@@ -10,6 +10,7 @@ let _supplyPriceColumnEnsured = false;
 let _productIndexesEnsured = false;
 let _orderPaymentColumnsEnsured = false;
 let _userQrchatColumnsEnsured = false;
+let _overseasBlockedColumnEnsured = false;
 
 // D1 바인딩을 가져오는 함수 (lib/prisma.ts 와 동일 패턴)
 async function getD1(): Promise<any> {
@@ -57,6 +58,36 @@ export async function ensureSupplyPriceColumn(db?: any): Promise<void> {
  * 프로세스 당 1회만 시도. 실패해도 조회 자체는 진행되도록 예외를 삼킨다.
  * - isActive/categoryId/isFeatured/createdAt/price: 목록 필터·정렬에 사용
  */
+/**
+ * Product.overseasBlocked(해외배송 불가) 컬럼이 존재하도록 보장 (없으면 ADD COLUMN).
+ * 기본값 0(false) = 해외배송 가능. 1 = 해외(일본) 상품에서 제외.
+ * 프로세스 당 1회만 시도. 실패해도 상품 등록/조회는 진행되도록 예외 삼킴.
+ */
+export async function ensureOverseasBlockedColumn(db?: any): Promise<void> {
+  if (_overseasBlockedColumnEnsured) return;
+  const d1 = db || (await getD1());
+  if (!d1) return;
+  try {
+    const cols: any = await d1.prepare(`PRAGMA table_info("Product")`).all();
+    const rows: any[] = cols?.results || cols || [];
+    const has = Array.isArray(rows) && rows.some((r) => r && r.name === 'overseasBlocked');
+    if (!has) {
+      try {
+        await d1.prepare(`ALTER TABLE "Product" ADD COLUMN "overseasBlocked" INTEGER NOT NULL DEFAULT 0`).run();
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (!/duplicate column|already exists/i.test(msg)) {
+          console.warn('[ensureOverseasBlockedColumn] ALTER 실패(무시):', msg);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[ensureOverseasBlockedColumn] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
+  } finally {
+    _overseasBlockedColumnEnsured = true;
+  }
+}
+
 export async function ensureProductIndexes(db?: any): Promise<void> {
   if (_productIndexesEnsured) return;
   const d1 = db || (await getD1());

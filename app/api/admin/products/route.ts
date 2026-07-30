@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import { ensureSupplyPriceColumn } from '@/lib/ensureProductColumns';
+import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn } from '@/lib/ensureProductColumns';
 
 // 관리자 상품 조회 (GET)
 export async function GET(req: NextRequest) {
@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
       shippingInfo,
       returnInfo,
       isFeatured,
+      overseasBlocked,
       origin,
       manufacturer,
       brand,
@@ -149,8 +150,9 @@ export async function POST(req: NextRequest) {
     // slug 자동 생성 (제공되지 않은 경우)
     const productSlug = slug || (name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'product') + '-' + Date.now();
 
-    // 공급가(supplyPrice) 컬럼 자동 보정 (셀프 힐링)
+    // 공급가(supplyPrice) + 해외배송불가(overseasBlocked) 컬럼 자동 보정 (셀프 힐링)
     await ensureSupplyPriceColumn();
+    await ensureOverseasBlockedColumn();
 
     // 상품 생성
     const product = await prisma.product.create({
@@ -173,6 +175,7 @@ export async function POST(req: NextRequest) {
         returnInfo: returnInfo || null,
         isActive: isActive !== undefined ? isActive : true,
         isFeatured: isFeatured !== undefined ? isFeatured : false,
+        overseasBlocked: overseasBlocked === true, // 기본값 false = 해외배송 가능
         origin: origin || null,
         manufacturer: manufacturer || null,
         brand: brand || null,

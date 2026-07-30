@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
-import { ensureProductIndexes } from '@/lib/ensureProductColumns';
+import { ensureProductIndexes, ensureOverseasBlockedColumn } from '@/lib/ensureProductColumns';
 import { translateTextsServer } from '@/lib/translateCache';
 
 async function getProductsEnv(): Promise<any> {
@@ -170,6 +170,14 @@ export async function GET(request: NextRequest) {
     // 추천 상품 필터
     if (featured === 'true') {
       where.isFeatured = true;
+    }
+
+    // [해외배송] overseas=true 이면 해외배송 불가 상품 제외 (일본/해외 고객용 목록)
+    const overseas = searchParams.get('overseas');
+    if (overseas === 'true') {
+      // 컬럼이 없으면 WHERE 절이 실패하므로 조회 전 컬럼 보장
+      try { await ensureOverseasBlockedColumn(); } catch {}
+      where.overseasBlocked = false;
     }
 
     // 가격 필터
