@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getPrisma } from '@/lib/prisma';
-import { ensureSupplyPriceColumn } from '@/lib/ensureProductColumns';
+import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn } from '@/lib/ensureProductColumns';
 import * as XLSX from 'xlsx';
 
 /**
@@ -67,8 +67,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '등록할 상품 데이터가 없습니다' }, { status: 400 });
     }
 
-    // 공급가(supplyPrice) 컬럼 자동 보정 (마이그레이션 없이 D1 컬럼 보장)
+    // 공급가(supplyPrice) + 해외배송불가(overseasBlocked) 컬럼 자동 보정 (마이그레이션 없이 D1 컬럼 보장)
     await ensureSupplyPriceColumn();
+    await ensureOverseasBlockedColumn();
 
     // 카테고리 목록 조회 (이름 → ID 매핑)
     const categories = await prisma.category.findMany();
@@ -128,6 +129,8 @@ export async function POST(req: NextRequest) {
         const returnInfo = String(row[17] || '').trim() || null;
         const isActiveStr = String(row[18] || 'Y').trim().toUpperCase();
         const isFeaturedStr = String(row[19] || 'N').trim().toUpperCase();
+        // [해외배송] 해외배송불가(Y/N). 기본 N = 해외배송 가능. Y = 일본/해외 구매에서 제외.
+        const overseasBlockedStr = String(row[20] || 'N').trim().toUpperCase();
 
         // ── 필수 필드 검증 ──
         if (!name) {
@@ -238,6 +241,7 @@ export async function POST(req: NextRequest) {
             returnInfo,
             isActive: isActiveStr !== 'N',
             isFeatured: isFeaturedStr === 'Y',
+            overseasBlocked: overseasBlockedStr === 'Y',
             origin,
             manufacturer,
             brand,

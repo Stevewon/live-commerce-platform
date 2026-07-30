@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
       '교환반품안내',
       '판매상태(Y/N)',
       '추천상품(Y/N)',
+      '해외배송불가(Y/N)',
     ];
 
     // 예시 데이터 2행
@@ -77,6 +78,7 @@ export async function GET(req: NextRequest) {
       '',
       'Y',
       'Y',
+      'N',
     ];
 
     const example2 = [
@@ -100,6 +102,7 @@ export async function GET(req: NextRequest) {
       '',
       'Y',
       'N',
+      'Y',
     ];
 
     const productData = [headers, example1, example2];
@@ -127,6 +130,7 @@ export async function GET(req: NextRequest) {
       { wch: 30 },  // 교환반품
       { wch: 12 },  // 판매상태
       { wch: 12 },  // 추천상품
+      { wch: 14 },  // 해외배송불가
     ];
 
     XLSX.utils.book_append_sheet(wb, ws1, '상품입력');
@@ -165,6 +169,7 @@ export async function GET(req: NextRequest) {
       ['교환반품안내', '선택', '교환/반품 안내 (미입력 시 기본값 적용)', ''],
       ['판매상태', '선택', 'Y=판매중, N=판매중지 (기본값: Y)', 'Y'],
       ['추천상품', '선택', 'Y=추천, N=일반 (기본값: N)', 'N'],
+      ['해외배송불가', '선택', 'Y=해외배송 불가(일본/해외 구매 제외), N=해외배송 가능 (기본값: N)', 'N'],
       ['', '', '', ''],
       ['[주의사항]', '', '', ''],
       ['1. 첫 번째 행(헤더)은 삭제하지 마세요.', '', '', ''],
