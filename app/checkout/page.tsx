@@ -162,6 +162,19 @@ export default function CheckoutPage() {
       .catch(() => {});
   }, [shippingCountry, jpPrefectures.length]);
 
+  // [해외배송 불가] 장바구니에 해외배송 불가 상품이 생기면(로드/변경) 일본 선택을 국내로 자동 복귀
+  //   → 일본 버튼이 숨겨지는 상황에서 이전에 선택돼 있던 JP 상태가 남지 않도록 안전장치.
+  useEffect(() => {
+    const anyBlocked = cartItems.some((it: any) => it?.product?.overseasBlocked === true);
+    if (anyBlocked && shippingCountry === 'JP') {
+      setShippingCountry('KR');
+      setShippingPrefecture('');
+      setShippingZipCode('');
+      setShippingAddress('');
+      setShippingAddressDetail('');
+    }
+  }, [cartItems, shippingCountry]);
+
   // [v1.0.22] 로그인 사용자 잔액 로드 (KRW / QKEY)
   useEffect(() => {
     if (authLoading || !user) return;
@@ -300,11 +313,12 @@ export default function CheckoutPage() {
   const totalAmount = cartItems.reduce(
     (sum, item) => sum + item.product.price * item.quantity, 0
   );
-  // [해외배송 불가] 일본 선택 시, 장바구니에 담긴 해외배송 불가 상품 목록
-  const blockedItems = shippingCountry === 'JP'
-    ? cartItems.filter((it: any) => it?.product?.overseasBlocked === true)
-    : [];
+  // [해외배송 불가] 장바구니에 담긴 해외배송 불가 상품 목록 (국가 선택과 무관하게 항상 계산)
+  //   → 하나라도 있으면 일본 배송 자체가 불가하므로 일본 버튼을 아예 숨긴다.
+  const blockedItems = cartItems.filter((it: any) => it?.product?.overseasBlocked === true);
   const hasBlockedItems = blockedItems.length > 0;
+  // 일본 해외배송 가능 여부: 해외배송 불가 상품이 하나도 없어야 함
+  const canShipToJapan = !hasBlockedItems;
 
   // [정책] 국내(KR)는 전 상품 무조건 무료배송. 일본(JP)은 선택한 도도부현의 해외배송비 부과.
   const selectedJpPref = jpPrefectures.find((p) => p.code === shippingPrefecture) || null;
@@ -654,23 +668,33 @@ export default function CheckoutPage() {
                         }`}>
                         🇰🇷 국내 (무료배송)
                       </button>
-                      <button type="button"
-                        onClick={() => {
-                          if (shippingCountry === 'JP') return;
-                          // KR→JP 전환: 국내 우편번호 검색으로 채운 주소를 초기화(일본 주소 자유입력)
-                          setShippingCountry('JP');
-                          setShippingZipCode('');
-                          setShippingAddress('');
-                          setShippingAddressDetail('');
-                        }}
-                        className={`flex-1 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
-                          shippingCountry === 'JP'
-                            ? 'bg-sky-600 text-white border-sky-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        }`}>
-                        🇯🇵 일본 (해외배송)
-                      </button>
+                      {/* [해외배송 불가] 장바구니에 해외배송 불가 상품이 있으면 일본 버튼 자체를 숨긴다 */}
+                      {canShipToJapan && (
+                        <button type="button"
+                          onClick={() => {
+                            if (shippingCountry === 'JP') return;
+                            // KR→JP 전환: 국내 우편번호 검색으로 채운 주소를 초기화(일본 주소 자유입력)
+                            setShippingCountry('JP');
+                            setShippingZipCode('');
+                            setShippingAddress('');
+                            setShippingAddressDetail('');
+                          }}
+                          className={`flex-1 px-4 py-2 rounded-lg border text-sm font-semibold transition ${
+                            shippingCountry === 'JP'
+                              ? 'bg-sky-600 text-white border-sky-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}>
+                          🇯🇵 일본 (해외배송)
+                        </button>
+                      )}
                     </div>
+                    {/* 해외배송 불가 상품 안내 (일본 버튼 숨김 사유) */}
+                    {hasBlockedItems && (
+                      <p className="mt-2 text-xs text-gray-500 flex items-start gap-1">
+                        <span>🚫</span>
+                        <span>해외배송이 불가한 상품이 포함되어 있어 <b>국내 배송만</b> 가능합니다.</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* [해외배송] 일본 도도부현 선택 */}
@@ -703,17 +727,6 @@ export default function CheckoutPage() {
                             {shippingFeeJpy.toLocaleString()}엔
                             <span className="text-gray-400 font-normal ml-1">({shippingFee.toLocaleString()}원)</span>
                           </span>
-                        </div>
-                      )}
-                      {hasBlockedItems && (
-                        <div className="rounded-lg bg-red-50 border border-red-300 px-3 py-2 text-sm text-red-700">
-                          <p className="font-semibold">🚫 해외배송 불가 상품이 있습니다</p>
-                          <ul className="mt-1 list-disc list-inside">
-                            {blockedItems.map((it: any) => (
-                              <li key={it.id || it.productId}>{it.product?.name || '상품'}</li>
-                            ))}
-                          </ul>
-                          <p className="mt-1 text-xs">해당 상품을 제외하거나 국내 배송을 선택해주세요.</p>
                         </div>
                       )}
                     </div>
