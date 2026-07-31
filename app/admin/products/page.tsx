@@ -1,7 +1,7 @@
 'use client'
 import { useAdminAuth } from '@/lib/hooks/useAdminAuth'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { authFetch } from '@/lib/auth/clientFetch'
 
@@ -31,19 +31,39 @@ interface Category {
 }
 
 export default function AdminProductsPage() {
+  // useSearchParams()는 Suspense 경계가 필요하므로 내부 컴포넌트를 감싼다.
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <AdminProductsPageInner />
+    </Suspense>
+  )
+}
+
+function AdminProductsPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading, logout } = useAdminAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
+  // [검색상태 유지] 필터/검색/페이지 초기값을 URL 쿼리에서 복원한다.
+  //   → 상품 수정 후 브라우저 뒤로가기 시 검색결과 화면이 그대로 유지됨.
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
+    (searchParams.get('status') as 'all' | 'active' | 'inactive') || 'all'
+  )
+  const [categoryFilter, setCategoryFilter] = useState<string>(searchParams.get('category') || 'all')
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '')
+  const [currentPage, setCurrentPage] = useState(Number(searchParams.get('page')) || 1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // 최초 마운트 시 1페이지 리셋 useEffect가 URL 복원값을 덮어쓰지 않도록 하는 가드
+  const [urlRestored, setUrlRestored] = useState(false)
 
   useEffect(() => {
     if (user && user.role === 'ADMIN') {
@@ -61,9 +81,25 @@ export default function AdminProductsPage() {
   }, [searchQuery])
 
   // 검색어/필터가 바뀌면 항상 1페이지부터 다시 조회 (전체 상품 대상 검색)
+  //   단, 최초 마운트(URL에서 복원한 경우)에는 page 값을 유지한다.
   useEffect(() => {
+    if (!urlRestored) {
+      setUrlRestored(true)
+      return
+    }
     setCurrentPage(1)
   }, [debouncedSearch, statusFilter, categoryFilter])
+
+  // [검색상태 유지] 필터/검색/페이지가 바뀔 때마다 URL 쿼리에 반영(replace: 히스토리 오염 방지)
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (statusFilter !== 'all') params.set('status', statusFilter)
+    if (categoryFilter !== 'all') params.set('category', categoryFilter)
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (currentPage > 1) params.set('page', String(currentPage))
+    const qs = params.toString()
+    router.replace(qs ? `/admin/products?${qs}` : '/admin/products', { scroll: false })
+  }, [statusFilter, categoryFilter, debouncedSearch, currentPage])
 
   // [자동 이미지 이전] 관리자가 상품관리에 들어오면, 외부(dbimg 등) 상품 이미지를
   // 우리 R2 로 조용히 백그라운드 이전한다. 사장님/관리자 조작 불필요.
