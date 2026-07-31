@@ -7,12 +7,17 @@ import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useState, useEffect } from 'react';
 import { authFetch } from '@/lib/auth/clientFetch';
 import LanguageSelector from '@/components/LanguageSelector';
+import { useIsAppEmbed, shouldShowInEmbed } from '@/lib/embed/useIsAppEmbed';
 
 export default function ShopNavigation() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // ★★★ 큐알쳇 앱 WebView 진입 감지 (모든 훅 호출 후 조건부 return — React Hook 규칙 준수).
+  //   서버단 kill-switch: lib/embed/useIsAppEmbed.ts 를 배포하면 앱 재설치 없이 즉시 on/off.
+  const isAppEmbed = useIsAppEmbed();
 
   // 상단 바 QKEY 잔액 표시 (로그인 시). B 회원은 큐알쳇 실시간 잔액이 내려온다.
   const [qkeyBalance, setQkeyBalance] = useState<number | null>(null);
@@ -40,6 +45,11 @@ export default function ShopNavigation() {
     };
     // pathname 변경 시(결제/충전 후 이동 등) 잔액 갱신
   }, [user, pathname]);
+
+  // ★★★ 훅 호출 완료 후 조건부 렌더링 — 앱 WebView 에서는 웹 헤더 숨김 (카톡 스타일).
+  if (isAppEmbed && !shouldShowInEmbed(pathname)) {
+    return null;
+  }
 
   const qkeyLabel =
     qkeyBalance != null ? `${qkeyBalance.toLocaleString()} QKEY` : '';

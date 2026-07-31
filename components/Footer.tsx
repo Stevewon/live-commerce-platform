@@ -4,13 +4,22 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import LanguageSelector from '@/components/LanguageSelector';
+import { useIsAppEmbed, shouldShowInEmbed } from '@/lib/embed/useIsAppEmbed';
 
 export default function Footer() {
   const pathname = usePathname();
   const { t } = useLanguage();
+  // ★★★ 모든 훅 호출을 조건부 return 이전에 배치 — React Hook 규칙 준수.
+  const isAppEmbed = useIsAppEmbed();
 
   // Hide on admin/partner dashboards
   if (pathname.startsWith('/admin') || pathname.startsWith('/partner')) {
+    return null;
+  }
+
+  // ★★★ 큐알쳇 앱 WebView 안에서는 푸터 숨김 (카톡 스타일).
+  //   서버단 kill-switch: lib/embed/useIsAppEmbed.ts 로 언제든 on/off.
+  if (isAppEmbed && !shouldShowInEmbed(pathname)) {
     return null;
   }
 
