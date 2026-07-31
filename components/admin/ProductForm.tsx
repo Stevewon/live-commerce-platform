@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { resizeImageToWebP } from '@/lib/utils/imageResize'
 
 const RichEditor = lazy(() => import('@/components/admin/RichEditor'))
@@ -74,6 +73,15 @@ const defaultReturnInfo = `• 교환/반품 기간: 상품 수령 후 7일 이�
 
 export default function ProductForm({ mode, initialData }: Props) {
   const router = useRouter()
+  // [검색상태 유지] 수정 화면에서 '취소/뒤로가기'를 누르면 목록 첫 페이지가 아니라
+  //   바로 이전 화면(검색결과 등)으로 돌아간다. 이전 히스토리가 없으면 목록으로 폴백.
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back()
+    } else {
+      router.push('/admin/products')
+    }
+  }
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -662,11 +670,11 @@ export default function ProductForm({ mode, initialData }: Props) {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/admin/products" className="text-gray-500 hover:text-gray-700">
+              <button type="button" onClick={goBack} className="text-gray-500 hover:text-gray-700">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-              </Link>
+              </button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
                   {mode === 'create' ? '상품 등록' : '상품 수정'}
@@ -677,12 +685,13 @@ export default function ProductForm({ mode, initialData }: Props) {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Link
-                href="/admin/products"
+              <button
+                type="button"
+                onClick={goBack}
                 className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
               >
                 취소
-              </Link>
+              </button>
               <button
                 onClick={handleSubmit}
                 disabled={saving}
@@ -1544,12 +1553,13 @@ export default function ProductForm({ mode, initialData }: Props) {
 
         {/* 하단 저장 버튼 (모바일 대응) */}
         <div className="mt-6 flex justify-end gap-3">
-          <Link
-            href="/admin/products"
+          <button
+            type="button"
+            onClick={goBack}
             className="px-6 py-3 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
           >
             취소
-          </Link>
+          </button>
           <button
             onClick={handleSubmit}
             disabled={saving}

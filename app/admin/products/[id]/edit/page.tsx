@@ -88,6 +88,7 @@ export default function EditProductPage() {
         categoryId: product.categoryId || product.category?.id,
         isActive: product.isActive,
         isFeatured: product.isFeatured,
+        overseasBlocked: product.overseasBlocked,
         origin: product.origin,
         manufacturer: product.manufacturer,
         brand: product.brand,
