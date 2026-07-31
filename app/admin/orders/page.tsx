@@ -55,7 +55,7 @@ interface Pagination {
 
 const STATUS_LABELS: Record<string, string> = {
   ALL: '전체',
-  PENDING: '대기중',
+  PENDING: '발송준비',
   CONFIRMED: '확인됨',
   SHIPPING: '배송중',
   DELIVERED: '배송완료',
@@ -323,7 +323,7 @@ export default function AdminOrdersPage() {
           </div>
 
           <div className="group bg-gradient-to-br from-white to-yellow-50 rounded-3xl shadow-2xl p-6 border-t-4 border-yellow-500 hover:shadow-yellow-200 hover:scale-105 transition-all duration-300 cursor-pointer">
-            <div className="text-xs font-black text-yellow-600 uppercase tracking-wider mb-2">⏳ 대기중</div>
+            <div className="text-xs font-black text-yellow-600 uppercase tracking-wider mb-2">⏳ 발송준비</div>
             <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 group-hover:scale-110 transition-transform">
               {orders.filter(o => o.status === 'PENDING').length}
             </div>
@@ -550,7 +550,7 @@ export default function AdminOrdersPage() {
                           onChange={(e) => handleStatusChange(order.id, e.target.value)}
                           className="px-4 py-3 border-3 border-gray-300 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-300 focus:border-blue-500 hover:border-blue-400 transition-all cursor-pointer bg-white shadow-sm"
                         >
-                          <option value="PENDING">⏳ 대기중</option>
+                          <option value="PENDING">⏳ 발송준비</option>
                           <option value="CONFIRMED">✅ 확인됨</option>
                           <option value="SHIPPING">🚚 배송중</option>
                           <option value="DELIVERED">📦 배송완료</option>

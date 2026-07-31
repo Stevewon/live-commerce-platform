@@ -5,7 +5,7 @@ import { getD1 } from '@/lib/balance';
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: '대기중',
+  PENDING: '발송준비',
   CONFIRMED: '확인됨',
   SHIPPING: '배송중',
   DELIVERED: '배송완료',

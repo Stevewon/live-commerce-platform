@@ -27,7 +27,7 @@ interface Order {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: '대기중',
+  PENDING: '발송준비',
   CONFIRMED: '확인됨',
   SHIPPING: '배송중',
   DELIVERED: '배송완료',
@@ -124,7 +124,7 @@ export default function PartnerOrdersPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="ALL">전체</option>
-                <option value="PENDING">대기중</option>
+                <option value="PENDING">발송준비</option>
                 <option value="CONFIRMED">확인됨</option>
                 <option value="SHIPPING">배송중</option>
                 <option value="DELIVERED">배송완료</option>
