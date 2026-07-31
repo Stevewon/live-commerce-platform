@@ -52,7 +52,7 @@ export async function notifyOrderStatusChange(
   newStatus: string
 ) {
   const statusMap: Record<string, string> = {
-    PENDING: '주문 대기',
+    PENDING: '발송준비',
     CONFIRMED: '주문 확인',
     SHIPPING: '배송 중',
     DELIVERED: '배송 완료',

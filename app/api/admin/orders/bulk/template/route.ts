@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
         order.total,
         new Date(order.createdAt).toLocaleString('ko-KR'),
         order.status === 'CONFIRMED' ? '확인됨' :
-          order.status === 'PENDING' ? '대기중' :
+          order.status === 'PENDING' ? '발송준비' :
           order.status === 'SHIPPING' ? '배송중' : order.status,
       ];
     });
