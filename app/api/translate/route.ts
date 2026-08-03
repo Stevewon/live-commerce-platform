@@ -3,6 +3,9 @@ import {
   ensureTranslationTable,
   getCachedTranslations,
   saveTranslations,
+  deleteTranslations,
+  aiTranslateOne,
+  isBrokenTranslation,
 } from '@/lib/translateCache';
 
 // m2m100 언어 코드 매핑 (앱 Locale → 모델 언어코드)
@@ -66,11 +69,22 @@ export async function POST(req: NextRequest) {
 
     const out: Record<string, string> = {};
 
-    // 1) 캐시 조회
+    // 1) 캐시 조회 (단, 과거에 잘못 저장된 깨진 번역은 무효화 후 재번역)
     if (db) {
       await ensureTranslationTable(db);
       const cached = await getCachedTranslations(db, uniqueTexts, target);
-      for (const [k, v] of cached) out[k] = v;
+      const staleKeys: string[] = [];
+      for (const [k, v] of cached) {
+        if (isBrokenTranslation(k, v, target)) {
+          staleKeys.push(k); // 깨진 캐시 → 미캐시로 취급하여 재번역
+        } else {
+          out[k] = v;
+        }
+      }
+      // 깨진 캐시 삭제(재번역 결과로 새로 저장되도록)
+      if (staleKeys.length > 0) {
+        await deleteTranslations(db, staleKeys, target);
+      }
     }
 
     // 2) 미캐시 항목만 AI 번역
@@ -79,24 +93,14 @@ export async function POST(req: NextRequest) {
     if (toTranslate.length > 0 && ai) {
       const newlyTranslated: { sourceText: string; translatedText: string }[] = [];
       for (const text of toTranslate) {
-        try {
-          const res: any = await ai.run('@cf/meta/m2m100-1.2b', {
-            text,
-            source_lang: LANG_MAP[source] || 'ko',
-            target_lang: LANG_MAP[target],
-          });
-          const translated =
-            (res && (res.translated_text || res.result?.translated_text)) || text;
-          out[text] = translated;
-          if (translated && translated !== text) {
-            newlyTranslated.push({ sourceText: text, translatedText: translated });
-          }
-        } catch {
-          // 개별 번역 실패 → 원문 유지
-          out[text] = text;
+        // LLM(llama-3.1) 우선 → 검증 → m2m100 폴백. 깨진 번역은 원문 유지(캐시 저장 안 함).
+        const { text: translated, ok } = await aiTranslateOne(ai, text, source, target);
+        out[text] = translated;
+        if (ok && translated && translated !== text) {
+          newlyTranslated.push({ sourceText: text, translatedText: translated });
         }
       }
-      // 3) 캐시 저장
+      // 3) 검증 통과한 번역만 캐시 저장
       if (db && newlyTranslated.length > 0) {
         await saveTranslations(db, newlyTranslated, target);
       }
