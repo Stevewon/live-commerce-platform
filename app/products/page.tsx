@@ -193,6 +193,11 @@ function ProductsContent() {
 
   const hasActiveFilters = currentSearch || currentBrand || currentMinPrice || currentMaxPrice || currentInStock;
 
+  // 현재 목록의 전체 URL(카테고리/정렬/페이지/검색 등 필터 상태 포함).
+  // 상품 상세로 이동할 때 이 값을 from 쿼리로 넘겨, 상세에서 뒤로가기를 누르면
+  // "왔던 목록"(예: 식품 카테고리 2페이지)으로 정확히 되돌아가게 한다.
+  const currentListUrl = buildUrl({});
+
   // 동적 텍스트(상품명/카테고리명/브랜드/카테고리 표시명) 자동 번역
   const dynamicTexts = [
     ...categories.map(c => c.name),
@@ -396,7 +401,7 @@ function ProductsContent() {
                   return (
                     <Link
                       key={product.id}
-                      href={`/products/${product.slug}`}
+                      href={`/products/${product.slug}?from=${encodeURIComponent(currentListUrl)}`}
                       prefetch
                       className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-all group"
                     >

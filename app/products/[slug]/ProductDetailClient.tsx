@@ -134,40 +134,87 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   }, [slug]);
 
   // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 시
-  // ★ 사장님 지시: 상세페이지에서 뒤로가기를 누르면 "무조건" 메인 쇼핑 홈(/products)으로 간다.
-  //   앱 메인(APP)으로 절대 튕겨나가지 않는다.
+  // ★ 사장님 지시: 상세페이지에서 뒤로가기를 누르면 "왔던 목록"으로 돌아가야 한다.
+  //   예) 식품 카테고리 2페이지에서 상품을 눌러 들어왔으면 → 뒤로가기 시 식품 2페이지로.
+  //   무조건 메인(/products)으로 보내지 않는다. (단, 앱 메인으로 튕겨 나가는 것은 계속 방지)
   //
-  // 핵심: 앱 WebView 에서 상품 상세로 '직접 진입'하면 뒤 히스토리에 쇼핑몰이 없어
+  // 돌아갈 목적지 결정 우선순위:
+  //   ① from 쿼리 — 목록에서 넘어올 때 심어준 "왔던 목록 URL"(카테고리/페이지/검색 필터 포함)
+  //   ② document.referrer — 같은 사이트의 /products 목록에서 왔으면 그 URL
+  //   ③ 상품 카테고리 — 최소한 이 상품이 속한 카테고리 목록(/products?category=<slug>)
+  //   ④ 그래도 없으면 /products (쇼핑 메인)
+  //
+  // 앱 WebView 에서 상품 상세로 '직접 진입'하면 뒤 히스토리에 쇼핑몰이 없어
   // 뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
   // → 진입 시 히스토리에 방어용 엔트리를 "여러 개" 쌓고, 뒤로가기가 감지될 때마다
-  //   방어 엔트리를 즉시 재삽입하면서 /products 로 하드 이동시켜 항상 쇼핑몰 메인에 머물게 한다.
+  //   방어 엔트리를 재삽입하면서 목적지로 하드 이동시켜 항상 쇼핑몰 안에 머물게 한다.
+  const categorySlug = product?.category?.slug || null;
+
+  // 뒤로가기 시 돌아갈 "왔던 목록" 목적지를 계산한다. (popstate 핸들러 + 화면 뒤로가기 버튼 공용)
+  const resolveBackTarget = (): string => {
+    const PRODUCTS_HOME = '/products';
+    if (typeof window === 'undefined') {
+      return categorySlug ? `${PRODUCTS_HOME}?category=${encodeURIComponent(categorySlug)}` : PRODUCTS_HOME;
+    }
+    // ① from 쿼리 (목록에서 심어준 원래 목록 URL)
+    try {
+      const from = new URLSearchParams(window.location.search).get('from');
+      if (from) {
+        const dec = decodeURIComponent(from);
+        // 오픈 리다이렉트 방지: 사이트 내부 /products 경로만 허용
+        if (dec.startsWith('/products')) return dec;
+      }
+    } catch { /* noop */ }
+
+    // ② document.referrer 가 같은 오리진의 /products 목록이면 그 URL
+    try {
+      if (document.referrer) {
+        const ref = new URL(document.referrer);
+        if (
+          ref.origin === window.location.origin &&
+          ref.pathname === PRODUCTS_HOME &&
+          // 자기 자신(상세)에서 온 게 아닌 목록만
+          ref.pathname !== window.location.pathname
+        ) {
+          return ref.pathname + ref.search;
+        }
+      }
+    } catch { /* noop */ }
+
+    // ③ 상품 카테고리 목록으로 fallback
+    if (categorySlug) return `${PRODUCTS_HOME}?category=${encodeURIComponent(categorySlug)}`;
+
+    // ④ 최종 fallback: 쇼핑 메인
+    return PRODUCTS_HOME;
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const PRODUCTS_HOME = '/products';
 
-    const goShopHome = () => {
-      // SPA 라우팅(router.push)은 WebView 가 '뒤로가기 완료'로 인식 못 하는 경우가 있어
-      // 하드 네비게이션으로 강제 이동한다. 이미 /products 면 재이동 생략(무한루프 방지).
+    const goBackToList = () => {
+      const target = resolveBackTarget();
+      // 이미 목적지(또는 목록 홈)에 있으면 재이동하지 않고 방어 엔트리만 유지(무한루프 방지)
       try {
-        const path = window.location.pathname;
-        if (path === PRODUCTS_HOME || path === PRODUCTS_HOME + '/') {
-          // 이미 홈이면 방어 엔트리만 다시 쌓아 앱 메인으로 못 나가게 유지
+        const here = window.location.pathname + window.location.search;
+        const herePath = window.location.pathname;
+        if (here === target || herePath === PRODUCTS_HOME || herePath === PRODUCTS_HOME + '/') {
           window.history.pushState({ shopGuard: true }, '', window.location.href);
           return;
         }
       } catch { /* noop */ }
-      // 상세페이지에서 뒤로가기 → 무조건 쇼핑 메인으로 하드 이동
-      window.location.assign(PRODUCTS_HOME);
+      // SPA 라우팅은 WebView 가 '뒤로가기 완료'로 인식 못 하는 경우가 있어 하드 이동.
+      window.location.assign(target);
     };
 
     const handlePopState = () => {
       // 뒤로가기가 발생하면(방어 엔트리가 소비됨) 즉시 새 방어 엔트리를 다시 쌓아
-      // WebView 가 히스토리 경계에 닿아 닫히는 것을 막고, 쇼핑몰 메인으로 이동한다.
+      // WebView 가 히스토리 경계에 닿아 닫히는 것을 막고, "왔던 목록"으로 이동한다.
       try {
         window.history.pushState({ shopGuard: true }, '', window.location.href);
       } catch { /* noop */ }
-      goShopHome();
+      goBackToList();
     };
 
     // 진입 시 방어 엔트리를 여러 개 삽입 (현재 URL 유지) — 빠른 연속 뒤로가기까지 방어.
@@ -180,7 +227,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [router]);
+  }, [router, categorySlug]);
 
   const fetchProduct = async () => {
     try {
@@ -431,7 +478,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
         <nav className="sm:hidden mb-3 flex items-center gap-1.5 text-sm text-gray-600">
           <button
             type="button"
-            onClick={() => router.push('/products')}
+            onClick={() => { window.location.assign(resolveBackTarget()); }}
             className="inline-flex items-center gap-1 px-2 py-1 -ml-2 rounded-md hover:bg-gray-100 active:bg-gray-200 shrink-0"
             aria-label="뒤로"
           >
