@@ -8,6 +8,18 @@
 
 let _translationTableEnsured = false;
 
+/**
+ * 번역 캐시 버전. 번역 엔진/프롬프트를 크게 바꿔 과거 캐시를 통째로 무효화해야 할 때 올린다.
+ * 저장/조회 시 대상 로케일에 접미사로 붙여(예: 'ja' → 'ja@v2') 이전 버전 캐시를 자연스럽게 우회한다.
+ * v2: m2m100/8B → Llama3.3-70B/Gemma3 체인으로 교체(상품명 헛번역 대량 무효화).
+ */
+export const TRANSLATION_CACHE_VERSION = 'v2';
+
+/** 캐시 저장/조회에 쓰는 로케일 키(버전 접미사 포함). */
+export function cacheLocale(target: string): string {
+  return `${target}@${TRANSLATION_CACHE_VERSION}`;
+}
+
 export async function ensureTranslationTable(db: any): Promise<void> {
   if (_translationTableEnsured) return;
   if (!db) return;
@@ -81,9 +93,14 @@ function hasJapanese(s: string): boolean { return /[\u3040-\u30FF\u4E00-\u9FFF]/
 function hasCJKIdeograph(s: string): boolean { return /[\u4E00-\u9FFF]/.test(s); }
 
 // 같은 짧은 토큰이 무의미하게 반복되는지(예: "メッセージメッセージ") 감지
+//   - 3회+ 연속 반복이면 무조건 헛소리
+//   - 2회 반복이라도 그 반복 블록이 전체의 60% 이상이면 헛소리(예: 토큰 2배 복제)
 function hasSillyRepetition(s: string): boolean {
-  const m = s.match(/(.{2,10}?)\1{2,}/); // 2~10자 패턴이 3회 이상 연속 반복
-  return !!m;
+  const t = s.trim();
+  if (/(.{2,10}?)\1{2,}/.test(t)) return true; // 3회 이상 연속 반복
+  const m = t.match(/(.{2,12}?)\1{1,}/);        // 2회 이상 연속 반복
+  if (m && m[0].length >= t.length * 0.6) return true;
+  return false;
 }
 
 // 번역 결과가 "명백히 깨졌는지" 검사 → 깨졌으면 원문 유지(+캐시 저장 안 함)
@@ -232,18 +249,19 @@ export async function translateTextsServer(
 
   const db = env?.DB;
   const ai = env?.AI;
+  const cLocale = cacheLocale(target); // 버전 접미사 포함 캐시 키
 
-  // 1) 캐시 조회 (깨진 캐시는 무효화 후 재번역)
+  // 1) 캐시 조회 (버전 캐시 사용 + 깨진 캐시는 무효화 후 재번역)
   if (db) {
     try {
       await ensureTranslationTable(db);
-      const cached = await getCachedTranslations(db, uniqueTexts, target);
+      const cached = await getCachedTranslations(db, uniqueTexts, cLocale);
       const staleKeys: string[] = [];
       for (const [k, v] of cached) {
         if (isBrokenTranslation(k, v, target)) staleKeys.push(k);
         else out.set(k, v);
       }
-      if (staleKeys.length > 0) await deleteTranslations(db, staleKeys, target);
+      if (staleKeys.length > 0) await deleteTranslations(db, staleKeys, cLocale);
     } catch { /* 무시 */ }
   }
 
@@ -260,7 +278,7 @@ export async function translateTextsServer(
       }
     }
     if (db && newly.length > 0) {
-      try { await saveTranslations(db, newly, target); } catch { /* 무시 */ }
+      try { await saveTranslations(db, newly, cLocale); } catch { /* 무시 */ }
     }
   } else {
     for (const t of toTranslate) if (!out.has(t)) out.set(t, t);

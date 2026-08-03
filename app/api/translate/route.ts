@@ -6,6 +6,7 @@ import {
   deleteTranslations,
   aiTranslateOne,
   isBrokenTranslation,
+  cacheLocale,
 } from '@/lib/translateCache';
 
 // m2m100 언어 코드 매핑 (앱 Locale → 모델 언어코드)
@@ -68,11 +69,12 @@ export async function POST(req: NextRequest) {
     const ai = env?.AI;
 
     const out: Record<string, string> = {};
+    const cLocale = cacheLocale(target); // 버전 접미사 포함 캐시 키(과거 캐시 우회)
 
-    // 1) 캐시 조회 (단, 과거에 잘못 저장된 깨진 번역은 무효화 후 재번역)
+    // 1) 캐시 조회 (버전 캐시 사용 + 과거에 잘못 저장된 깨진 번역은 무효화 후 재번역)
     if (db) {
       await ensureTranslationTable(db);
-      const cached = await getCachedTranslations(db, uniqueTexts, target);
+      const cached = await getCachedTranslations(db, uniqueTexts, cLocale);
       const staleKeys: string[] = [];
       for (const [k, v] of cached) {
         if (isBrokenTranslation(k, v, target)) {
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
       }
       // 깨진 캐시 삭제(재번역 결과로 새로 저장되도록)
       if (staleKeys.length > 0) {
-        await deleteTranslations(db, staleKeys, target);
+        await deleteTranslations(db, staleKeys, cLocale);
       }
     }
 
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest) {
       }
       // 3) 검증 통과한 번역만 캐시 저장
       if (db && newlyTranslated.length > 0) {
-        await saveTranslations(db, newlyTranslated, target);
+        await saveTranslations(db, newlyTranslated, cLocale);
       }
     } else {
       // AI 미가용 → 미캐시 항목 원문 유지
