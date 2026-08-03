@@ -75,8 +75,19 @@ const LANG_NAME: Record<string, string> = {
   zh: 'Chinese (Simplified)', vi: 'Vietnamese', th: 'Thai',
 };
 
+// 문자 계열 판별 헬퍼
+function hasHangul(s: string): boolean { return /[\uAC00-\uD7A3]/.test(s); }
+function hasJapanese(s: string): boolean { return /[\u3040-\u30FF\u4E00-\u9FFF]/.test(s); }
+function hasCJKIdeograph(s: string): boolean { return /[\u4E00-\u9FFF]/.test(s); }
+
+// 같은 짧은 토큰이 무의미하게 반복되는지(예: "メッセージメッセージ") 감지
+function hasSillyRepetition(s: string): boolean {
+  const m = s.match(/(.{2,10}?)\1{2,}/); // 2~10자 패턴이 3회 이상 연속 반복
+  return !!m;
+}
+
 // 번역 결과가 "명백히 깨졌는지" 검사 → 깨졌으면 원문 유지(+캐시 저장 안 함)
-//   상품명 등 복잡한 텍스트에서 m2m100/LLM 이 엉뚱한 문장을 뱉는 경우를 방어한다.
+//   상품명 등 복잡한 텍스트에서 번역 모델이 엉뚱한 문장을 뱉는 경우를 방어한다.
 export function isBrokenTranslation(source: string, translated: string, target: string): boolean {
   if (!translated || typeof translated !== 'string') return true;
   const t = translated.trim();
@@ -84,12 +95,32 @@ export function isBrokenTranslation(source: string, translated: string, target: 
   // 원문과 완전히 동일하면(번역 안 됨) 실패로 보지 않고 그대로 사용하므로 여기선 통과 처리
   if (t === source.trim()) return false;
   // LLM 이 지시문/따옴표/설명을 덧붙이는 경우 방어
-  if (/^(translation|번역|sure|here|の翻訳|翻訳)[:：]/i.test(t)) return true;
+  if (/^(translation|번역|sure|here|의역|直訳|の翻訳|翻訳|here is|here's|the translation)[:：\s]/i.test(t)) return true;
+  // 무의미한 반복(같은 토큰 3회+) → 헛소리
+  if (hasSillyRepetition(t)) return true;
+  // 대상 언어 문자 검사
+  if (target === 'ja') {
+    // 일본어 번역인데 일본어 문자(가나/한자)가 전혀 없으면 실패
+    if (!hasJapanese(t)) return true;
+    // 원문에 한글이 남아있고(브랜드/괄호 예외는 허용) 번역 대부분이 한글이면 실패
+    // → 한글 비율이 30% 초과면 번역 안 된 것으로 간주
+    const hangulCount = (t.match(/[\uAC00-\uD7A3]/g) || []).length;
+    if (hangulCount > 0 && hangulCount / t.replace(/\s/g, '').length > 0.3) return true;
+  } else if (target === 'zh') {
+    if (!hasCJKIdeograph(t)) return true;
+    const hangulCount = (t.match(/[\uAC00-\uD7A3]/g) || []).length;
+    if (hangulCount > 0 && hangulCount / t.replace(/\s/g, '').length > 0.3) return true;
+  } else if (target === 'ko') {
+    // ko 타겟은 사용하지 않지만 방어
+  } else {
+    // en/vi/th 등: 번역문에 한글이 대량 남으면 실패(원문 그대로 흘러나온 것)
+    const hangulCount = (t.match(/[\uAC00-\uD7A3]/g) || []).length;
+    if (hangulCount > 0 && hangulCount / t.replace(/\s/g, '').length > 0.5) return true;
+  }
   // 숫자 보존 검사: 원문에 있던 아라비아 숫자가 번역문에서 완전히 사라지면(수량/인분 등 왜곡) 실패
   const srcNums = (source.match(/\d+/g) || []);
   if (srcNums.length > 0) {
     const dstNums = (t.match(/\d+/g) || []);
-    // 원문 숫자가 2개 이상인데 번역문에 하나도 없으면 왜곡으로 간주
     if (srcNums.length >= 2 && dstNums.length === 0) return true;
   }
   // 길이 폭주(원문 대비 4배 초과)면 헛소리 생성으로 간주
@@ -97,11 +128,40 @@ export function isBrokenTranslation(source: string, translated: string, target: 
   return false;
 }
 
+// 프롬프트 기반 LLM 번역 1회 시도 (모델 ID 지정)
+async function llmTranslateOnce(
+  ai: any, model: string, text: string, srcName: string, dstName: string, target: string
+): Promise<string> {
+  const sys =
+    `You are a professional Korean e-commerce translator. Translate the user's product text from ${srcName} to ${dstName}. ` +
+    `Rules:\n` +
+    `- Output ONLY the translated text. No quotes, no explanation, no notes, no romanization, no original text.\n` +
+    `- The entire output MUST be written in ${dstName}. Do NOT leave Korean words untranslated.\n` +
+    `- Preserve numbers, units, quantities (e.g. 2인분→2人前), and any text inside brackets like [ ] ( ).\n` +
+    `- Brand names inside [ ] may stay as-is if untranslatable.\n` +
+    `- Keep it natural and concise for an online shopping product title.`;
+  const res: any = await ai.run(model, {
+    messages: [
+      { role: 'system', content: sys },
+      { role: 'user', content: text },
+    ],
+    max_tokens: 300,
+    temperature: 0.1,
+  });
+  let out: string = (res && (res.response ?? res.result?.response)) || '';
+  out = String(out).trim();
+  // 앞뒤 따옴표/괄호쌍 제거 (전체를 감싼 경우만)
+  out = out.replace(/^\s*["'「『]([\s\S]*)["'」』]\s*$/,'$1').trim();
+  // 모델이 "번역:" 같은 접두사를 붙이면 제거
+  out = out.replace(/^(번역|translation|訳|翻訳)\s*[:：]\s*/i, '').trim();
+  return out;
+}
+
 /**
  * 단일 텍스트를 Workers AI 로 번역한다.
- *  1) LLM(llama-3.1-8b-instruct) 프롬프트 번역 우선 — 상품명 등 복잡 텍스트에 강함
- *  2) LLM 결과가 깨졌으면 m2m100 로 폴백
- *  3) 둘 다 실패/깨짐이면 원문 반환
+ *  1) 강력한 LLM 체인(70B → Gemma3 12B → 8B) 프롬프트 번역 — 상품명 등 복잡 텍스트에 강함
+ *  2) 모두 깨지면 m2m100 폴백 (짧은 단어)
+ *  3) 전부 실패/깨짐이면 원문 반환 (캐시 저장 안 함)
  * @returns { text: 번역문(또는 원문), ok: 캐시 저장해도 되는 정상 번역인지 }
  */
 export async function aiTranslateOne(
@@ -113,27 +173,20 @@ export async function aiTranslateOne(
   const srcName = LANG_NAME[source] || 'Korean';
   const dstName = LANG_NAME[target] || 'English';
 
-  // 1) LLM 번역 (프롬프트: 번역문만, 대괄호/숫자/브랜드 보존)
-  try {
-    const sys =
-      `You are a professional e-commerce translator. Translate the user's text from ${srcName} to ${dstName}. ` +
-      `Rules: Output ONLY the translated text with no quotes, no explanation, no notes. ` +
-      `Preserve numbers, units, quantities, brand names, and any text inside brackets like [ ]. ` +
-      `Keep it natural for an online shopping product listing.`;
-    const res: any = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: sys },
-        { role: 'user', content: text },
-      ],
-      max_tokens: 256,
-      temperature: 0.1,
-    });
-    let out: string = (res && (res.response ?? res.result?.response)) || '';
-    out = String(out).trim().replace(/^["'「『]|["'」』]$/g, '').trim();
-    if (out && !isBrokenTranslation(text, out, target)) {
-      return { text: out, ok: true };
-    }
-  } catch { /* LLM 실패 → m2m100 폴백 */ }
+  // 1) LLM 체인 (품질 높은 순서). 하나라도 검증 통과하면 채택.
+  const LLM_CHAIN = [
+    '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    '@cf/google/gemma-3-12b-it',
+    '@cf/meta/llama-3.1-8b-instruct',
+  ];
+  for (const model of LLM_CHAIN) {
+    try {
+      const out = await llmTranslateOnce(ai, model, text, srcName, dstName, target);
+      if (out && !isBrokenTranslation(text, out, target)) {
+        return { text: out, ok: true };
+      }
+    } catch { /* 다음 모델로 */ }
+  }
 
   // 2) m2m100 폴백 (짧은 단어에 강함)
   try {
@@ -148,7 +201,7 @@ export async function aiTranslateOne(
     }
   } catch { /* 무시 */ }
 
-  // 3) 둘 다 실패 → 원문 유지(캐시 저장 안 함)
+  // 3) 전부 실패 → 원문 유지(캐시 저장 안 함)
   return { text, ok: false };
 }
 
