@@ -12,8 +12,9 @@ let _translationTableEnsured = false;
  * 번역 캐시 버전. 번역 엔진/프롬프트를 크게 바꿔 과거 캐시를 통째로 무효화해야 할 때 올린다.
  * 저장/조회 시 대상 로케일에 접미사로 붙여(예: 'ja' → 'ja@v2') 이전 버전 캐시를 자연스럽게 우회한다.
  * v2: m2m100/8B → Llama3.3-70B/Gemma3 체인으로 교체(상품명 헛번역 대량 무효화).
+ * v3: 긴 상세설명 토큰 확장 + 한글 잔존 15% 기준 강화 + 최선후보 채택(원문 노출 방지).
  */
-export const TRANSLATION_CACHE_VERSION = 'v2';
+export const TRANSLATION_CACHE_VERSION = 'v3';
 
 /** 캐시 저장/조회에 쓰는 로케일 키(버전 접미사 포함). */
 export function cacheLocale(target: string): string {
@@ -88,9 +89,16 @@ const LANG_NAME: Record<string, string> = {
 };
 
 // 문자 계열 판별 헬퍼
-function hasHangul(s: string): boolean { return /[\uAC00-\uD7A3]/.test(s); }
 function hasJapanese(s: string): boolean { return /[\u3040-\u30FF\u4E00-\u9FFF]/.test(s); }
 function hasCJKIdeograph(s: string): boolean { return /[\u4E00-\u9FFF]/.test(s); }
+
+// 번역문에서 한글이 차지하는 비율(공백 제외). 낮을수록 번역이 잘 된 것.
+function hangulRatio(s: string): number {
+  const compact = s.replace(/\s/g, '');
+  if (!compact.length) return 0;
+  const hangul = (compact.match(/[\uAC00-\uD7A3]/g) || []).length;
+  return hangul / compact.length;
+}
 
 // 같은 짧은 토큰이 무의미하게 반복되는지(예: "メッセージメッセージ") 감지
 //   - 3회+ 연속 반복이면 무조건 헛소리
@@ -115,24 +123,21 @@ export function isBrokenTranslation(source: string, translated: string, target: 
   if (/^(translation|번역|sure|here|의역|直訳|の翻訳|翻訳|here is|here's|the translation)[:：\s]/i.test(t)) return true;
   // 무의미한 반복(같은 토큰 3회+) → 헛소리
   if (hasSillyRepetition(t)) return true;
-  // 대상 언어 문자 검사
+  // 대상 언어 문자 검사 + 한글 잔존 검사 (잔존 한글은 번역 결함)
+  const hRatio = hangulRatio(t);
   if (target === 'ja') {
     // 일본어 번역인데 일본어 문자(가나/한자)가 전혀 없으면 실패
     if (!hasJapanese(t)) return true;
-    // 원문에 한글이 남아있고(브랜드/괄호 예외는 허용) 번역 대부분이 한글이면 실패
-    // → 한글 비율이 30% 초과면 번역 안 된 것으로 간주
-    const hangulCount = (t.match(/[\uAC00-\uD7A3]/g) || []).length;
-    if (hangulCount > 0 && hangulCount / t.replace(/\s/g, '').length > 0.3) return true;
+    // 한글이 15% 초과로 남으면 미번역 조각이 많은 것으로 간주 → 실패(재시도/폴백)
+    if (hRatio > 0.15) return true;
   } else if (target === 'zh') {
     if (!hasCJKIdeograph(t)) return true;
-    const hangulCount = (t.match(/[\uAC00-\uD7A3]/g) || []).length;
-    if (hangulCount > 0 && hangulCount / t.replace(/\s/g, '').length > 0.3) return true;
+    if (hRatio > 0.15) return true;
   } else if (target === 'ko') {
     // ko 타겟은 사용하지 않지만 방어
   } else {
-    // en/vi/th 등: 번역문에 한글이 대량 남으면 실패(원문 그대로 흘러나온 것)
-    const hangulCount = (t.match(/[\uAC00-\uD7A3]/g) || []).length;
-    if (hangulCount > 0 && hangulCount / t.replace(/\s/g, '').length > 0.5) return true;
+    // en/vi/th 등: 번역문에 한글이 남으면 원문 유출 → 실패
+    if (hRatio > 0.15) return true;
   }
   // 숫자 보존 검사: 원문에 있던 아라비아 숫자가 번역문에서 완전히 사라지면(수량/인분 등 왜곡) 실패
   const srcNums = (source.match(/\d+/g) || []);
@@ -152,17 +157,19 @@ async function llmTranslateOnce(
   const sys =
     `You are a professional Korean e-commerce translator. Translate the user's product text from ${srcName} to ${dstName}. ` +
     `Rules:\n` +
-    `- Output ONLY the translated text. No quotes, no explanation, no notes, no romanization, no original text.\n` +
-    `- The entire output MUST be written in ${dstName}. Do NOT leave Korean words untranslated.\n` +
-    `- Preserve numbers, units, quantities (e.g. 2인분→2人前), and any text inside brackets like [ ] ( ).\n` +
-    `- Brand names inside [ ] may stay as-is if untranslatable.\n` +
-    `- Keep it natural and concise for an online shopping product title.`;
+    `- Output ONLY the translated text. No quotes, no explanation, no notes, no romanization, no original Korean text.\n` +
+    `- CRITICAL: The ENTIRE output MUST be written in ${dstName}. Do NOT leave ANY Korean (Hangul) word untranslated. Translate every single Korean word, including food/ingredient names (e.g. 막국수→막국수 in ${dstName} script, 들기름→sesame/perilla oil, 메밀→buckwheat).\n` +
+    `- Preserve numbers, units, quantities (e.g. 2인분→2 servings), and keep bracket structures like [ ] ( ).\n` +
+    `- A proper brand name inside [ ] may stay as-is only if it is truly untranslatable.\n` +
+    `- Keep it natural for an online shopping product listing. Do not add or drop information.`;
+  // 입력 길이에 비례해 출력 토큰 확보 (긴 상세설명이 잘리지 않도록). 대략 글자수*2 + 여유.
+  const maxTokens = Math.min(2000, Math.max(300, Math.ceil(text.length * 2.2) + 64));
   const res: any = await ai.run(model, {
     messages: [
       { role: 'system', content: sys },
       { role: 'user', content: text },
     ],
-    max_tokens: 300,
+    max_tokens: maxTokens,
     temperature: 0.1,
   });
   let out: string = (res && (res.response ?? res.result?.response)) || '';
@@ -170,7 +177,7 @@ async function llmTranslateOnce(
   // 앞뒤 따옴표/괄호쌍 제거 (전체를 감싼 경우만)
   out = out.replace(/^\s*["'「『]([\s\S]*)["'」』]\s*$/,'$1').trim();
   // 모델이 "번역:" 같은 접두사를 붙이면 제거
-  out = out.replace(/^(번역|translation|訳|翻訳)\s*[:：]\s*/i, '').trim();
+  out = out.replace(/^(번역|translation|訳|翻訳|Translation|Here is the translation)\s*[:：]\s*/i, '').trim();
   return out;
 }
 
@@ -189,8 +196,19 @@ export async function aiTranslateOne(
 ): Promise<{ text: string; ok: boolean }> {
   const srcName = LANG_NAME[source] || 'Korean';
   const dstName = LANG_NAME[target] || 'English';
+  const cjkTarget = target === 'ja' || target === 'zh';
 
-  // 1) LLM 체인 (품질 높은 순서). 하나라도 검증 통과하면 채택.
+  // 후보 중 "가장 한글이 적은(=가장 잘 번역된)" 결과를 추적.
+  //   완벽(검증 통과)한 결과가 나오면 즉시 채택.
+  //   완벽한 게 없더라도, 원문보다 확실히 번역된 최선 후보는 저장(ok=true)해 원문 노출을 막는다.
+  let best: { text: string; hRatio: number } | null = null;
+  const consider = (out: string) => {
+    if (!out) return;
+    const r = hangulRatio(out);
+    if (!best || r < best.hRatio) best = { text: out, hRatio: r };
+  };
+
+  // 1) LLM 체인 (품질 높은 순서). 하나라도 검증 통과하면 즉시 채택.
   const LLM_CHAIN = [
     '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     '@cf/google/gemma-3-12b-it',
@@ -202,6 +220,8 @@ export async function aiTranslateOne(
       if (out && !isBrokenTranslation(text, out, target)) {
         return { text: out, ok: true };
       }
+      // 검증엔 못 미쳐도(한글 15~) 대상언어 문자를 포함하면 후보로 보관
+      if (out && (!cjkTarget || hasJapanese(out) || hasCJKIdeograph(out))) consider(out);
     } catch { /* 다음 모델로 */ }
   }
 
@@ -216,9 +236,20 @@ export async function aiTranslateOne(
     if (out && !isBrokenTranslation(text, out, target)) {
       return { text: out, ok: true };
     }
+    if (out && !hasSillyRepetition(out) && (!cjkTarget || hasJapanese(out) || hasCJKIdeograph(out))) consider(out);
   } catch { /* 무시 */ }
 
-  // 3) 전부 실패 → 원문 유지(캐시 저장 안 함)
+  // 3) 완벽한 결과는 없지만, 원문(전부 한글)보다 확실히 번역된 최선 후보가 있으면 채택.
+  //    최선 후보의 한글 비율이 원문 대비 절반 이하로 줄었을 때만(=실제 번역 진전) 저장.
+  if (best !== null) {
+    const b = best as { text: string; hRatio: number };
+    const srcRatio = hangulRatio(text);
+    if (b.hRatio < srcRatio * 0.5 && b.hRatio < 0.35) {
+      return { text: b.text, ok: true };
+    }
+  }
+
+  // 4) 전부 실패 → 원문 유지(캐시 저장 안 함)
   return { text, ok: false };
 }
 
