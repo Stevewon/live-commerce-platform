@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getD1, getUserBalance, ensureQtaColumn } from '@/lib/balance';
 import { ensureUserQrchatColumns } from '@/lib/ensureProductColumns';
-import { getQrchatQkeyBalance } from '@/lib/qrchat-bridge';
+import { getQrchatQkeyBalance, linkQrchatWallet, normWallet, normNick } from '@/lib/qrchat-bridge';
 
 /**
  * [v1.0.22] GET /api/my/balance
@@ -56,6 +56,36 @@ export async function GET(req: NextRequest) {
     //        "잔액 0 + 쇼핑 불가" 문제가 근본적으로 해소된다.
     let qkeyBalance = balance.qkeyBalance;
     let qkeySource: 'local' | 'qrchat' = 'local';
+
+    // ★★ qrchatUid 가 아예 없는 큐알쳇 연동 계정(쇼핑몰 자체 로그인 경로 등) 복구:
+    //    지갑+닉으로 큐알쳇 uid 를 역조회(linkQrchatWallet)해 확보하고 D1 에 백필한다.
+    //    → 로그인 경로와 무관하게 큐알쳇 쿠키 잔액이 항상 표시되게 한다.
+    if (!qrchatUid) {
+      const isQrchatLinked =
+        String(origin || '').toUpperCase() === 'QRCHAT' || !!qrchatWallet;
+      const w = normWallet(qrchatWallet);
+      const n = normNick(qrchatNick);
+      if (isQrchatLinked && w && n) {
+        try {
+          const link = await linkQrchatWallet(w, n);
+          if (link.ok && link.uid) {
+            qrchatUid = link.uid;
+            try {
+              await db
+                .prepare(
+                  `UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP
+                     WHERE "id" = ? AND ("qrchatUid" IS NULL OR "qrchatUid" = '')`
+                )
+                .bind(link.uid, auth.userId)
+                .run();
+            } catch { /* unique 충돌 무시 */ }
+          }
+        } catch (e) {
+          console.error('[GET /api/my/balance] uid backfill by wallet failed:', e);
+        }
+      }
+    }
+
     if (qrchatUid) {
       try {
         const live = await getQrchatQkeyBalance(qrchatUid as string);
