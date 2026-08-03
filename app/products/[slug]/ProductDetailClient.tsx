@@ -133,16 +133,29 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  // 뒤로가기 시 쇼핑몰 메인(/products)에 머물도록 히스토리 관리
+  // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 시
+  // 반드시 쇼핑몰 메인(/products)으로 이동해 WebView 밖(앱 메인)으로 튕겨나가지 않게 한다.
+  //
+  // 핵심: 앱 WebView 에서 상품 상세로 '직접 진입'하면 뒤 히스토리에 쇼핑몰이 없어
+  // 뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
+  // → 진입 시 히스토리에 방어용 엔트리를 넣고, 뒤로가기가 감지되면
+  //   방어 엔트리를 즉시 재삽입하면서 /products 로 이동시켜 항상 쇼핑몰에 머물게 한다.
   useEffect(() => {
-    // popstate 이벤트로 뒤로가기 감지
+    if (typeof window === 'undefined') return;
+
     const handlePopState = () => {
-      // 뒤로가기 시 /products로 이동 (쇼핑몰 메인에 머물게)
-      router.replace('/products');
+      // 뒤로가기가 발생하면(방어 엔트리가 소비됨) 즉시 새 방어 엔트리를 다시 쌓아
+      // WebView 가 히스토리 경계에 닿아 닫히는 것을 막고, 쇼핑몰 메인으로 이동한다.
+      try {
+        window.history.pushState({ shopGuard: true }, '', window.location.href);
+      } catch { /* noop */ }
+      router.push('/products');
     };
 
-    // 히스토리에 현재 상태를 push하여 뒤로가기 시 popstate 발생하도록 함
-    window.history.pushState({ fromProductDetail: true }, '', window.location.href);
+    // 진입 시 방어 엔트리 1개 삽입 (현재 URL 유지)
+    try {
+      window.history.pushState({ shopGuard: true }, '', window.location.href);
+    } catch { /* noop */ }
     window.addEventListener('popstate', handlePopState);
 
     return () => {
@@ -399,7 +412,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
         <nav className="sm:hidden mb-3 flex items-center gap-1.5 text-sm text-gray-600">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={() => router.push('/products')}
             className="inline-flex items-center gap-1 px-2 py-1 -ml-2 rounded-md hover:bg-gray-100 active:bg-gray-200 shrink-0"
             aria-label="뒤로"
           >
