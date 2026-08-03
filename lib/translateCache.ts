@@ -69,6 +69,89 @@ const SERVER_LANG_MAP: Record<string, string> = {
   ko: 'ko', en: 'en', ja: 'ja', zh: 'zh', vi: 'vi', th: 'th',
 };
 
+// 사람이 읽는 언어명 (LLM 프롬프트용)
+const LANG_NAME: Record<string, string> = {
+  ko: 'Korean', en: 'English', ja: 'Japanese',
+  zh: 'Chinese (Simplified)', vi: 'Vietnamese', th: 'Thai',
+};
+
+// 번역 결과가 "명백히 깨졌는지" 검사 → 깨졌으면 원문 유지(+캐시 저장 안 함)
+//   상품명 등 복잡한 텍스트에서 m2m100/LLM 이 엉뚱한 문장을 뱉는 경우를 방어한다.
+export function isBrokenTranslation(source: string, translated: string, target: string): boolean {
+  if (!translated || typeof translated !== 'string') return true;
+  const t = translated.trim();
+  if (!t) return true;
+  // 원문과 완전히 동일하면(번역 안 됨) 실패로 보지 않고 그대로 사용하므로 여기선 통과 처리
+  if (t === source.trim()) return false;
+  // LLM 이 지시문/따옴표/설명을 덧붙이는 경우 방어
+  if (/^(translation|번역|sure|here|の翻訳|翻訳)[:：]/i.test(t)) return true;
+  // 숫자 보존 검사: 원문에 있던 아라비아 숫자가 번역문에서 완전히 사라지면(수량/인분 등 왜곡) 실패
+  const srcNums = (source.match(/\d+/g) || []);
+  if (srcNums.length > 0) {
+    const dstNums = (t.match(/\d+/g) || []);
+    // 원문 숫자가 2개 이상인데 번역문에 하나도 없으면 왜곡으로 간주
+    if (srcNums.length >= 2 && dstNums.length === 0) return true;
+  }
+  // 길이 폭주(원문 대비 4배 초과)면 헛소리 생성으로 간주
+  if (t.length > Math.max(40, source.length * 4)) return true;
+  return false;
+}
+
+/**
+ * 단일 텍스트를 Workers AI 로 번역한다.
+ *  1) LLM(llama-3.1-8b-instruct) 프롬프트 번역 우선 — 상품명 등 복잡 텍스트에 강함
+ *  2) LLM 결과가 깨졌으면 m2m100 로 폴백
+ *  3) 둘 다 실패/깨짐이면 원문 반환
+ * @returns { text: 번역문(또는 원문), ok: 캐시 저장해도 되는 정상 번역인지 }
+ */
+export async function aiTranslateOne(
+  ai: any,
+  text: string,
+  source: string,
+  target: string
+): Promise<{ text: string; ok: boolean }> {
+  const srcName = LANG_NAME[source] || 'Korean';
+  const dstName = LANG_NAME[target] || 'English';
+
+  // 1) LLM 번역 (프롬프트: 번역문만, 대괄호/숫자/브랜드 보존)
+  try {
+    const sys =
+      `You are a professional e-commerce translator. Translate the user's text from ${srcName} to ${dstName}. ` +
+      `Rules: Output ONLY the translated text with no quotes, no explanation, no notes. ` +
+      `Preserve numbers, units, quantities, brand names, and any text inside brackets like [ ]. ` +
+      `Keep it natural for an online shopping product listing.`;
+    const res: any = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
+      messages: [
+        { role: 'system', content: sys },
+        { role: 'user', content: text },
+      ],
+      max_tokens: 256,
+      temperature: 0.1,
+    });
+    let out: string = (res && (res.response ?? res.result?.response)) || '';
+    out = String(out).trim().replace(/^["'「『]|["'」』]$/g, '').trim();
+    if (out && !isBrokenTranslation(text, out, target)) {
+      return { text: out, ok: true };
+    }
+  } catch { /* LLM 실패 → m2m100 폴백 */ }
+
+  // 2) m2m100 폴백 (짧은 단어에 강함)
+  try {
+    const res: any = await ai.run('@cf/meta/m2m100-1.2b', {
+      text,
+      source_lang: SERVER_LANG_MAP[source] || 'ko',
+      target_lang: SERVER_LANG_MAP[target],
+    });
+    const out = String((res && (res.translated_text || res.result?.translated_text)) || '').trim();
+    if (out && !isBrokenTranslation(text, out, target)) {
+      return { text: out, ok: true };
+    }
+  } catch { /* 무시 */ }
+
+  // 3) 둘 다 실패 → 원문 유지(캐시 저장 안 함)
+  return { text, ok: false };
+}
+
 /**
  * 서버 측 일괄 번역: D1 캐시 우선 → 미캐시만 Workers AI → 캐시 저장.
  * API 라우트가 응답에 번역본을 곧바로 실어 보낼 때 사용(클라이언트 async 번역 타이밍 이슈 제거).
@@ -97,31 +180,30 @@ export async function translateTextsServer(
   const db = env?.DB;
   const ai = env?.AI;
 
-  // 1) 캐시 조회
+  // 1) 캐시 조회 (깨진 캐시는 무효화 후 재번역)
   if (db) {
     try {
       await ensureTranslationTable(db);
       const cached = await getCachedTranslations(db, uniqueTexts, target);
-      for (const [k, v] of cached) out.set(k, v);
+      const staleKeys: string[] = [];
+      for (const [k, v] of cached) {
+        if (isBrokenTranslation(k, v, target)) staleKeys.push(k);
+        else out.set(k, v);
+      }
+      if (staleKeys.length > 0) await deleteTranslations(db, staleKeys, target);
     } catch { /* 무시 */ }
   }
 
-  // 2) 미캐시만 AI 번역
+  // 2) 미캐시만 AI 번역 (LLM 우선 → 검증 → m2m100 폴백; 정상 결과만 캐시)
   const toTranslate = uniqueTexts.filter((t) => !out.has(t));
   if (toTranslate.length > 0 && ai) {
     const newly: { sourceText: string; translatedText: string }[] = [];
     for (const text of toTranslate) {
-      try {
-        const res: any = await ai.run('@cf/meta/m2m100-1.2b', {
-          text,
-          source_lang: SERVER_LANG_MAP[source] || 'ko',
-          target_lang: SERVER_LANG_MAP[target],
-        });
-        const translated = (res && (res.translated_text || res.result?.translated_text)) || text;
-        out.set(text, translated);
-        if (translated && translated !== text) newly.push({ sourceText: text, translatedText: translated });
-      } catch {
-        out.set(text, text);
+      const { text: translated, ok } = await aiTranslateOne(ai, text, source, target);
+      out.set(text, translated);
+      // ok=true(검증 통과) 이고 원문과 다를 때만 캐시 저장 → 깨진 번역이 캐시에 남지 않도록
+      if (ok && translated && translated !== text) {
+        newly.push({ sourceText: text, translatedText: translated });
       }
     }
     if (db && newly.length > 0) {
@@ -155,5 +237,26 @@ export async function saveTranslations(
     } catch {
       // 개별 저장 실패는 무시
     }
+  }
+}
+
+/** 잘못 캐시된 번역 삭제 (재번역 위해). 원문+대상언어로 제거. */
+export async function deleteTranslations(
+  db: any,
+  sourceTexts: string[],
+  targetLocale: string
+): Promise<void> {
+  if (!db || sourceTexts.length === 0) return;
+  try {
+    const placeholders = sourceTexts.map(() => '?').join(',');
+    await db
+      .prepare(
+        `DELETE FROM "Translation"
+         WHERE "targetLocale" = ? AND "sourceText" IN (${placeholders})`
+      )
+      .bind(targetLocale, ...sourceTexts)
+      .run();
+  } catch {
+    // 삭제 실패는 무시(다음 요청에서 재시도)
   }
 }
