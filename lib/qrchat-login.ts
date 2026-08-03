@@ -9,8 +9,19 @@
  *
  * 사장님 확정 규칙:
  *   - A 회원(origin="QRLIVE")과 절대 자동병합하지 않는다.
- *   - qrchatUid 를 가장 강한 매칭키로 사용한다.
+ *   - ★★★ 매칭키는 "지갑주소(securetQrUrl) + 닉네임 동시일치". qrchatUid 는 캐시.
  *   - 결제는 QRChat Firebase 잔액을 직접 차감하므로 로컬 password 는 임의값.
+ *
+ * ★★★ 2026-08-03 수정 (오로로 사건):
+ *   ─ 문제: 큐알쳇 앱을 재설치/재가입해 uid 가 바뀌면 쇼핑몰 D1 은 옛 uid 로
+ *          큐알쳇 잔액을 조회 → Firebase 에 그 uid 없음 → 마이페이지 0 표시.
+ *   ─ 실제 케이스: 오로로 D1 qrchatUid=1771146200132(옛), 큐알쳇 실제=1785378429362(새).
+ *                지갑주소·닉네임은 완전히 동일. 매칭키는 살아있었는데 조회순서가
+ *                qrchatUid 우선이라 옛 계정으로 잠겨서 갱신이 안 됐음.
+ *   ─ 수정: (1) 조회 최우선을 "지갑+닉 동시일치"로 승격 (원래 사장님 원칙).
+ *           (2) qrchatUid 우선순위를 최후 폴백으로 강등 (지갑/닉으로 못 찾을 때만).
+ *           (3) 지갑 일치로 찾은 계정의 qrchatUid 가 SSO 값과 다르면 자동 갱신.
+ *               (지갑이 동시일치 확인된 상태이므로 계정 탈취 위험 없음)
  */
 import { cookies } from 'next/headers';
 import { getPrisma } from '@/lib/prisma';
@@ -64,30 +75,32 @@ export async function loginQrchatIdentity(
   //   같은 사람이 여러 번 로그인해도 항상 "동일 계정 1개"로 귀결되어야 한다.
   //   (절대 중복 생성 금지 — 충전잔액이 딴 계정에 꽂히는 사고 방지)
   //
-  // 조회 순서(모두 같은 사람으로 수렴):
-  //   1) qrchatUid 일치 (이미 연결된 계정)
-  //   2) 지갑(securetQrUrl) + 닉네임 동시일치 (매칭키)  ← 핵심
-  //   3) 지갑(securetQrUrl) 단독 일치 (닉만 바뀐 경우까지 흡수, 중복생성 방지)
+  // ★★★ 2026-08-03 수정: qrchatUid 우선순위 강등.
+  //   기존: qrchatUid → 지갑+닉 → name 폴백 → 지갑단독
+  //   신규: 지갑+닉 → name 폴백 → 지갑단독 → qrchatUid (최후)
+  //   이유: qrchatUid 는 앱 재설치/재가입 시 새로 발급될 수 있는 값(휘발성 캐시).
+  //         지갑+닉은 사장님 원칙상 "동일인"을 결정하는 진짜 매칭키.
+  //         옛 uid 로 먼저 잠기면 지갑+닉이 같아도 qrchatUid 갱신이 안 됐음
+  //         (오로로 사건: D1=1771146200132, 앱실제=1785378429362, 지갑·닉 동일).
+  //   ─── 도출된 조회 순서 (모두 "동일인 1계정"으로 수렴) ───
+  //   1) 지갑 + 닉네임 동시일치 (매칭키 — 사장님 원칙 최우선)
+  //   2) 지갑 + name 동시일치 (B회원 접미사 처리 흔적 흡수)
+  //   3) 지갑 단독 일치 (같은 지갑이면 동일인 — 중복 계정 생성 금지)
+  //   4) qrchatUid 일치 (지갑조차 없는 예전 데이터 폴백 — 최후 폴백)
   // ───────────────────────────────────────────────────────────────
   const db = await getD1();
 
   let row: any = null;
-  // 1) qrchatUid
+
+  // 1) 지갑 + 닉네임 동시일치 (매칭키 — 최우선)
   row = await db
-    .prepare(`SELECT * FROM "User" WHERE "qrchatUid" = ? LIMIT 1`)
-    .bind(qrchatUid)
+    .prepare(
+      `SELECT * FROM "User" WHERE LOWER("securetQrUrl") = ? AND "nickname" = ? LIMIT 1`
+    )
+    .bind(wallet, nickname)
     .first();
 
-  // 2) 지갑 + 닉네임 동시일치 (매칭키). securetQrUrl 에 지갑주소 저장됨.
-  if (!row) {
-    row = await db
-      .prepare(
-        `SELECT * FROM "User" WHERE LOWER("securetQrUrl") = ? AND "nickname" = ? LIMIT 1`
-      )
-      .bind(wallet, nickname)
-      .first();
-  }
-  // 2-b) name 필드에 원본 닉이 저장된 케이스(B회원 접미사 처리 흔적) 흡수
+  // 2) 지갑 + name 동시일치 (B회원 접미사 처리 흔적 흡수)
   if (!row) {
     row = await db
       .prepare(
@@ -96,28 +109,52 @@ export async function loginQrchatIdentity(
       .bind(wallet, nickname)
       .first();
   }
-  // 3) 지갑 단독 일치 (같은 지갑이면 동일인 — 중복 계정 생성 금지)
+  // 3) 지갑 단독 일치 (같은 지갑이면 동일인)
   if (!row) {
     row = await db
       .prepare(`SELECT * FROM "User" WHERE LOWER("securetQrUrl") = ? LIMIT 1`)
       .bind(wallet)
       .first();
   }
+  // 4) qrchatUid 일치 (지갑 데이터가 없는 최후 폴백)
+  if (!row) {
+    row = await db
+      .prepare(`SELECT * FROM "User" WHERE "qrchatUid" = ? LIMIT 1`)
+      .bind(qrchatUid)
+      .first();
+  }
 
   let user: any = row;
 
-  // 찾았으면: 연동 판별에 필요한 3필드(qrchatUid/지갑/닉)를 "비어있을 때만" 채워
-  //   연결을 안정화한다. (기존 잔액/origin 은 절대 건드리지 않음)
-  //   ★★ 핵심 버그 수정: 예전엔 qrchatUid 만 채우고 지갑(securetQrUrl)/닉네임은
-  //      비어 있어도 그대로 뒀다. 그 결과 usesFirebaseQkey(=uid&&지갑&&닉) 가 false 가 되어
-  //      · 마이페이지에 큐알쳇 쿠키 잔액이 0 으로 표시되고
-  //      · QKEY 결제가 'QRCHAT_LINK_INCOMPLETE' 로 막혔다.
-  //      SSO/직접로그인에서 받은 지갑·닉으로 빈 칸을 메워 연동을 완성시킨다.
+  // 찾았으면: 연동 판별에 필요한 3필드(qrchatUid/지갑/닉)를 채워 연결을 안정화한다.
+  //   (기존 잔액/origin 은 절대 건드리지 않음)
+  //
+  //   ★★★ 2026-08-03 수정 (오로로 사건):
+  //     기존엔 qrchatUid 도 "비어있을 때만" 채웠기 때문에, 옛 uid 가 박혀있으면
+  //     새 uid 로 갱신이 안 됐다. 그 결과 큐알쳇 앱 재설치/재가입한 사용자는
+  //     마이페이지 쿠키가 계속 0 원으로 표시됐다.
+  //
+  //     이번 수정으로 "지갑 동시일치" 로 계정을 찾은 경우, qrchatUid 를
+  //     항상 SSO 값으로 갱신한다. 지갑이 동시일치 확인된 상태이므로
+  //     계정 탈취 위험은 없다 (오히려 옛 uid 를 유지하는 것이 데이터 부정합).
+  //     지갑이 비어있는 옛 데이터는 종전대로 "비어있을 때만" 채우는
+  //     보수적 백필을 유지한다.
   if (user) {
     try {
       const sets: string[] = [];
       const binds: any[] = [];
-      if (!user.qrchatUid) {
+
+      // ★ 매칭키(지갑) 동시일치 → qrchatUid 를 항상 SSO 값으로 정정 (오로로 자동복구).
+      //   지갑이 없거나 다른 계정은 아래 "빈 값 보수적 백필" 로 처리.
+      const userWallet = String(user.securetQrUrl || '').trim().toLowerCase();
+      const walletMatched = !!userWallet && userWallet === wallet;
+
+      if (walletMatched) {
+        if (String(user.qrchatUid || '') !== qrchatUid) {
+          sets.push(`"qrchatUid" = ?`);
+          binds.push(qrchatUid);
+        }
+      } else if (!user.qrchatUid) {
         sets.push(`"qrchatUid" = ?`);
         binds.push(qrchatUid);
       }
@@ -138,7 +175,12 @@ export async function loginQrchatIdentity(
           .prepare(`UPDATE "User" SET ${sets.join(', ')} WHERE "id" = ?`)
           .bind(...binds)
           .run();
-        if (!user.qrchatUid) user.qrchatUid = qrchatUid;
+        // 인메모리 반영
+        if (walletMatched && String(user.qrchatUid || '') !== qrchatUid) {
+          user.qrchatUid = qrchatUid;
+        } else if (!user.qrchatUid) {
+          user.qrchatUid = qrchatUid;
+        }
         if (!String(user.securetQrUrl || '').trim() && wallet) user.securetQrUrl = wallet;
         if (!String(user.nickname || '').trim() && nickname) user.nickname = nickname;
       }
