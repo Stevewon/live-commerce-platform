@@ -21,7 +21,6 @@
 // ============================================================================
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 
 /**
  * 서버단 kill-switch:
@@ -33,7 +32,6 @@ export const FORCE_SHOW_ALL_IN_APP = false;
 const STORAGE_KEY = 'qrchat_embed';
 
 export function useIsAppEmbed(): boolean {
-  const searchParams = useSearchParams();
   const [embed, setEmbed] = useState<boolean>(false);
 
   useEffect(() => {
@@ -43,7 +41,15 @@ export function useIsAppEmbed(): boolean {
     }
     try {
       // 1) URL 쿼리 (앱 진입 시 명시)
-      const q = searchParams?.get('embed');
+      //    useSearchParams() 훅 대신 window.location 을 직접 읽는다.
+      //    (전역 컴포넌트에서 useSearchParams 사용 시 정적 프리렌더가 Suspense
+      //     경계 요구로 빌드 실패 → 클라이언트 전용 effect 안에서 안전하게 파싱)
+      let q: string | null = null;
+      try {
+        q = new URLSearchParams(window.location.search).get('embed');
+      } catch {
+        q = null;
+      }
       if (q === 'app') {
         try {
           window.localStorage.setItem(STORAGE_KEY, 'app');
@@ -92,7 +98,7 @@ export function useIsAppEmbed(): boolean {
     } catch {
       setEmbed(false);
     }
-  }, [searchParams]);
+  }, []);
 
   return embed;
 }
