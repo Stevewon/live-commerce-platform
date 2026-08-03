@@ -134,14 +134,32 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   }, [slug]);
 
   // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 시
-  // 반드시 쇼핑몰 메인(/products)으로 이동해 WebView 밖(앱 메인)으로 튕겨나가지 않게 한다.
+  // ★ 사장님 지시: 상세페이지에서 뒤로가기를 누르면 "무조건" 메인 쇼핑 홈(/products)으로 간다.
+  //   앱 메인(APP)으로 절대 튕겨나가지 않는다.
   //
   // 핵심: 앱 WebView 에서 상품 상세로 '직접 진입'하면 뒤 히스토리에 쇼핑몰이 없어
   // 뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
-  // → 진입 시 히스토리에 방어용 엔트리를 넣고, 뒤로가기가 감지되면
-  //   방어 엔트리를 즉시 재삽입하면서 /products 로 이동시켜 항상 쇼핑몰에 머물게 한다.
+  // → 진입 시 히스토리에 방어용 엔트리를 "여러 개" 쌓고, 뒤로가기가 감지될 때마다
+  //   방어 엔트리를 즉시 재삽입하면서 /products 로 하드 이동시켜 항상 쇼핑몰 메인에 머물게 한다.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const PRODUCTS_HOME = '/products';
+
+    const goShopHome = () => {
+      // SPA 라우팅(router.push)은 WebView 가 '뒤로가기 완료'로 인식 못 하는 경우가 있어
+      // 하드 네비게이션으로 강제 이동한다. 이미 /products 면 재이동 생략(무한루프 방지).
+      try {
+        const path = window.location.pathname;
+        if (path === PRODUCTS_HOME || path === PRODUCTS_HOME + '/') {
+          // 이미 홈이면 방어 엔트리만 다시 쌓아 앱 메인으로 못 나가게 유지
+          window.history.pushState({ shopGuard: true }, '', window.location.href);
+          return;
+        }
+      } catch { /* noop */ }
+      // 상세페이지에서 뒤로가기 → 무조건 쇼핑 메인으로 하드 이동
+      window.location.assign(PRODUCTS_HOME);
+    };
 
     const handlePopState = () => {
       // 뒤로가기가 발생하면(방어 엔트리가 소비됨) 즉시 새 방어 엔트리를 다시 쌓아
@@ -149,11 +167,12 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
       try {
         window.history.pushState({ shopGuard: true }, '', window.location.href);
       } catch { /* noop */ }
-      router.push('/products');
+      goShopHome();
     };
 
-    // 진입 시 방어 엔트리 1개 삽입 (현재 URL 유지)
+    // 진입 시 방어 엔트리를 여러 개 삽입 (현재 URL 유지) — 빠른 연속 뒤로가기까지 방어.
     try {
+      window.history.pushState({ shopGuard: true }, '', window.location.href);
       window.history.pushState({ shopGuard: true }, '', window.location.href);
     } catch { /* noop */ }
     window.addEventListener('popstate', handlePopState);
