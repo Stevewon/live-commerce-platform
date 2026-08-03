@@ -106,20 +106,44 @@ export async function loginQrchatIdentity(
 
   let user: any = row;
 
-  // 찾았으면: qrchatUid 가 비어있을 때만 채워 연결 안정화 (기존 잔액/origin 보존)
+  // 찾았으면: 연동 판별에 필요한 3필드(qrchatUid/지갑/닉)를 "비어있을 때만" 채워
+  //   연결을 안정화한다. (기존 잔액/origin 은 절대 건드리지 않음)
+  //   ★★ 핵심 버그 수정: 예전엔 qrchatUid 만 채우고 지갑(securetQrUrl)/닉네임은
+  //      비어 있어도 그대로 뒀다. 그 결과 usesFirebaseQkey(=uid&&지갑&&닉) 가 false 가 되어
+  //      · 마이페이지에 큐알쳇 쿠키 잔액이 0 으로 표시되고
+  //      · QKEY 결제가 'QRCHAT_LINK_INCOMPLETE' 로 막혔다.
+  //      SSO/직접로그인에서 받은 지갑·닉으로 빈 칸을 메워 연동을 완성시킨다.
   if (user) {
-    if (!user.qrchatUid) {
-      try {
-        await db
-          .prepare(
-            `UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`
-          )
-          .bind(qrchatUid, user.id)
-          .run();
-        user.qrchatUid = qrchatUid;
-      } catch {
-        /* qrchatUid unique 충돌 등은 무시 (이미 다른 곳에 연결) */
+    try {
+      const sets: string[] = [];
+      const binds: any[] = [];
+      if (!user.qrchatUid) {
+        sets.push(`"qrchatUid" = ?`);
+        binds.push(qrchatUid);
       }
+      // 지갑(securetQrUrl) 이 비어 있으면 SSO 지갑으로 백필
+      if (!String(user.securetQrUrl || '').trim() && wallet) {
+        sets.push(`"securetQrUrl" = ?`);
+        binds.push(wallet);
+      }
+      // 닉네임이 비어 있으면 SSO 닉으로 백필 (name 은 표시 겸용이라 건드리지 않음)
+      if (!String(user.nickname || '').trim() && nickname) {
+        sets.push(`"nickname" = ?`);
+        binds.push(nickname);
+      }
+      if (sets.length > 0) {
+        sets.push(`"updatedAt" = CURRENT_TIMESTAMP`);
+        binds.push(user.id);
+        await db
+          .prepare(`UPDATE "User" SET ${sets.join(', ')} WHERE "id" = ?`)
+          .bind(...binds)
+          .run();
+        if (!user.qrchatUid) user.qrchatUid = qrchatUid;
+        if (!String(user.securetQrUrl || '').trim() && wallet) user.securetQrUrl = wallet;
+        if (!String(user.nickname || '').trim() && nickname) user.nickname = nickname;
+      }
+    } catch {
+      /* qrchatUid unique 충돌 등은 무시 (이미 다른 곳에 연결) */
     }
   } else {
     // 정말로 처음 보는 사람일 때만 신규 생성 (origin=QRCHAT)
