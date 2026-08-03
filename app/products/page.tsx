@@ -8,6 +8,7 @@ import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import ShopNavigation from '@/components/ShopNavigation';
 import { krwToQkeyDisplay } from '@/lib/utils/qkey';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
+import { useIsAppEmbed } from '@/lib/embed/useIsAppEmbed';
 
 interface Product {
   id: string;
@@ -54,6 +55,11 @@ function ProductsContent() {
   const searchParams = useSearchParams();
   const { t, locale } = useLanguage();
   const tp = t.products;
+
+  // 앱 WebView 에서는 웹 헤더(ShopNavigation)가 숨겨지므로,
+  // 검색바가 top-14/16 만큼 떠서 상단 메뉴/컨텐츠를 가리는 문제가 생긴다.
+  // → 앱일 땐 sticky 오프셋을 0(top-0)으로, 웹일 땐 헤더 아래(top-14/16)로 맞춘다.
+  const isAppEmbed = useIsAppEmbed();
 
   const SORT_OPTIONS = [
     { value: 'newest', label: tp.newest },
@@ -203,7 +209,8 @@ function ProductsContent() {
       <ShopNavigation />
 
       {/* 검색 바 (상품 목록 전용) */}
-      <div className="bg-white border-b shadow-sm sticky top-14 sm:top-16 z-30">
+      {/* 앱 WebView: 웹 헤더가 없으므로 top-0. 웹: 헤더(h-14/16) 아래에 붙도록 top-14/16. */}
+      <div className={`bg-white border-b shadow-sm sticky z-30 ${isAppEmbed ? 'top-0' : 'top-14 sm:top-16'}`}>
         <div className="max-w-7xl mx-auto px-4 py-3">
           <form onSubmit={handleSearch} className="relative">
             <input
