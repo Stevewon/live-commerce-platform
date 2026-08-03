@@ -13,8 +13,9 @@ let _translationTableEnsured = false;
  * 저장/조회 시 대상 로케일에 접미사로 붙여(예: 'ja' → 'ja@v2') 이전 버전 캐시를 자연스럽게 우회한다.
  * v2: m2m100/8B → Llama3.3-70B/Gemma3 체인으로 교체(상품명 헛번역 대량 무효화).
  * v3: 긴 상세설명 토큰 확장 + 한글 잔존 15% 기준 강화 + 최선후보 채택(원문 노출 방지).
+ * v4: 긴 문장에서 m2m100 폴백 제외(의미 오역 방지) + 단어 반복 헛번역 감지.
  */
-export const TRANSLATION_CACHE_VERSION = 'v3';
+export const TRANSLATION_CACHE_VERSION = 'v4';
 
 /** 캐시 저장/조회에 쓰는 로케일 키(버전 접미사 포함). */
 export function cacheLocale(target: string): string {
@@ -103,11 +104,20 @@ function hangulRatio(s: string): number {
 // 같은 짧은 토큰이 무의미하게 반복되는지(예: "メッセージメッセージ") 감지
 //   - 3회+ 연속 반복이면 무조건 헛소리
 //   - 2회 반복이라도 그 반복 블록이 전체의 60% 이상이면 헛소리(예: 토큰 2배 복제)
+//   - 같은 '단어'가 비정상적으로 여러 번 등장(예: strawberries ...strawberries...) 하면 헛소리
 function hasSillyRepetition(s: string): boolean {
   const t = s.trim();
   if (/(.{2,10}?)\1{2,}/.test(t)) return true; // 3회 이상 연속 반복
   const m = t.match(/(.{2,12}?)\1{1,}/);        // 2회 이상 연속 반복
   if (m && m[0].length >= t.length * 0.6) return true;
+  // 바로 붙은 단어 중복(예: "sweet sweet")
+  if (/\b(\w{3,})\s+\1\b/i.test(t)) return true;
+  // 라틴 단어 빈도 검사: 길이 5+ 단어가 3회 이상 등장하면 헛소리(번역 붕괴)
+  const words = (t.toLowerCase().match(/[a-z]{5,}/g) || []);
+  if (words.length >= 3) {
+    const freq: Record<string, number> = {};
+    for (const w of words) { freq[w] = (freq[w] || 0) + 1; if (freq[w] >= 3) return true; }
+  }
   return false;
 }
 
@@ -225,19 +235,23 @@ export async function aiTranslateOne(
     } catch { /* 다음 모델로 */ }
   }
 
-  // 2) m2m100 폴백 (짧은 단어에 강함)
-  try {
-    const res: any = await ai.run('@cf/meta/m2m100-1.2b', {
-      text,
-      source_lang: SERVER_LANG_MAP[source] || 'ko',
-      target_lang: SERVER_LANG_MAP[target],
-    });
-    const out = String((res && (res.translated_text || res.result?.translated_text)) || '').trim();
-    if (out && !isBrokenTranslation(text, out, target)) {
-      return { text: out, ok: true };
-    }
-    if (out && !hasSillyRepetition(out) && (!cjkTarget || hasJapanese(out) || hasCJKIdeograph(out))) consider(out);
-  } catch { /* 무시 */ }
+  // 2) m2m100 폴백 — 짧은 단어(≤24자)에만 사용.
+  //    긴 문장(상세설명 등)에서는 유창하지만 의미가 틀린 번역(예: 메밀→strawberry, 단어 반복)을
+  //    내놓기 쉬워 오히려 해로우므로 폴백에서 제외한다.
+  if (text.length <= 24) {
+    try {
+      const res: any = await ai.run('@cf/meta/m2m100-1.2b', {
+        text,
+        source_lang: SERVER_LANG_MAP[source] || 'ko',
+        target_lang: SERVER_LANG_MAP[target],
+      });
+      const out = String((res && (res.translated_text || res.result?.translated_text)) || '').trim();
+      if (out && !isBrokenTranslation(text, out, target)) {
+        return { text: out, ok: true };
+      }
+      if (out && !hasSillyRepetition(out) && (!cjkTarget || hasJapanese(out) || hasCJKIdeograph(out))) consider(out);
+    } catch { /* 무시 */ }
+  }
 
   // 3) 완벽한 결과는 없지만, 원문(전부 한글)보다 확실히 번역된 최선 후보가 있으면 채택.
   //    최선 후보의 한글 비율이 원문 대비 절반 이하로 줄었을 때만(=실제 번역 진전) 저장.
