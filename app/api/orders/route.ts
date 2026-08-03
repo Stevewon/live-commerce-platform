@@ -464,8 +464,38 @@ export async function POST(req: NextRequest) {
     //      절대 다른 사람 QKEY 를 차감하지 않음. 단, A 회원이 명시적으로 지갑연결한
     //      경우도 qrchatUid 로 본인 QRChat 잔액을 차감할 수 있음(사장님 답변 (2)).
     const qrchatUid: string | null = userRow.qrchatUid || null;
-    const qrchatWallet: string = String(userRow.securetQrUrl || '').trim().toLowerCase();
-    const qrchatNick: string = String(userRow.nickname || userRow.name || '').trim();
+    let qrchatWallet: string = String(userRow.securetQrUrl || '').trim().toLowerCase();
+    let qrchatNick: string = String(userRow.nickname || userRow.name || '').trim();
+
+    // ★★ 자가치유(self-heal): qrchatUid 는 있는데 지갑/닉이 비어 결제가 막히는 계정 복구.
+    //    큐알쳇 실시간 조회(getQrchatQkeyBalance)는 uid 만으로 지갑주소/닉네임을 함께 돌려주므로,
+    //    그 값으로 빈 칸을 즉시 채워(그리고 D1 에도 백필) QKEY 결제가 정상 진행되게 한다.
+    //    (오로로/오똥지 처럼 SSO 로그인 시점에 지갑/닉이 안 채워진 계정 대응)
+    if (qrchatUid && (!qrchatWallet || !qrchatNick)) {
+      try {
+        const info = await getQrchatQkeyBalance(qrchatUid);
+        if (info.ok) {
+          const w = String(info.walletAddress || '').trim().toLowerCase();
+          const n = String(info.nickname || '').trim();
+          const sets: string[] = [];
+          const binds: any[] = [];
+          if (!qrchatWallet && w) { qrchatWallet = w; sets.push(`"securetQrUrl" = ?`); binds.push(w); }
+          if (!qrchatNick && n) { qrchatNick = n; sets.push(`"nickname" = ?`); binds.push(n); }
+          if (sets.length > 0) {
+            sets.push(`"updatedAt" = CURRENT_TIMESTAMP`);
+            binds.push(userId);
+            try {
+              await d1.prepare(`UPDATE "User" SET ${sets.join(', ')} WHERE "id" = ?`).bind(...binds).run();
+            } catch (healErr) {
+              console.error('[POST /api/orders] self-heal wallet/nick failed:', healErr);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('[POST /api/orders] qrchat self-heal fetch failed:', e);
+      }
+    }
+
     // QKEY 를 Firebase 에서 차감해야 하는 회원인지: qrchatUid + 지갑 존재 (B 회원 또는 지갑연결 A 회원)
     const usesFirebaseQkey: boolean = !!(qrchatUid && qrchatWallet && qrchatNick);
 
