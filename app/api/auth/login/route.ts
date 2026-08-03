@@ -5,6 +5,58 @@ import { verifyPassword } from '@/lib/auth/password';
 import { generateToken } from '@/lib/auth/jwt';
 import { qrchatDirectLogin } from '@/lib/qrchat-bridge';
 import { loginQrchatIdentity } from '@/lib/qrchat-login';
+import { getD1 } from '@/lib/balance';
+import { ensureUserQrchatColumns } from '@/lib/ensureProductColumns';
+import { linkQrchatWallet, normWallet, normNick } from '@/lib/qrchat-bridge';
+
+/**
+ * 쇼핑몰 자체 비밀번호로 로그인한 계정이라도, 큐알쳇 연동 계정(origin=QRCHAT
+ * 또는 지갑주소 보유)인데 qrchatUid 가 비어 있으면 여기서 채워 넣는다.
+ * ──────────────────────────────────────────────────────────────────────────
+ * ★ 이게 없으면: 큐알쳇 회원이 쇼핑몰 자체 로그인 경로로 들어올 때 qrchatUid 가
+ *   저장되지 않아 /api/my/balance 가 큐알쳇 실시간 잔액을 조회하지 못하고
+ *   로컬 0 을 표시한다(= 오로로/오똥지 "쿠키 0" 증상).
+ *   → 지갑주소로 큐알쳇 uid 를 역조회(linkQrchatWallet)해 백필한다.
+ */
+async function healQrchatLinkOnLogin(userId: string): Promise<void> {
+  try {
+    const db = await getD1();
+    await ensureUserQrchatColumns(db);
+    const row: any = await db
+      .prepare(
+        `SELECT "origin","qrchatUid","securetQrUrl","nickname","name"
+           FROM "User" WHERE "id" = ? LIMIT 1`
+      )
+      .bind(userId)
+      .first();
+    if (!row) return;
+
+    const already = String(row.qrchatUid || '').trim();
+    const wallet = normWallet(row.securetQrUrl);
+    const nick = normNick(row.nickname || row.name);
+    const isQrchatLinked =
+      String(row.origin || '').toUpperCase() === 'QRCHAT' || !!wallet;
+
+    if (already) return;                       // 이미 uid 있음 → 그대로 둠
+    if (!isQrchatLinked || !wallet || !nick) return;
+
+    // 지갑+닉으로 큐알쳇 uid 역조회 → 백필
+    const link = await linkQrchatWallet(wallet, nick);
+    if (link.ok && link.uid) {
+      try {
+        await db
+          .prepare(
+            `UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP
+               WHERE "id" = ? AND ("qrchatUid" IS NULL OR "qrchatUid" = '')`
+          )
+          .bind(link.uid, userId)
+          .run();
+      } catch { /* unique 충돌 등 무시 */ }
+    }
+  } catch (e) {
+    console.error('[healQrchatLinkOnLogin] failed:', e);
+  }
+}
 
 /**
  * QRChat 닉/비번 직접 로그인 폴백.
@@ -112,6 +164,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // ★ 큐알쳇 연동 계정인데 qrchatUid 가 비어 있으면 지갑/닉으로 역조회해 백필.
+    //   (쇼핑몰 자체 비번 로그인 경로로도 큐알쳇 쿠키 잔액이 정상 표시되게)
+    await healQrchatLinkOnLogin(user.id);
+
     // JWT 토큰 생성
     const token = generateToken({
       userId: user.id,

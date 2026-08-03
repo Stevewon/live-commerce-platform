@@ -12,7 +12,7 @@ import { ensureOrderPaymentColumns, ensureUserQrchatColumns } from '@/lib/ensure
 // [상품 스냅샷] OrderItem 에 주문 시점 상품명/썸네일 저장 (상품 삭제/변경돼도 주문내역 유지)
 import { ensureOrderItemSnapshotColumns, backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 // [QRChat 연동] B 회원(origin=QRCHAT) QKEY 를 Firebase 에서 직접 차감
-import { spendQkeyForQrlive, getQrchatQkeyBalance } from '@/lib/qrchat-bridge';
+import { spendQkeyForQrlive, getQrchatQkeyBalance, linkQrchatWallet } from '@/lib/qrchat-bridge';
 // Cloudflare Workers compatible crypto
 
 // ─── 휴대전화번호 정규화 (KR) ───
@@ -463,9 +463,34 @@ export async function POST(req: NextRequest) {
     //   ⚠️ A 회원(origin=QRLIVE)은 지갑연결(qrchatUid 있음)이라도 origin 으로 구분되어
     //      절대 다른 사람 QKEY 를 차감하지 않음. 단, A 회원이 명시적으로 지갑연결한
     //      경우도 qrchatUid 로 본인 QRChat 잔액을 차감할 수 있음(사장님 답변 (2)).
-    const qrchatUid: string | null = userRow.qrchatUid || null;
+    let qrchatUid: string | null = userRow.qrchatUid || null;
     let qrchatWallet: string = String(userRow.securetQrUrl || '').trim().toLowerCase();
     let qrchatNick: string = String(userRow.nickname || userRow.name || '').trim();
+
+    // ★★ qrchatUid 가 아예 없는 큐알쳇 연동 계정 복구: 지갑+닉으로 큐알쳇 uid 역조회 후 백필.
+    //    (쇼핑몰 자체 로그인 경로로 들어와 uid 가 저장 안 된 계정도 쿠키 결제 가능하게)
+    {
+      const originIsQrchatEarly = String(userRow.origin || '').toUpperCase() === 'QRCHAT';
+      if (!qrchatUid && (originIsQrchatEarly || qrchatWallet) && qrchatWallet && qrchatNick) {
+        try {
+          const link = await linkQrchatWallet(qrchatWallet, qrchatNick);
+          if (link.ok && link.uid) {
+            qrchatUid = link.uid;
+            try {
+              await d1
+                .prepare(
+                  `UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP
+                     WHERE "id" = ? AND ("qrchatUid" IS NULL OR "qrchatUid" = '')`
+                )
+                .bind(link.uid, userId)
+                .run();
+            } catch { /* unique 충돌 무시 */ }
+          }
+        } catch (e) {
+          console.error('[POST /api/orders] uid backfill by wallet failed:', e);
+        }
+      }
+    }
 
     // ★★ 자가치유(self-heal): qrchatUid 는 있는데 지갑/닉이 비어 결제가 막히는 계정 복구.
     //    큐알쳇 실시간 조회(getQrchatQkeyBalance)는 uid 만으로 지갑주소/닉네임을 함께 돌려주므로,
