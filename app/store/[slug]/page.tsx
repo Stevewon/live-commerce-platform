@@ -256,7 +256,7 @@ export default function StorePage() {
               return (
                 <Link
                   key={product.id}
-                  href={`/products/${product.slug}?store=${store.storeSlug}&partner=${store.id}`}
+                  href={`/products/${product.slug}?store=${store.storeSlug}&partner=${store.id}&from=${encodeURIComponent(`/store/${store.storeSlug}`)}`}
                   className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg hover:border-blue-300 transition-all duration-200"
                 >
                   {/* 이미지 */}
