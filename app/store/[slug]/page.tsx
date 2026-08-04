@@ -50,6 +50,53 @@ export default function StorePage() {
     if (slug) fetchStoreData()
   }, [slug])
 
+  // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 시
+  // ★ 사장님 지시: 스토어 메인(/store/[slug])에서 뒤로가기를 누르면
+  //   "쿠키몰 메인(/products)"으로 가야 한다. 앱 메인으로 절대 튕겨나가지 않는다.
+  //
+  // 앱 WebView 에서 스토어 페이지로 '직접 진입'하면 뒤 히스토리에 쇼핑몰이 없어
+  // 뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
+  // → 진입 시 히스토리에 방어용 엔트리를 여러 개 쌓고, 뒤로가기가 감지될 때마다
+  //   방어 엔트리를 즉시 재삽입하면서 /products 로 하드 이동시켜 항상 쇼핑몰 안에 머물게 한다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const PRODUCTS_HOME = '/products'
+
+    const goShopHome = () => {
+      try {
+        const path = window.location.pathname
+        if (path === PRODUCTS_HOME || path === PRODUCTS_HOME + '/') {
+          // 이미 홈이면 방어 엔트리만 다시 쌓아 앱 메인으로 못 나가게 유지
+          window.history.pushState({ shopGuard: true }, '', window.location.href)
+          return
+        }
+      } catch { /* noop */ }
+      // 스토어 메인에서 뒤로가기 → 쇼핑 메인으로 하드 이동
+      window.location.assign(PRODUCTS_HOME)
+    }
+
+    const handlePopState = () => {
+      // 뒤로가기가 발생하면(방어 엔트리가 소비됨) 즉시 새 방어 엔트리를 다시 쌓아
+      // WebView 가 히스토리 경계에 닿아 닫히는 것을 막고, 쇼핑몰 메인으로 이동한다.
+      try {
+        window.history.pushState({ shopGuard: true }, '', window.location.href)
+      } catch { /* noop */ }
+      goShopHome()
+    }
+
+    // 진입 시 방어 엔트리를 여러 개 삽입 (현재 URL 유지) — 빠른 연속 뒤로가기까지 방어.
+    try {
+      window.history.pushState({ shopGuard: true }, '', window.location.href)
+      window.history.pushState({ shopGuard: true }, '', window.location.href)
+    } catch { /* noop */ }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [])
+
   const fetchStoreData = async () => {
     try {
       const res = await fetch(`/api/store/${slug}`)
