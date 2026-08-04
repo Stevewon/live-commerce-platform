@@ -156,24 +156,35 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     if (typeof window === 'undefined') {
       return categorySlug ? `${PRODUCTS_HOME}?category=${encodeURIComponent(categorySlug)}` : PRODUCTS_HOME;
     }
-    // ① from 쿼리 (목록에서 심어준 원래 목록 URL)
+    // ① from 쿼리 (목록/스토어 등에서 심어준 "왔던 페이지" URL)
     try {
       const from = new URLSearchParams(window.location.search).get('from');
       if (from) {
         const dec = decodeURIComponent(from);
-        // 오픈 리다이렉트 방지: 사이트 내부 /products 경로만 허용
-        if (dec.startsWith('/products')) return dec;
+        // 오픈 리다이렉트 방지: 사이트 내부의 허용된 페이지 경로만 인정한다.
+        // (프로토콜상대 URL "//evil.com" 은 startsWith('/') 를 통과하므로 '//' 는 명시적으로 차단)
+        const isInternal = dec.startsWith('/') && !dec.startsWith('//');
+        const isAllowed = /^\/(products|store|shop|cart|wishlist|lives|live|my|my-orders|orders|search)(\/|\?|$)/.test(dec);
+        if (isInternal && isAllowed) return dec;
       }
     } catch { /* noop */ }
 
-    // ② document.referrer 가 같은 오리진의 /products 목록이면 그 URL
+    // ② document.referrer 가 "같은 오리진의 내부 페이지"면 그 URL 로 되돌아간다.
+    //    (스토어 /store/[slug], 장바구니 /cart, 위시리스트 /wishlist, 라이브 /lives/[id],
+    //     주문내역 등에서 상품을 눌러 들어온 경우 → 뒤로가기 시 왔던 그 페이지로)
+    //    단, 상세페이지 자기 자신(다른 상품 상세 포함)에서 온 것은 제외해 루프를 막는다.
     try {
       if (document.referrer) {
         const ref = new URL(document.referrer);
+        const isSameOrigin = ref.origin === window.location.origin;
+        // 상품 상세끼리의 이동(연관상품 클릭 등)은 referrer 로 인정하지 않는다.
+        const refIsProductDetail = /^\/products\/[^/]+/.test(ref.pathname);
+        // 인증/결제/에러 등 되돌아가면 안 되는 경로는 제외
+        const refIsBlocked = /^\/(login|register|checkout|payment|sso|_next|api)(\/|$)/.test(ref.pathname);
         if (
-          ref.origin === window.location.origin &&
-          ref.pathname === PRODUCTS_HOME &&
-          // 자기 자신(상세)에서 온 게 아닌 목록만
+          isSameOrigin &&
+          !refIsProductDetail &&
+          !refIsBlocked &&
           ref.pathname !== window.location.pathname
         ) {
           return ref.pathname + ref.search;
