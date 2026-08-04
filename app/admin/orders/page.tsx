@@ -100,6 +100,36 @@ export default function AdminOrdersPage() {
   const [exporting, setExporting] = useState(false);
   const [cancelProcessing, setCancelProcessing] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  // [일괄 작업] 체크박스로 선택한 주문 ID 집합 + 일괄 상태변경 진행 상태
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('');
+
+  // 현재 페이지 주문이 바뀌면(검색/필터/페이지 이동) 선택을 초기화한다.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [orders]);
+
+  // 현재 페이지의 전체 선택 여부
+  const allSelected = orders.length > 0 && orders.every((o) => selectedIds.has(o.id));
+  const someSelected = selectedIds.size > 0;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(orders.map((o) => o.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (user && user.role === 'ADMIN') {
@@ -207,6 +237,87 @@ export default function AdminOrdersPage() {
       alert('주문 목록 다운로드에 실패했습니다.');
     } finally {
       setExporting(false);
+    }
+  };
+
+  // [선택 다운로드] 체크한 주문만 엑셀(CSV)로 내려받는다.
+  const handleExportSelected = async () => {
+    if (selectedIds.size === 0) {
+      alert('다운로드할 주문을 먼저 선택해주세요.');
+      return;
+    }
+    try {
+      setExporting(true);
+      const params = new URLSearchParams();
+      params.append('ids', Array.from(selectedIds).join(','));
+
+      const res = await authFetch(`/api/admin/orders/export?${params}`);
+      if (!res.ok) throw new Error('다운로드 실패');
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      const disposition = res.headers.get('Content-Disposition');
+      let fileName = `orders_selected_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`;
+      if (disposition) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match) fileName = match[1];
+      }
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export selected error:', error);
+      alert('선택 주문 다운로드에 실패했습니다.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // [선택 일괄 상태변경] 체크한 주문들의 상태를 한꺼번에 변경한다.
+  const handleBulkStatusChange = async () => {
+    if (selectedIds.size === 0) {
+      alert('상태를 변경할 주문을 먼저 선택해주세요.');
+      return;
+    }
+    if (!bulkStatus) {
+      alert('변경할 상태를 선택해주세요.');
+      return;
+    }
+    const ids = Array.from(selectedIds);
+    if (!confirm(`선택한 ${ids.length}건의 주문 상태를 "${STATUS_LABELS[bulkStatus]}"(으)로 변경하시겠습니까?`)) {
+      return;
+    }
+    try {
+      setBulkProcessing(true);
+      let success = 0;
+      let fail = 0;
+      // 서버 부하를 줄이려 순차 처리(주문 건수는 페이지당 최대 limit 개로 제한적)
+      for (const id of ids) {
+        try {
+          const res = await authFetch(`/api/admin/orders/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: bulkStatus }),
+          });
+          if (res.ok) success++;
+          else fail++;
+        } catch {
+          fail++;
+        }
+      }
+      alert(`일괄 상태 변경 완료\n\n성공: ${success}건${fail > 0 ? `\n실패: ${fail}건` : ''}`);
+      setBulkStatus('');
+      setSelectedIds(new Set());
+      loadOrders();
+    } catch (error) {
+      console.error('Bulk status change error:', error);
+      alert('일괄 상태 변경에 실패했습니다.');
+    } finally {
+      setBulkProcessing(false);
     }
   };
 
@@ -430,12 +541,95 @@ export default function AdminOrdersPage() {
 
         {/* Premium Orders Table */}
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200">
-          <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50 border-b-2 border-gray-200">
+          <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50 border-b-2 border-gray-200 flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-2xl font-black text-gray-900 flex items-center">
               <span className="text-3xl mr-3">📋</span>
               주문 목록 ({pagination.total}건)
             </h2>
+            {someSelected && (
+              <div className="text-sm font-bold text-blue-700">
+                ✅ {selectedIds.size}건 선택됨
+              </div>
+            )}
           </div>
+
+          {/* [일괄 작업 바] 체크박스로 주문을 선택하면 나타난다.
+               - 선택 주문 엑셀 다운로드
+               - 선택 주문 상태 일괄 변경 */}
+          {someSelected && (
+            <div className="px-8 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b-2 border-blue-200 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-black text-blue-800 flex items-center gap-1">
+                <span className="text-lg">🗂️</span>
+                선택 {selectedIds.size}건 일괄 작업:
+              </span>
+
+              {/* 선택 다운로드 */}
+              <button
+                type="button"
+                onClick={handleExportSelected}
+                disabled={exporting}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 font-black text-sm shadow-md hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {exporting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>다운로드 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📥</span>
+                    <span>선택 항목 엑셀 다운로드</span>
+                  </>
+                )}
+              </button>
+
+              {/* 선택 상태 일괄 변경 */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={bulkStatus}
+                  onChange={(e) => setBulkStatus(e.target.value)}
+                  disabled={bulkProcessing}
+                  className="px-4 py-2.5 border-2 border-blue-300 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-200 focus:border-blue-500 bg-white shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  <option value="">상태 변경 선택...</option>
+                  <option value="PENDING">⏳ 발송준비</option>
+                  <option value="CONFIRMED">✅ 확인됨</option>
+                  <option value="SHIPPING">🚚 배송중</option>
+                  <option value="DELIVERED">📦 배송완료</option>
+                  <option value="CANCELLED">❌ 취소됨</option>
+                  <option value="REFUNDED">💸 환불됨</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={handleBulkStatusChange}
+                  disabled={bulkProcessing || !bulkStatus}
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 font-black text-sm shadow-md hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {bulkProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>처리 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🔄</span>
+                      <span>선택 항목 상태 일괄 변경</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 선택 해제 */}
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                disabled={bulkProcessing}
+                className="px-4 py-2.5 bg-white text-gray-600 border-2 border-gray-300 rounded-xl hover:bg-gray-50 font-bold text-sm shadow-sm transition-all disabled:opacity-50"
+              >
+                선택 해제
+              </button>
+            </div>
+          )}
 
           {orders.length === 0 ? (
             <div className="text-center py-20">
@@ -447,6 +641,15 @@ export default function AdminOrdersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-slate-800 via-blue-900 to-indigo-900 border-b-4 border-blue-500">
+                    <th className="px-6 py-6 text-center">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        aria-label="전체 선택"
+                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-400 cursor-pointer accent-blue-600"
+                      />
+                    </th>
                     <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
                       🔢 주문번호
                     </th>
@@ -475,7 +678,23 @@ export default function AdminOrdersPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200 group">
+                    <tr
+                      key={order.id}
+                      className={`transition-all duration-200 group ${
+                        selectedIds.has(order.id)
+                          ? 'bg-blue-50/70'
+                          : 'hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50'
+                      }`}
+                    >
+                      <td className="px-6 py-6 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(order.id)}
+                          onChange={() => toggleSelectOne(order.id)}
+                          aria-label={`주문 ${order.orderNumber} 선택`}
+                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-400 cursor-pointer accent-blue-600"
+                        />
+                      </td>
                       <td className="px-8 py-6">
                         <button
                           onClick={() => setSelectedOrder(order)}

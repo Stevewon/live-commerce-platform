@@ -87,9 +87,21 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status') || 'ALL';
     const search = searchParams.get('search') || '';
     const partnerId = searchParams.get('partnerId') || '';
+    // [선택 다운로드] 관리자가 목록에서 체크한 주문만 내보내기 위한 주문 ID 목록.
+    //   ?ids=id1,id2,id3 형태로 전달. 값이 있으면 다른 필터보다 우선해 해당 주문만 내보낸다.
+    const idsParam = searchParams.get('ids') || '';
+    const selectedIds = idsParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     // 필터 조건
     const where: any = {};
+
+    // 선택된 주문 ID 가 있으면 그 주문들만 내보낸다(체크박스 선택 다운로드).
+    if (selectedIds.length > 0) {
+      where.id = { in: selectedIds };
+    }
 
     if (status !== 'ALL') {
       where.status = status;
