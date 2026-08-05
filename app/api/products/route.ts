@@ -127,9 +127,14 @@ export async function GET(request: NextRequest) {
         }, { status: 404 });
       }
 
+      // ★ 어드민 전용 필드는 고객(공개) 응답에서 제거한다.
+      const pub: any = product;
+      delete pub.sku;
+      delete pub.supplyPrice;
+
       return NextResponse.json({
         success: true,
-        data: [product],
+        data: [pub],
       });
     }
 
