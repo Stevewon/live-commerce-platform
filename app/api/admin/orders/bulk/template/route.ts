@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
         user: { select: { name: true, email: true, phone: true, nickname: true } },
         items: {
           include: {
-            product: { select: { name: true } },
+            product: { select: { name: true, sku: true } },
           },
         },
       },
@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
       '연락처(참고)',
       '배송지(참고)',
       '상품명(참고)',
+      '상품코드(참고)',
       '주문금액(참고)',
       '주문일시(참고)',
       '현재상태(참고)',
@@ -71,6 +72,15 @@ export async function GET(req: NextRequest) {
         const productName = item.product?.name || '상품';
         return item.quantity > 1 ? `${productName} x${item.quantity}` : productName;
       }).join(', ');
+
+      // 상품코드(sku) - 주문 내 상품들의 코드를 중복 제거해 표시 (없으면 빈칸)
+      const itemSkus = Array.from(
+        new Set(
+          order.items
+            .map((item: any) => (item.product?.sku || '').trim())
+            .filter((s: string) => s)
+        )
+      ).join(', ');
 
       const customerName = order.user?.name || order.user?.nickname || order.shippingName || '-';
       const customerPhone = order.user?.phone || order.shippingPhone || '-';
@@ -83,6 +93,7 @@ export async function GET(req: NextRequest) {
         customerPhone,
         order.shippingAddress || '-',
         itemNames || '-',
+        itemSkus || '-',
         order.total,
         new Date(order.createdAt).toLocaleString('ko-KR'),
         order.status === 'CONFIRMED' ? '확인됨' :
@@ -103,6 +114,7 @@ export async function GET(req: NextRequest) {
       { wch: 16 },  // 연락처
       { wch: 40 },  // 배송지
       { wch: 35 },  // 상품명
+      { wch: 16 },  // 상품코드
       { wch: 14 },  // 주문금액
       { wch: 20 },  // 주문일시
       { wch: 10 },  // 현재상태
@@ -122,6 +134,7 @@ export async function GET(req: NextRequest) {
       ['연락처', '참고', '수령인 연락처 (수정 불필요, 참고용)', '010-1234-5678'],
       ['배송지', '참고', '배송 주소 (수정 불필요, 참고용)', '서울시 강남구...'],
       ['상품명', '참고', '주문 상품 (수정 불필요, 참고용)', '블루투스 이어폰 x2'],
+      ['상품코드', '참고', '상품 관리코드/SKU (수정 불필요, 참고용)', '438250'],
       ['주문금액', '참고', '총 주문금액 (수정 불필요, 참고용)', '59000'],
       ['주문일시', '참고', '주문 생성 시각 (수정 불필요, 참고용)', '2026. 4. 13. 오후 3:00'],
       ['현재상태', '참고', '현재 주문 상태 (수정 불필요, 참고용)', '확인됨'],
