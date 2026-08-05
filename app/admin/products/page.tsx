@@ -50,6 +50,7 @@ function AdminProductsPageInner() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [stripping, setStripping] = useState(false)
   // [검색상태 유지] 필터/검색/페이지 초기값을 URL 쿼리에서 복원한다.
   //   → 상품 수정 후 브라우저 뒤로가기 시 검색결과 화면이 그대로 유지됨.
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>(
@@ -183,6 +184,50 @@ function AdminProductsPageInner() {
     }
   }
 
+  // 상품명 맨앞 [브랜드] 대괄호 일괄 삭제
+  const handleStripBrackets = async () => {
+    if (stripping) return
+    try {
+      // 1) 미리보기(dry-run) 로 몇 개가 바뀌는지 먼저 확인
+      const previewRes = await authFetch('/api/admin/products/strip-name-brackets', { method: 'GET' })
+      const preview = await previewRes.json()
+      if (!preview.success) {
+        alert(preview.error || '미리보기 실패')
+        return
+      }
+      if (!preview.willChange) {
+        alert('맨앞에 대괄호가 붙은 상품이 없습니다.')
+        return
+      }
+      const sample = (preview.preview || [])
+        .slice(0, 5)
+        .map((c: any) => `• ${c.before}\n   → ${c.after}`)
+        .join('\n')
+      if (!confirm(
+        `상품명 맨앞의 [브랜드] 대괄호를 삭제합니다.\n\n` +
+        `대상: ${preview.willChange}개 상품\n\n` +
+        `예시)\n${sample}\n\n` +
+        `실행하시겠습니까? (되돌릴 수 없습니다)`
+      )) return
+
+      // 2) 실제 적용
+      setStripping(true)
+      const res = await authFetch('/api/admin/products/strip-name-brackets', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        alert(`완료되었습니다.\n\n변경: ${data.updated}개\n건너뜀: ${data.skipped}개` +
+          (data.failed?.length ? `\n실패: ${data.failed.length}개` : ''))
+        fetchProducts()
+      } else {
+        alert(data.error || '정리 실패')
+      }
+    } catch (error: any) {
+      alert('상품명 정리에 실패했습니다: ' + (error?.message || String(error)))
+    } finally {
+      setStripping(false)
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('정말 이 상품을 삭제하시겠습니까?')) return
     try {
@@ -296,6 +341,17 @@ function AdminProductsPageInner() {
                 </svg>
                 대량등록
               </Link>
+              <button
+                onClick={handleStripBrackets}
+                disabled={stripping}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium text-sm flex items-center gap-1 disabled:opacity-60"
+                title="상품명 맨앞에 붙은 [브랜드] 대괄호를 일괄 삭제합니다"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2m0 2h10M7 4L5 20a2 2 0 002 2h10a2 2 0 002-2L17 4M10 9v6m4-6v6" />
+                </svg>
+                {stripping ? '정리 중...' : '상품명 대괄호 정리'}
+              </button>
               <Link
                 href="/admin/products/optimize-images"
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium text-sm flex items-center gap-1"
