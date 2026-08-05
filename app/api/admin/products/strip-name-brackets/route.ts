@@ -4,17 +4,22 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 
 export const dynamic = 'force-dynamic';
 
-// 상품명 맨앞 대괄호 [ ... ] 1개 + 뒤따르는 공백 제거
-// 예) "[데코아르] 멜로우 스냅백..." -> "멜로우 스냅백..."
-// 두번째 대괄호(예: "[생면]", "[2개세트]")나 맨뒤 상품코드(예: "[438250]")는 건드리지 않음
-const LEAD_BRACKET = /^\s*\[[^\]]*\]\s*/;
+// 상품명에 있는 모든 대괄호 [ ... ] + 안의 텍스트를 위치(앞/중간/뒤) 상관없이 전부 제거
+// 예) "[루비토] 프리미엄 세제 90개입 [447344]" -> "프리미엄 세제 90개입"
+//     "씨없는 홍시 500g*2팩[파인애플바 증정] [447529]" -> "씨없는 홍시 500g*2팩"
+const ANY_BRACKET = /\[[^\]]*\]/g;
 
-function stripLeadingBracket(name: string): string {
+function stripAllBrackets(name: string): string {
   if (!name) return name;
-  const next = name.replace(LEAD_BRACKET, '');
+  // 대괄호+내용 제거 후 남은 공백 정리
+  const next = name.replace(ANY_BRACKET, ' ').replace(/\s+/g, ' ').trim();
   // 안전장치: 제거 후 빈 문자열이 되면 원본 유지
-  if (!next.trim()) return name;
+  if (!next) return name;
   return next;
+}
+
+function hasBracket(name: string): boolean {
+  return /\[[^\]]*\]/.test(name);
 }
 
 // GET: 미리보기 (dry-run) — 어떤 상품명이 어떻게 바뀌는지 확인만 하고 DB 는 변경하지 않음
@@ -33,8 +38,8 @@ export async function GET(req: NextRequest) {
 
     const changes: { id: string; before: string; after: string }[] = [];
     for (const p of products) {
-      if (LEAD_BRACKET.test(p.name)) {
-        const after = stripLeadingBracket(p.name);
+      if (hasBracket(p.name)) {
+        const after = stripAllBrackets(p.name);
         if (after !== p.name) {
           changes.push({ id: p.id, before: p.name, after });
         }
@@ -72,11 +77,11 @@ export async function POST(req: NextRequest) {
     const failed: { id: string; error: string }[] = [];
 
     for (const p of products) {
-      if (!LEAD_BRACKET.test(p.name)) {
+      if (!hasBracket(p.name)) {
         skipped++;
         continue;
       }
-      const after = stripLeadingBracket(p.name);
+      const after = stripAllBrackets(p.name);
       if (after === p.name) {
         skipped++;
         continue;
