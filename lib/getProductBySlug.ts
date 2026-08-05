@@ -40,6 +40,13 @@ async function fetchProductBySlug(slug: string): Promise<any | null> {
   if (!Array.isArray(p.reviews)) p.reviews = [];
   if (!Array.isArray(p.partnerProducts)) p.partnerProducts = [];
   if (!Array.isArray(p.variants)) p.variants = [];
+
+  // ★ 어드민 전용 필드는 고객(공개) 응답에서 제거한다.
+  //   - sku: 상품코드(내부 관리용, 회원 미노출 — 사장님 지시)
+  //   - supplyPrice: 공급가/매입원가(어드민 전용)
+  //   상세 페이지/공개 API 는 이 함수를 공유하므로 여기서 한 번에 걸러 네트워크로도 안 나가게 한다.
+  delete p.sku;
+  delete p.supplyPrice;
   return p;
 }
 

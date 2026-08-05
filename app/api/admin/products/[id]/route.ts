@@ -218,6 +218,13 @@ export async function PATCH(
 
   } catch (error) {
     console.error('상품 수정 실패:', error);
+    // Unique constraint 위반 (상품명 slug 또는 상품코드 sku 중복)
+    if ((error as any)?.code === 'P2002') {
+      return NextResponse.json(
+        { success: false, error: '이미 존재하는 상품명 또는 상품코드입니다' },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: '상품 수정에 실패했습니다', detail: (error as any)?.message || String(error) },
       { status: 500 }
