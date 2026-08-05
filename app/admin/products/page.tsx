@@ -184,7 +184,7 @@ function AdminProductsPageInner() {
     }
   }
 
-  // 상품명 맨앞 [브랜드] 대괄호 일괄 삭제
+  // 상품명에 있는 모든 대괄호 [ ] + 안의 텍스트 일괄 삭제 (앞/중간/뒤 전부)
   const handleStripBrackets = async () => {
     if (stripping) return
     try {
@@ -196,7 +196,7 @@ function AdminProductsPageInner() {
         return
       }
       if (!preview.willChange) {
-        alert('맨앞에 대괄호가 붙은 상품이 없습니다.')
+        alert('대괄호가 포함된 상품이 없습니다.')
         return
       }
       const sample = (preview.preview || [])
@@ -204,7 +204,7 @@ function AdminProductsPageInner() {
         .map((c: any) => `• ${c.before}\n   → ${c.after}`)
         .join('\n')
       if (!confirm(
-        `상품명 맨앞의 [브랜드] 대괄호를 삭제합니다.\n\n` +
+        `상품명에 있는 모든 [ ] 대괄호(안의 텍스트 포함)를 삭제합니다.\n\n` +
         `대상: ${preview.willChange}개 상품\n\n` +
         `예시)\n${sample}\n\n` +
         `실행하시겠습니까? (되돌릴 수 없습니다)`
@@ -345,7 +345,7 @@ function AdminProductsPageInner() {
                 onClick={handleStripBrackets}
                 disabled={stripping}
                 className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium text-sm flex items-center gap-1 disabled:opacity-60"
-                title="상품명 맨앞에 붙은 [브랜드] 대괄호를 일괄 삭제합니다"
+                title="상품명에 있는 모든 [ ] 대괄호와 안의 텍스트를 일괄 삭제합니다 (앞/중간/뒤 전부)"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2m0 2h10M7 4L5 20a2 2 0 002 2h10a2 2 0 002-2L17 4M10 9v6m4-6v6" />
