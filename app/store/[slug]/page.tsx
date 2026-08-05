@@ -51,46 +51,43 @@ export default function StorePage() {
     if (slug) fetchStoreData()
   }, [slug])
 
-  // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 시
-  // ★ 사장님 지시: 스토어 메인(/store/[slug])에서 뒤로가기를 누르면
-  //   "쿠키몰 메인(/products)"으로 가야 한다. 앱 메인으로 절대 튕겨나가지 않는다.
-  //
-  // 앱 WebView 에서 스토어 페이지로 '직접 진입'하면 뒤 히스토리에 쇼핑몰이 없어
-  // 뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
-  // → 진입 시 히스토리에 방어용 엔트리를 여러 개 쌓고, 뒤로가기가 감지될 때마다
-  //   방어 엔트리를 즉시 재삽입하면서 /products 로 하드 이동시켜 항상 쇼핑몰 안에 머물게 한다.
+  // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 처리
+  // ★ 사장님 지시:
+  //   - 사이트 내부에서 클릭해 들어온 경우 → 브라우저 기본 뒤로가기(직전 단계)를 그대로 살린다.
+  //   - 앱 WebView 등에서 스토어로 '직접 진입'(딥링크/새 탭)한 경우엔 뒤 히스토리에 쇼핑몰이 없어
+  //     뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
+  //     → 이 "직접 진입" 케이스에서만 뒤로가기 1회를 쇼핑 메인(/products)으로 보정한다.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const PRODUCTS_HOME = '/products'
 
-    const goShopHome = () => {
-      try {
-        const path = window.location.pathname
-        if (path === PRODUCTS_HOME || path === PRODUCTS_HOME + '/') {
-          // 이미 홈이면 방어 엔트리만 다시 쌓아 앱 메인으로 못 나가게 유지
-          window.history.pushState({ shopGuard: true }, '', window.location.href)
-          return
-        }
-      } catch { /* noop */ }
-      // 스토어 메인에서 뒤로가기 → 쇼핑 메인으로 하드 이동
-      window.location.assign(PRODUCTS_HOME)
+    // 사이트 내부 유입 판별 (같은 오리진 referrer 존재 여부)
+    let cameFromInsideSite = false
+    try {
+      if (document.referrer) {
+        const ref = new URL(document.referrer)
+        cameFromInsideSite = ref.origin === window.location.origin
+      }
+    } catch { /* noop */ }
+
+    // (A) 사이트 내부 유입 → 개입하지 않는다. 뒤로가기가 직전 페이지로 정상 동작.
+    if (cameFromInsideSite) {
+      return
     }
 
-    const handlePopState = () => {
-      // 뒤로가기가 발생하면(방어 엔트리가 소비됨) 즉시 새 방어 엔트리를 다시 쌓아
-      // WebView 가 히스토리 경계에 닿아 닫히는 것을 막고, 쇼핑몰 메인으로 이동한다.
-      try {
-        window.history.pushState({ shopGuard: true }, '', window.location.href)
-      } catch { /* noop */ }
-      goShopHome()
-    }
-
-    // 진입 시 방어 엔트리를 여러 개 삽입 (현재 URL 유지) — 빠른 연속 뒤로가기까지 방어.
+    // (B) 직접 진입 → 방어 엔트리 1개만 쌓고, 첫 뒤로가기 때 쇼핑 메인으로 1회 보정.
+    let guarded = false
     try {
       window.history.pushState({ shopGuard: true }, '', window.location.href)
-      window.history.pushState({ shopGuard: true }, '', window.location.href)
+      guarded = true
     } catch { /* noop */ }
+
+    const handlePopState = () => {
+      if (!guarded) return
+      guarded = false
+      window.location.assign(PRODUCTS_HOME)
+    }
 
     window.addEventListener('popstate', handlePopState)
     return () => {

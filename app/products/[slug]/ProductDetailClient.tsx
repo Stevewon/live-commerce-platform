@@ -133,108 +133,98 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 시
-  // ★ 사장님 지시: 상세페이지에서 뒤로가기를 누르면 "왔던 목록"으로 돌아가야 한다.
-  //   예) 식품 카테고리 2페이지에서 상품을 눌러 들어왔으면 → 뒤로가기 시 식품 2페이지로.
-  //   무조건 메인(/products)으로 보내지 않는다. (단, 앱 메인으로 튕겨 나가는 것은 계속 방지)
+  // 뒤로가기(브라우저/앱 WebView 네이티브 뒤로가기 포함) 처리
   //
-  // 돌아갈 목적지 결정 우선순위:
-  //   ① from 쿼리 — 목록에서 넘어올 때 심어준 "왔던 목록 URL"(카테고리/페이지/검색 필터 포함)
-  //   ② document.referrer — 같은 사이트의 /products 목록에서 왔으면 그 URL
-  //   ③ 상품 카테고리 — 최소한 이 상품이 속한 카테고리 목록(/products?category=<slug>)
-  //   ④ 그래도 없으면 /products (쇼핑 메인)
+  // ★ 사장님 지시 (2026-08-05 최신):
+  //   상세페이지에서 뒤로가기 1번 → "상품을 누르기 바로 직전 단계"로 가야 한다.
+  //     (그 상품이 있던 목록의 스크롤/필터/페이지 상태 그대로 = 브라우저 히스토리상 직전 페이지)
+  //   거기서 뒤로가기 또 1번 → 그 다음 자연스러운 이전 단계(예: 카테고리)로.
+  //   → 즉, 특정 URL 로 강제 점프(shopGuard + location.assign)를 하면 안 되고,
+  //     "브라우저 기본 뒤로가기 히스토리"를 그대로 살려야 한다.
   //
-  // 앱 WebView 에서 상품 상세로 '직접 진입'하면 뒤 히스토리에 쇼핑몰이 없어
-  // 뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
-  // → 진입 시 히스토리에 방어용 엔트리를 "여러 개" 쌓고, 뒤로가기가 감지될 때마다
-  //   방어 엔트리를 재삽입하면서 목적지로 하드 이동시켜 항상 쇼핑몰 안에 머물게 한다.
+  //   단, 예외: 앱 WebView 등에서 상세로 '직접 진입'(딥링크/새 탭)한 경우엔
+  //   뒤 히스토리에 쇼핑몰이 없어 뒤로가기 한 번에 WebView 가 닫히며 앱 메인으로 나가버린다.
+  //   이 "직접 진입" 케이스에서만 뒤로가기 1회를 목록으로 보정한다.
   const categorySlug = product?.category?.slug || null;
 
-  // 뒤로가기 시 돌아갈 "왔던 목록" 목적지를 계산한다. (popstate 핸들러 + 화면 뒤로가기 버튼 공용)
-  const resolveBackTarget = (): string => {
+  // "직접 진입" fallback 목적지 (사이트 내부에서 클릭해 들어온 게 아닐 때만 사용).
+  //   ① from 쿼리(목록에서 심어준 왔던 URL) → ② 카테고리 목록 → ③ 쇼핑 메인
+  const resolveFallbackTarget = (): string => {
     const PRODUCTS_HOME = '/products';
     if (typeof window === 'undefined') {
       return categorySlug ? `${PRODUCTS_HOME}?category=${encodeURIComponent(categorySlug)}` : PRODUCTS_HOME;
     }
-    // ① from 쿼리 (목록/스토어 등에서 심어준 "왔던 페이지" URL)
     try {
       const from = new URLSearchParams(window.location.search).get('from');
       if (from) {
         const dec = decodeURIComponent(from);
-        // 오픈 리다이렉트 방지: 사이트 내부의 허용된 페이지 경로만 인정한다.
-        // (프로토콜상대 URL "//evil.com" 은 startsWith('/') 를 통과하므로 '//' 는 명시적으로 차단)
         const isInternal = dec.startsWith('/') && !dec.startsWith('//');
         const isAllowed = /^\/(products|store|shop|cart|wishlist|lives|live|my|my-orders|orders|search)(\/|\?|$)/.test(dec);
         if (isInternal && isAllowed) return dec;
       }
     } catch { /* noop */ }
+    if (categorySlug) return `${PRODUCTS_HOME}?category=${encodeURIComponent(categorySlug)}`;
+    return PRODUCTS_HOME;
+  };
 
-    // ② document.referrer 가 "같은 오리진의 내부 페이지"면 그 URL 로 되돌아간다.
-    //    (스토어 /store/[slug], 장바구니 /cart, 위시리스트 /wishlist, 라이브 /lives/[id],
-    //     주문내역 등에서 상품을 눌러 들어온 경우 → 뒤로가기 시 왔던 그 페이지로)
-    //    단, 상세페이지 자기 자신(다른 상품 상세 포함)에서 온 것은 제외해 루프를 막는다.
+  // 화면 뒤로가기 버튼 클릭 핸들러.
+  //   - 사이트 내부에서 클릭해 들어왔으면 → 브라우저 기본 뒤로가기(직전 페이지)로.
+  //   - 직접 진입(딥링크 등, 뒤 히스토리 없음)이면 → 목록 fallback 으로 이동.
+  const handleBackButton = () => {
+    if (typeof window === 'undefined') return;
+    let cameFromInsideSite = false;
     try {
       if (document.referrer) {
         const ref = new URL(document.referrer);
-        const isSameOrigin = ref.origin === window.location.origin;
-        // 상품 상세끼리의 이동(연관상품 클릭 등)은 referrer 로 인정하지 않는다.
-        const refIsProductDetail = /^\/products\/[^/]+/.test(ref.pathname);
-        // 인증/결제/에러 등 되돌아가면 안 되는 경로는 제외
-        const refIsBlocked = /^\/(login|register|checkout|payment|sso|_next|api)(\/|$)/.test(ref.pathname);
-        if (
-          isSameOrigin &&
-          !refIsProductDetail &&
-          !refIsBlocked &&
-          ref.pathname !== window.location.pathname
-        ) {
-          return ref.pathname + ref.search;
-        }
+        cameFromInsideSite = ref.origin === window.location.origin;
       }
     } catch { /* noop */ }
-
-    // ③ 상품 카테고리 목록으로 fallback
-    if (categorySlug) return `${PRODUCTS_HOME}?category=${encodeURIComponent(categorySlug)}`;
-
-    // ④ 최종 fallback: 쇼핑 메인
-    return PRODUCTS_HOME;
+    if (cameFromInsideSite && window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.assign(resolveFallbackTarget());
+    }
   };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const PRODUCTS_HOME = '/products';
+    // "사이트 내부에서 클릭해 들어왔는가?" 판별.
+    //   - 같은 오리진 referrer 가 있으면 = 사이트 안에서 링크를 눌러 들어온 것 → 뒤 히스토리 존재.
+    //   - referrer 가 없거나 외부면 = 딥링크/직접 진입/새 탭 → 뒤 히스토리에 쇼핑몰 없음.
+    let cameFromInsideSite = false;
+    try {
+      if (document.referrer) {
+        const ref = new URL(document.referrer);
+        cameFromInsideSite = ref.origin === window.location.origin;
+      }
+    } catch { /* noop */ }
 
-    const goBackToList = () => {
-      const target = resolveBackTarget();
-      // 이미 목적지(또는 목록 홈)에 있으면 재이동하지 않고 방어 엔트리만 유지(무한루프 방지)
-      try {
-        const here = window.location.pathname + window.location.search;
-        const herePath = window.location.pathname;
-        if (here === target || herePath === PRODUCTS_HOME || herePath === PRODUCTS_HOME + '/') {
-          window.history.pushState({ shopGuard: true }, '', window.location.href);
-          return;
-        }
-      } catch { /* noop */ }
+    // (A) 사이트 내부 유입 → 아무것도 하지 않는다.
+    //     방어 엔트리도 안 쌓고 popstate 도 가로채지 않는다.
+    //     그래야 뒤로가기가 "직전 페이지(상품 클릭 직전)"로 정상 동작하고,
+    //     한 번 더 누르면 그 이전 단계로 자연스럽게 이어진다.
+    if (cameFromInsideSite) {
+      return;
+    }
+
+    // (B) 직접 진입(딥링크 등) → 뒤로가기 시 앱/브라우저가 쇼핑몰 밖으로 나가버리므로,
+    //     방어 엔트리 1개만 쌓아 두고, 그게 소비되는 첫 뒤로가기 때 목록으로 1회 보정한다.
+    let guarded = false;
+    try {
+      window.history.pushState({ shopGuard: true }, '', window.location.href);
+      guarded = true;
+    } catch { /* noop */ }
+
+    const handlePopState = () => {
+      if (!guarded) return;
+      guarded = false; // 1회성 — 이후엔 브라우저 기본 동작에 맡긴다.
+      const target = resolveFallbackTarget();
       // SPA 라우팅은 WebView 가 '뒤로가기 완료'로 인식 못 하는 경우가 있어 하드 이동.
       window.location.assign(target);
     };
 
-    const handlePopState = () => {
-      // 뒤로가기가 발생하면(방어 엔트리가 소비됨) 즉시 새 방어 엔트리를 다시 쌓아
-      // WebView 가 히스토리 경계에 닿아 닫히는 것을 막고, "왔던 목록"으로 이동한다.
-      try {
-        window.history.pushState({ shopGuard: true }, '', window.location.href);
-      } catch { /* noop */ }
-      goBackToList();
-    };
-
-    // 진입 시 방어 엔트리를 여러 개 삽입 (현재 URL 유지) — 빠른 연속 뒤로가기까지 방어.
-    try {
-      window.history.pushState({ shopGuard: true }, '', window.location.href);
-      window.history.pushState({ shopGuard: true }, '', window.location.href);
-    } catch { /* noop */ }
     window.addEventListener('popstate', handlePopState);
-
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
@@ -489,7 +479,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
         <nav className="sm:hidden mb-3 flex items-center gap-1.5 text-sm text-gray-600">
           <button
             type="button"
-            onClick={() => { window.location.assign(resolveBackTarget()); }}
+            onClick={handleBackButton}
             className="inline-flex items-center gap-1 px-2 py-1 -ml-2 rounded-md hover:bg-gray-100 active:bg-gray-200 shrink-0"
             aria-label="뒤로"
           >
