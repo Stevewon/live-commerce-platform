@@ -166,6 +166,7 @@ export async function GET(req: NextRequest) {
             product: {
               select: {
                 name: true,
+                sku: true,
                 price: true,
                 supplyPrice: true,
               },
@@ -195,6 +196,7 @@ export async function GET(req: NextRequest) {
       '우편번호',
       '배송메모',
       '상품명',
+      '상품코드',
       '옵션',
       '상품수량',
       '상품단가',
@@ -252,6 +254,7 @@ export async function GET(req: NextRequest) {
           order.shippingZipCode || '',
           order.shippingMemo || '',
           '', // 상품명
+          '', // 상품코드
           '', // 옵션
           '', // 수량
           '', // 단가
@@ -288,6 +291,7 @@ export async function GET(req: NextRequest) {
             idx === 0 ? (order.shippingZipCode || '') : '',
             idx === 0 ? (order.shippingMemo || '') : '',
             item.product?.name || item.productName || '주문 상품',
+            item.product?.sku || '',
             formatOptionValues(item),
             item.quantity || 0,
             item.price || 0,
