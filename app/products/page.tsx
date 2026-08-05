@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import ShopNavigation from '@/components/ShopNavigation';
-import { krwToQkeyDisplay } from '@/lib/utils/qkey';
+import { krwToQkeyDisplay, krwToQtaDisplay } from '@/lib/utils/qkey';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import { useIsAppEmbed } from '@/lib/embed/useIsAppEmbed';
 
@@ -446,6 +446,13 @@ function ProductsContent() {
                           <span aria-hidden>🍪</span>
                           {krwToQkeyDisplay(product.price).toLocaleString()} {tp.qkeyUnit}
                         </p>
+                        {/* [QTA 적립 안내] 현금 결제 시 결제액의 5% 를 QTA 로 적립 */}
+                        {krwToQtaDisplay(product.price) > 0 && (
+                          <p className="text-[11px] font-semibold text-amber-600 mt-0.5 flex items-center gap-0.5">
+                            <span aria-hidden>🎁</span>
+                            현금결제 시 {krwToQtaDisplay(product.price).toLocaleString()} QTA 적립
+                          </p>
+                        )}
                         {product.comparePrice && product.comparePrice > product.price && (
                           <p className="text-xs text-gray-400 line-through">₩{product.comparePrice.toLocaleString()}</p>
                         )}

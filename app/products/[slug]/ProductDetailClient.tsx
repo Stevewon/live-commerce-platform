@@ -9,7 +9,7 @@ import { addToGuestCart } from '@/lib/utils/guestCart';
 import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
 import ProductQnA from '@/components/ProductQnA';
-import { krwToQkeyDisplay } from '@/lib/utils/qkey';
+import { krwToQkeyDisplay, krwToQtaDisplay } from '@/lib/utils/qkey';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 
@@ -600,11 +600,19 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                   ₩{currentPrice.toLocaleString()}
                 </span>
               </div>
-              {/* [qkey 표시] 1 쿠키 = 10원 */}
-              <p className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                <span aria-hidden>🍪</span>
-                {krwToQkeyDisplay(currentPrice).toLocaleString()} 쿠키
-              </p>
+              {/* [qkey 표시] 1 쿠키 = 10원 + QTA 적립 안내(현금결제 5%) */}
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                  <span aria-hidden>🍪</span>
+                  {krwToQkeyDisplay(currentPrice).toLocaleString()} 쿠키
+                </span>
+                {krwToQtaDisplay(currentPrice) > 0 && (
+                  <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                    <span aria-hidden>🎁</span>
+                    현금결제 시 {krwToQtaDisplay(currentPrice).toLocaleString()} QTA 적립
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-3 mt-2 text-sm">
                 {shippingFree ? (
                   <span className="text-green-600 font-medium">무료배송</span>

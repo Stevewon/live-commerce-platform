@@ -36,3 +36,22 @@ export function qkeyToKrw(qkey: number | null | undefined): number {
 export function formatQkey(krw: number | null | undefined, label = '쿠키'): string {
   return `${krwToQkeyDisplay(krw).toLocaleString()} ${label}`;
 }
+
+// ─── QTA 적립 표시 유틸 (사장님 확정 룰과 동일 값, lib/balance.ts 미러) ───
+// - 현금(KRW) 결제 금액의 5% 를 QTA 로 적립
+// - 1 QTA = 100원 환산
+// - 예: 20,000원 × 5% = 1,000원 → ÷100 = 10 QTA
+export const QTA_TO_KRW = 100; // 1 QTA = 100원
+export const QTA_ACCRUAL_RATE = 0.05; // 현금 결제액의 5% 적립
+
+/**
+ * 현금(KRW) 결제 금액으로부터 적립될 QTA 개수 계산 (표시용, 내림).
+ * lib/balance.ts 의 qtaFromKrw 와 동일한 계산식.
+ * 예) 15,000원 → 750원(5%) → 7 QTA
+ */
+export function krwToQtaDisplay(krw: number | null | undefined): number {
+  const won = Number(krw) || 0;
+  if (won <= 0) return 0;
+  const rewardKrw = won * QTA_ACCRUAL_RATE;
+  return Math.floor(rewardKrw / QTA_TO_KRW);
+}

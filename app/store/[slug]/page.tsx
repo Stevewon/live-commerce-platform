@@ -6,6 +6,7 @@ import Link from 'next/link'
 import ShopNavigation from '@/components/ShopNavigation'
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate'
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy'
+import { krwToQkeyDisplay, krwToQtaDisplay } from '@/lib/utils/qkey'
 
 interface StoreInfo {
   id: string
@@ -312,6 +313,18 @@ export default function StorePage() {
                         {formatPrice(displayPrice)}
                         <span className="text-sm font-normal text-gray-600">원</span>
                       </p>
+                      {/* [qkey 표시] 1 쿠키 = 10원 */}
+                      <p className="text-[11px] font-semibold text-purple-600 mt-0.5 flex items-center gap-0.5">
+                        <span aria-hidden>🍪</span>
+                        {krwToQkeyDisplay(displayPrice).toLocaleString()} 쿠키
+                      </p>
+                      {/* [QTA 적립 안내] 현금 결제 시 결제액의 5% 를 QTA 로 적립 */}
+                      {krwToQtaDisplay(displayPrice) > 0 && (
+                        <p className="text-[11px] font-semibold text-amber-600 mt-0.5 flex items-center gap-0.5">
+                          <span aria-hidden>🎁</span>
+                          현금결제 시 {krwToQtaDisplay(displayPrice).toLocaleString()} QTA 적립
+                        </p>
+                      )}
                     </div>
                   </div>
                 </Link>
