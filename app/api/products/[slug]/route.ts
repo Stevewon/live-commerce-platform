@@ -33,10 +33,15 @@ export async function GET(
         { status: 404 }
       );
     }
-    
+
+    // ★ 어드민 전용 필드는 공개 응답에서 제거 (sku=상품코드 내부관리용, supplyPrice=공급가)
+    const pub: any = product;
+    delete pub.sku;
+    delete pub.supplyPrice;
+
     return NextResponse.json({
       success: true,
-      data: product,
+      data: pub,
     });
   } catch (error) {
     console.error('[PRODUCT_GET]', error);

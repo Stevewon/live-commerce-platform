@@ -878,15 +878,16 @@ export default function ProductForm({ mode, initialData }: Props) {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    SKU (상품코드) <span className="text-gray-400 font-normal text-xs">(선택)</span>
+                    상품코드 <span className="text-gray-400 font-normal text-xs">(선택 · 관리자 전용)</span>
                   </label>
                   <input
                     type="text"
                     value={form.sku}
                     onChange={(e) => setForm(prev => ({ ...prev, sku: e.target.value }))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
-                    placeholder="예: PROD-001"
+                    placeholder="예: 438250 / PROD-001"
                   />
+                  <p className="mt-1 text-[11px] text-gray-400">※ 내부 관리용 코드입니다. 구매자(회원) 화면에는 노출되지 않습니다.</p>
                 </div>
               </div>
 
