@@ -660,6 +660,64 @@ export async function POST(req: NextRequest) {
       : paymentMethod === 'SPLIT_BALANCE' ? splitUsedKrw
       : 0;
 
+    // ─────────────────────────────────────────────────────────────
+    // ★ [중복 주문 방지] 서버측 멱등 가드
+    //   버튼 연타·네트워크 재시도·이중 제출 등으로 "같은 주문"이 짧은 시간 안에
+    //   여러 번 들어오면 결제가 여러 번 되고 주문내역에 중복이 쌓인다(사장님 신고).
+    //   → 같은 회원이 최근 90초 이내에 "동일 금액 + 동일 상품구성"으로 만든 주문이
+    //     이미 있으면, 새로 만들지 않고 기존 주문을 그대로 돌려준다(멱등 응답).
+    //   비회원(userId 없음)은 여기서 판별이 어려우므로 생략(토큰 기반이라 위험 낮음).
+    // ─────────────────────────────────────────────────────────────
+    if (userId) {
+      try {
+        // 이번 주문의 상품 구성 서명 (productId:variantId:quantity 정렬)
+        const buildSig = (rows: Array<{ productId?: string; variantId?: string | null; quantity?: number }>) =>
+          rows
+            .map((r) => `${r.productId || ''}:${r.variantId || ''}:${Number(r.quantity) || 0}`)
+            .sort()
+            .join('|');
+        const newSig = buildSig(validatedItems);
+
+        // 최근 90초 이내 같은 회원 + 같은 총액 주문 조회 (아이템 포함)
+        const sinceIso = new Date(Date.now() - 90 * 1000).toISOString();
+        const recentDup = await prisma.order.findFirst({
+          where: {
+            userId,
+            total,
+            createdAt: { gte: new Date(sinceIso) },
+            status: { in: ['PENDING', 'CONFIRMED', 'PAID', 'PROCESSING'] },
+          },
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: {
+              include: { product: { select: { id: true, name: true, slug: true, thumbnail: true, category: { select: { name: true } } } } },
+            },
+          },
+        });
+
+        if (recentDup && Array.isArray(recentDup.items)) {
+          const dupSig = buildSig(
+            recentDup.items.map((it: any) => ({ productId: it.productId, variantId: it.variantId, quantity: it.quantity }))
+          );
+          if (dupSig === newSig) {
+            // ⛔ 완전히 동일한 주문이 방금 생성됨 → 중복. 결제/차감 없이 기존 주문 반환.
+            console.warn('[중복주문차단] userId=%s total=%s 기존주문=%s 재사용', userId, total, recentDup.orderNumber);
+            normalizeOrderItems(recentDup as any);
+            return NextResponse.json({
+              success: true,
+              data: recentDup,
+              guestOrderToken: null,
+              deduplicated: true,
+              message: '이미 접수된 주문입니다',
+            });
+          }
+        }
+      } catch (dupErr) {
+        // 중복 검사 실패는 주문을 막지 않는다(안전 우선).
+        console.error('[중복주문검사 실패(무시)]', dupErr);
+      }
+    }
+
     // 주문 생성 (트랜잭션)
     const order = await prisma.$transaction(async (tx) => {
       // Build order data - only include non-null/undefined fields for D1 compatibility
