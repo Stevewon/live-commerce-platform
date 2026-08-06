@@ -320,6 +320,43 @@ export default function AdminOrdersPage() {
     }
   };
 
+  // [주문 삭제] 취소/환불된 주문을 목록에서 영구 삭제한다.
+  const handleDeleteOrder = async (orderId: string, orderNumber: string) => {
+    if (!window.confirm(`주문 ${orderNumber} 을(를) 목록에서 영구 삭제할까요?\n(취소/환불된 주문만 삭제되며, 되돌릴 수 없습니다)`)) return;
+    try {
+      const res = await authFetch(`/api/admin/orders/${orderId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || '주문 삭제에 실패했습니다.');
+      }
+      await loadOrders();
+    } catch (error: any) {
+      console.error('Delete order error:', error);
+      alert(error?.message || '주문 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // [취소주문 전체삭제] 현재 필터/검색 조건의 취소·환불 주문을 한꺼번에 삭제한다.
+  const handleDeleteAllCancelled = async () => {
+    // 화면상 취소/환불 상태인 주문만 대상
+    const targets = orders.filter((o) => o.status === 'CANCELLED' || o.status === 'REFUNDED');
+    if (targets.length === 0) {
+      alert('현재 목록에 삭제할 취소/환불 주문이 없습니다.');
+      return;
+    }
+    if (!window.confirm(`현재 목록의 취소/환불 주문 ${targets.length}건을 영구 삭제할까요?\n(되돌릴 수 없습니다)`)) return;
+    let ok = 0, fail = 0;
+    for (const o of targets) {
+      try {
+        const res = await authFetch(`/api/admin/orders/${o.id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok && data?.success) ok++; else fail++;
+      } catch { fail++; }
+    }
+    alert(`삭제 완료 ✅\n\n• 삭제: ${ok}건${fail > 0 ? `\n• 실패: ${fail}건` : ''}`);
+    await loadOrders();
+  };
+
   // [선택 다운로드] 체크한 주문만 엑셀(CSV)로 내려받는다.
   const handleExportSelected = async () => {
     if (selectedIds.size === 0) {
@@ -635,6 +672,15 @@ export default function AdminOrdersPage() {
                 </>
               )}
             </button>
+            <button
+              type="button"
+              onClick={handleDeleteAllCancelled}
+              title="현재 목록의 취소/환불된 주문을 모두 영구 삭제합니다"
+              className="px-8 py-5 bg-gradient-to-r from-gray-600 to-gray-800 text-white rounded-2xl hover:from-gray-700 hover:to-gray-900 font-black shadow-lg hover:scale-110 transition-all flex items-center space-x-2"
+            >
+              <span className="text-xl">🗑</span>
+              <span>취소주문 삭제</span>
+            </button>
           </form>
         </div>
 
@@ -875,6 +921,17 @@ export default function AdminOrdersPage() {
                           <option value="CANCELLED">❌ 취소됨</option>
                           <option value="REFUNDED">💸 환불됨</option>
                         </select>
+                        {(order.status === 'CANCELLED' || order.status === 'REFUNDED') && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrder(order.id, order.orderNumber)}
+                            title="이 주문을 목록에서 영구 삭제"
+                            className="mt-2 w-full px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl text-xs font-black hover:from-gray-700 hover:to-gray-800 transition-all shadow-sm flex items-center justify-center gap-1"
+                          >
+                            <span>🗑</span>
+                            <span>삭제</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
