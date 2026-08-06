@@ -298,3 +298,69 @@ export async function getQrchatQkeyBalance(
   const sig = await hmacHex(getBridgeSecret(), u);
   return postJson('getQrchatQkeyBalance', { uid: u, sig });
 }
+
+// ---------------------------------------------------------------------------
+// 6) 결제용 QRChat 신원(uid·지갑·닉) 정합화 (self-heal)
+//    ============================================================================
+//    쿠키(QKEY) 차감이 wallet_mismatch / nickname_mismatch / user_not_found /
+//    bad_signature 로 실패하는 계정은, D1 에 저장된 지갑/닉/uid 가 QRChat Firebase
+//    실제 값과 어긋나 서명 검증에 실패하는 것이다. (앱 재설치/닉변경/지갑변경 등)
+//
+//    복구 전략(둘 중 되는 쪽을 채택):
+//      (A) uid 로 실시간 조회(getQrchatQkeyBalance) → Firebase 가 아는 "그 uid 의
+//          정식 지갑/닉" 을 그대로 받아 사용. (uid 는 맞고 지갑/닉만 어긋난 케이스)
+//      (B) 지갑+닉으로 uid 역조회(linkQrchatWallet) → uid 가 바뀐 케이스 정정.
+//
+//    반환: 정합화된 { uid, wallet, nick } (없으면 입력값 그대로) + changed 플래그.
+//    ※ D1 반영은 호출부(주문 라우트)에서 수행한다(트랜잭션/권한 경계 유지).
+// ---------------------------------------------------------------------------
+export interface CanonicalIdentity {
+  uid: string;
+  wallet: string;
+  nick: string;
+  changed: boolean;
+  banned?: boolean;
+  source?: 'balance' | 'link' | 'none';
+}
+
+export async function resolveCanonicalQrchatIdentity(input: {
+  uid?: string | null;
+  wallet?: string | null;
+  nick?: string | null;
+}): Promise<CanonicalIdentity> {
+  const uid0 = String(input.uid || '').trim();
+  const wallet0 = normWallet(input.wallet);
+  const nick0 = normNick(input.nick);
+
+  // (A) uid 가 있으면 uid 기준 정식 지갑/닉을 먼저 받아온다.
+  if (uid0) {
+    try {
+      const bal = await getQrchatQkeyBalance(uid0);
+      if (bal.ok) {
+        const w = normWallet(bal.walletAddress);
+        const n = normNick(bal.nickname);
+        // 조회 성공 = uid 는 유효. 지갑/닉을 Firebase 정식값으로 교체.
+        const wallet = w || wallet0;
+        const nick = n || nick0;
+        const changed = wallet !== wallet0 || nick !== nick0;
+        return { uid: uid0, wallet, nick, changed, banned: bal.banned, source: 'balance' };
+      }
+    } catch { /* 아래 (B) 로 폴백 */ }
+  }
+
+  // (B) uid 조회 실패(또는 uid 없음) → 지갑+닉으로 실제 uid 역조회.
+  if (wallet0 && nick0) {
+    try {
+      const link = await linkQrchatWallet(wallet0, nick0);
+      if (link.ok && link.uid) {
+        const uid = String(link.uid);
+        const wallet = normWallet(link.walletAddress) || wallet0;
+        const nick = normNick(link.nickname) || nick0;
+        const changed = uid !== uid0 || wallet !== wallet0 || nick !== nick0;
+        return { uid, wallet, nick, changed, source: 'link' };
+      }
+    } catch { /* 실패 → 원본 반환 */ }
+  }
+
+  return { uid: uid0, wallet: wallet0, nick: nick0, changed: false, source: 'none' };
+}
