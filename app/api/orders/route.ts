@@ -916,6 +916,36 @@ export async function POST(req: NextRequest) {
         spend = { ok: false, error: 'bridge_error' } as any;
       }
 
+      // ★ 자가치유(1회 재시도): uid 드리프트/서명불일치 시 지갑+닉으로 실제 uid 재조회 후 재시도.
+      if ((!spend || !spend.ok)
+          && (spend?.error === 'user_not_found' || spend?.error === 'bad_signature')
+          && qrchatWallet && qrchatNick) {
+        try {
+          const relink = await linkQrchatWallet(qrchatWallet, qrchatNick);
+          if (relink.ok && relink.uid && String(relink.uid) !== String(qrchatUid)) {
+            qrchatUid = String(relink.uid);
+            try {
+              await d1
+                .prepare(`UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
+                .bind(qrchatUid, userId)
+                .run();
+            } catch (uidErr) {
+              console.error('[QKEY] qrchatUid 정정 D1 반영 실패(무시)', uidErr);
+            }
+            spend = await spendQkeyForQrlive({
+              uid: qrchatUid,
+              wallet: qrchatWallet,
+              nick: qrchatNick,
+              amountQkey: requiredQkey,
+              orderId: order.id,
+              idemKey: order.id,
+            });
+          }
+        } catch (relinkErr) {
+          console.error('[QKEY] uid 자가치유 재시도 실패(무시)', relinkErr);
+        }
+      }
+
       if (!spend || !spend.ok) {
         // 보상: 방금 만든 주문 롤백 (재고/쿠폰은 실패 확률 낮으나 주문 삭제로 표시)
         try {
@@ -925,6 +955,14 @@ export async function POST(req: NextRequest) {
           console.error('[QRChat QKEY spend 실패 후 주문 롤백 실패]', delErr);
         }
         const err = String((spend as any)?.error || 'spend_failed');
+        console.error('[QRChat QKEY spend 실패]', {
+          err,
+          reason: (spend as any)?.reason,
+          raw: (spend as any)?.raw,
+          uid: qrchatUid,
+          amountQkey: requiredQkey,
+          orderId: order.id,
+        });
         const status =
           err === 'insufficient_balance' ? 402
           : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? 409
@@ -935,7 +973,8 @@ export async function POST(req: NextRequest) {
           err === 'insufficient_balance' ? 'QKEY 잔액이 부족합니다. QRChat 앱에서 잔액을 확인해주세요.'
           : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? '본인확인 정보가 일치하지 않아 결제할 수 없습니다.'
           : err === 'banned' ? '이용이 제한된 계정입니다.'
-          : err === 'user_not_found' ? 'QRChat 사용자 정보를 찾을 수 없습니다.'
+          : err === 'user_not_found' ? 'QRChat 사용자 정보를 찾을 수 없습니다. 앱에서 다시 로그인한 뒤 시도해주세요.'
+          : err === 'bad_signature' ? '큐알쳇 연동 인증에 실패했습니다. 앱에서 다시 로그인한 뒤 시도해주세요.'
           : 'QKEY 결제 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
         return NextResponse.json(
           { success: false, error: msg, code: 'QRCHAT_QKEY_SPEND_FAILED', detail: err },
@@ -983,6 +1022,38 @@ export async function POST(req: NextRequest) {
         spend = { ok: false, error: 'bridge_error' } as any;
       }
 
+      // ★ 자가치유(1회 재시도): uid 드리프트/서명불일치로 실패하면 지갑+닉으로
+      //   Firebase 실제 uid 를 다시 조회해 정정한 뒤 한 번 더 차감을 시도한다.
+      //   (앱 재설치/재가입으로 D1 의 qrchatUid 가 옛 값인 계정 대응 — "오로로 사건")
+      if ((!spend || !spend.ok)
+          && (spend?.error === 'user_not_found' || spend?.error === 'bad_signature')
+          && qrchatWallet && qrchatNick) {
+        try {
+          const relink = await linkQrchatWallet(qrchatWallet, qrchatNick);
+          if (relink.ok && relink.uid && String(relink.uid) !== String(qrchatUid)) {
+            qrchatUid = String(relink.uid);
+            try {
+              await d1
+                .prepare(`UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
+                .bind(qrchatUid, userId)
+                .run();
+            } catch (uidErr) {
+              console.error('[SPLIT] qrchatUid 정정 D1 반영 실패(무시)', uidErr);
+            }
+            spend = await spendQkeyForQrlive({
+              uid: qrchatUid,
+              wallet: qrchatWallet,
+              nick: qrchatNick,
+              amountQkey: splitUsedQkey,
+              orderId: order.id,
+              idemKey: order.id,
+            });
+          }
+        } catch (relinkErr) {
+          console.error('[SPLIT] uid 자가치유 재시도 실패(무시)', relinkErr);
+        }
+      }
+
       if (!spend || !spend.ok) {
         // 보상 1) 이미 로컬에서 차감한 현금(splitUsedKrw) 을 되돌린다.
         if (splitUsedKrw > 0) {
@@ -1018,6 +1089,14 @@ export async function POST(req: NextRequest) {
           console.error('[SPLIT QRChat spend 실패 후 주문 롤백 실패]', delErr);
         }
         const err = String((spend as any)?.error || 'spend_failed');
+        console.error('[SPLIT QRChat spend 실패]', {
+          err,
+          reason: (spend as any)?.reason,
+          raw: (spend as any)?.raw,
+          uid: qrchatUid,
+          amountQkey: splitUsedQkey,
+          orderId: order.id,
+        });
         const status =
           err === 'insufficient_balance' ? 402
           : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? 409
@@ -1028,7 +1107,8 @@ export async function POST(req: NextRequest) {
           err === 'insufficient_balance' ? '쿠키 잔액이 부족합니다. QRChat 앱에서 잔액을 확인해주세요.'
           : err === 'wallet_mismatch' || err === 'nickname_mismatch' ? '본인확인 정보가 일치하지 않아 결제할 수 없습니다.'
           : err === 'banned' ? '이용이 제한된 계정입니다.'
-          : err === 'user_not_found' ? 'QRChat 사용자 정보를 찾을 수 없습니다.'
+          : err === 'user_not_found' ? 'QRChat 사용자 정보를 찾을 수 없습니다. 앱에서 다시 로그인한 뒤 시도해주세요.'
+          : err === 'bad_signature' ? '큐알쳇 연동 인증에 실패했습니다. 앱에서 다시 로그인한 뒤 시도해주세요.'
           : '병행결제 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
         return NextResponse.json(
           { success: false, error: msg, code: 'QRCHAT_QKEY_SPEND_FAILED', detail: err },
