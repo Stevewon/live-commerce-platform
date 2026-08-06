@@ -26,26 +26,27 @@ export async function GET(req: NextRequest) {
       const startDate = new Date(year, 0, 1).toISOString();
       const endDate = new Date(year + 1, 0, 1).toISOString();
 
-      const orders = await prisma.order.findMany({
-        where: {
-          createdAt: {
-            gte: startDate,
-            lt: endDate,
-          },
-        },
-        select: {
-          id: true,
-          total: true,
-          subtotal: true,
-          shippingFee: true,
-          discount: true,
-          status: true,
-          createdAt: true,
-          partnerRevenue: true,
-          platformRevenue: true,
-        },
-        orderBy: { createdAt: 'asc' }
-      });
+      // [2026-08-06 PERF FIX] 월별 리포트 DB 집계로 전환
+      // - 이전: 1년치 주문 전체를 findMany 로 메모리에 로드 후 JS 루프로 12개월 집계.
+      //   → 주문 수 증가 시 응답 시간/메모리 선형 증가.
+      // - 수정: 단일 raw SQL 로 (월 × 상태) 집계 → 주문 수와 무관하게 일정 속도.
+      //   · 월 그룹핑은 strftime('%m', createdAt) (D1 SQLite = UTC 기준)로 계산.
+      //     기존 JS 는 Workers(UTC) 에서 new Date().getMonth() 도 UTC 로 동작하므로
+      //     동일 결과. price/revenue 합계·건수도 조건부 SUM 으로 1:1 이식.
+      const aggRows = await prisma.$queryRawUnsafe(
+        `SELECT
+           CAST(strftime('%m', "createdAt") AS INTEGER) as m,
+           "status" as status,
+           COUNT(*) as cnt,
+           SUM("total") as sumTotal,
+           SUM(COALESCE("partnerRevenue", 0)) as sumPartner,
+           SUM(COALESCE("platformRevenue", 0)) as sumPlatform
+         FROM "Order"
+         WHERE "createdAt" >= ? AND "createdAt" < ?
+         GROUP BY m, "status"`,
+        startDate,
+        endDate,
+      );
 
       // 월별로 그룹핑
       const monthlyData: Record<number, {
@@ -86,34 +87,41 @@ export async function GET(req: NextRequest) {
         };
       }
 
-      for (const order of orders) {
-        const m = new Date(order.createdAt).getMonth() + 1;
+      // (월 × 상태) 집계 행을 기존 JS 분기 로직과 동일하게 반영
+      type AggRow = { m: string | number; status: string; cnt: number; sumTotal: number; sumPartner: number; sumPlatform: number };
+      const aggList: AggRow[] = Array.isArray(aggRows) ? (aggRows as AggRow[]) : [];
+      for (const row of aggList) {
+        const m = Number(row.m);
+        if (!m || m < 1 || m > 12) continue;
         const data = monthlyData[m];
-        
-        data.totalOrders++;
-        data.totalSales += order.total;
+        const cnt = Number(row.cnt) || 0;
+        const sumTotal = Number(row.sumTotal) || 0;
+        const status = row.status;
 
-        if (order.status === 'CANCELLED') {
-          data.cancelledAmount += order.total;
-          data.cancelledOrders++;
-        } else if (order.status === 'REFUNDED') {
-          data.refundedAmount += order.total;
-          data.refundedOrders++;
-        } else if (order.status === 'CONFIRMED') {
-          data.confirmedSales += order.total;
-          data.confirmedOrders++;
-        } else if (order.status === 'SHIPPING') {
-          data.shippingOrders++;
-          data.confirmedSales += order.total;
-        } else if (order.status === 'DELIVERED') {
-          data.deliveredOrders++;
-          data.confirmedSales += order.total;
-        } else if (order.status === 'PENDING') {
-          data.pendingOrders++;
+        data.totalOrders += cnt;
+        data.totalSales += sumTotal;
+
+        if (status === 'CANCELLED') {
+          data.cancelledAmount += sumTotal;
+          data.cancelledOrders += cnt;
+        } else if (status === 'REFUNDED') {
+          data.refundedAmount += sumTotal;
+          data.refundedOrders += cnt;
+        } else if (status === 'CONFIRMED') {
+          data.confirmedSales += sumTotal;
+          data.confirmedOrders += cnt;
+        } else if (status === 'SHIPPING') {
+          data.shippingOrders += cnt;
+          data.confirmedSales += sumTotal;
+        } else if (status === 'DELIVERED') {
+          data.deliveredOrders += cnt;
+          data.confirmedSales += sumTotal;
+        } else if (status === 'PENDING') {
+          data.pendingOrders += cnt;
         }
 
-        data.partnerRevenue += order.partnerRevenue || 0;
-        data.platformRevenue += order.platformRevenue || 0;
+        data.partnerRevenue += Number(row.sumPartner) || 0;
+        data.platformRevenue += Number(row.sumPlatform) || 0;
       }
 
       // 평균 주문 금액 계산
@@ -214,43 +222,43 @@ export async function GET(req: NextRequest) {
         prisma.order.count({ where }),
       ]);
 
-      // 취소/환불 통계
-      const stats = await prisma.order.aggregate({
-        where: {
-          status: { in: ['CANCELLED', 'REFUNDED'] },
-          createdAt: {
-            gte: startDate,
-            lt: endDate,
+      // [2026-08-06 PERF FIX] 취소/환불 통계 count 3종 + aggregate 를 병렬 실행
+      // (이전: stats → cancelCount → refundCount → totalOrderCount 순차 await)
+      const [stats, cancelCount, refundCount, totalOrderCount] = await Promise.all([
+        prisma.order.aggregate({
+          where: {
+            status: { in: ['CANCELLED', 'REFUNDED'] },
+            createdAt: {
+              gte: startDate,
+              lt: endDate,
+            },
           },
-        },
-        _sum: {
-          total: true,
-          refundAmount: true,
-        },
-        _count: {
-          id: true,
-        },
-      });
-
-      const cancelCount = await prisma.order.count({
-        where: {
-          status: 'CANCELLED',
-          createdAt: { gte: startDate, lt: endDate },
-        },
-      });
-
-      const refundCount = await prisma.order.count({
-        where: {
-          status: 'REFUNDED',
-          createdAt: { gte: startDate, lt: endDate },
-        },
-      });
-
-      const totalOrderCount = await prisma.order.count({
-        where: {
-          createdAt: { gte: startDate, lt: endDate },
-        },
-      });
+          _sum: {
+            total: true,
+            refundAmount: true,
+          },
+          _count: {
+            id: true,
+          },
+        }),
+        prisma.order.count({
+          where: {
+            status: 'CANCELLED',
+            createdAt: { gte: startDate, lt: endDate },
+          },
+        }),
+        prisma.order.count({
+          where: {
+            status: 'REFUNDED',
+            createdAt: { gte: startDate, lt: endDate },
+          },
+        }),
+        prisma.order.count({
+          where: {
+            createdAt: { gte: startDate, lt: endDate },
+          },
+        }),
+      ]);
 
       return NextResponse.json({
         success: true,
