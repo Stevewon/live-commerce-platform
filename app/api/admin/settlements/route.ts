@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'all';
     const partnerId = searchParams.get('partnerId');
 
+    // [2026-08-06 PERF/BUG FIX] 정산 목록
+    // - 버그: 프론트(app/admin/settlements/page.tsx)는 응답의 `data.settlements` 를
+    //   읽는데 API 는 `data` 로만 내려주고 있었음 → 정산 목록이 항상 비어 보임.
+    //   프론트가 목록 전체로 통계 카드(전체/대기/승인/반려 금액)를 계산하므로,
+    //   페이지네이션 대신 응답 필드명을 맞추고(settlements + data 동시 제공),
+    //   무제한 로드 방지용 상한(take)만 둔다. (정산은 주문/회원만큼 폭증하지 않음)
+    const takeCap = Math.min(1000, Math.max(1, parseInt(searchParams.get('limit') || '500') || 500));
+
     // 정산 내역 조회
     const where: any = {};
     if (status !== 'all') {
@@ -46,12 +54,14 @@ export async function GET(request: NextRequest) {
       },
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      take: takeCap,
     });
 
     return NextResponse.json({
       success: true,
-      data: settlements
+      settlements, // ★ 프론트 호환 (data.settlements)
+      data: settlements, // 하위호환 유지
     });
 
   } catch (error) {
