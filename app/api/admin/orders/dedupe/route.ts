@@ -20,8 +20,8 @@ export const dynamic = 'force-dynamic';
 //
 //   Body:
 //     { dryRun?: boolean,   // true 면 실제 취소 없이 무엇을 지울지만 리포트 (기본 true)
-//       windowSec?: number, // 같은 그룹으로 묶을 생성시간 간격(초). 기본 600(=10분)
 //       userId?: string }   // 특정 회원만 정리 (생략 시 전체)
+//   ※ 시간창(windowSec) 제거: 같은 회원 + 같은 상품 + 같은 금액이면 시간 상관없이 묶음.
 //
 //   안전장치:
 //     - dryRun 기본값 true → 실수로 지우지 않음. 실제 실행은 { "dryRun": false } 명시 필요.
@@ -80,41 +80,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 중복 후보: 같은 그룹에서 생성시간이 windowSec 안에 몰려 있는 주문들
-    //   (시간순 정렬돼 있으므로, 인접 주문 간격이 windowSec 이내면 같은 "연타 클러스터")
+    // 중복 후보: 같은 그룹(회원+상품+금액)에 2건 이상 있으면 전부 중복 처리
     type Cluster = { keep: string; cancel: Array<{ id: string; orderNumber: string }>; userId: string; total: number; count: number };
     const clusters: Cluster[] = [];
 
+    // ★ 사장님 지시: 같은 회원 + 같은 상품 + 같은 금액이면 "시간 상관없이"
+    //   마지막(최신) 1건만 남기고 나머지 전부 취소.
+    //   (기존엔 windowSec 시간창으로 묶어서 16분 차이 나는 주문이 안 묶이는 버그가 있었음 → 시간창 제거)
     for (const list of groups.values()) {
       if (list.length < 2) continue;
-      list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      // 인접 간격으로 클러스터 분할
-      let bucket: typeof list = [list[0]];
-      const flush = () => {
-        if (bucket.length >= 2) {
-          const sorted = [...bucket].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-          const keep = sorted[sorted.length - 1]; // ★ 마지막(최신) 1건만 남김
-          const cancel = sorted.slice(0, sorted.length - 1);
-          clusters.push({
-            keep: keep.orderNumber,
-            cancel: cancel.map((c) => ({ id: c.id, orderNumber: c.orderNumber })),
-            userId: String(keep.userId),
-            total: keep.total,
-            count: sorted.length,
-          });
-        }
-        bucket = [];
-      };
-      for (let i = 1; i < list.length; i++) {
-        const gap = (list[i].createdAt.getTime() - list[i - 1].createdAt.getTime()) / 1000;
-        if (gap <= windowSec) {
-          bucket.push(list[i]);
-        } else {
-          flush();
-          bucket = [list[i]];
-        }
-      }
-      flush();
+      const sorted = [...list].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      const keep = sorted[sorted.length - 1]; // 마지막(최신) 1건만 남김
+      const cancel = sorted.slice(0, sorted.length - 1);
+      clusters.push({
+        keep: keep.orderNumber,
+        cancel: cancel.map((c) => ({ id: c.id, orderNumber: c.orderNumber })),
+        userId: String(keep.userId),
+        total: keep.total,
+        count: sorted.length,
+      });
     }
 
     const cancelIds = clusters.flatMap((c) => c.cancel.map((x) => x.id));
