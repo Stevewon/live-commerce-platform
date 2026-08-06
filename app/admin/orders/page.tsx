@@ -457,7 +457,7 @@ export default function AdminOrdersPage() {
 
   const getStatusBadge = (status: string) => {
     return (
-      <span className={`px-4 py-2 rounded-xl text-sm font-black shadow-md flex items-center space-x-1 ${STATUS_COLORS[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm inline-flex items-center gap-1 ${STATUS_COLORS[status] || 'bg-gray-100 text-gray-800'}`}>
         <span>{STATUS_ICONS[status] || '📋'}</span>
         <span>{STATUS_LABELS[status] || status}</span>
       </span>
@@ -479,17 +479,17 @@ export default function AdminOrdersPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       {/* Premium Header */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 shadow-2xl border-b-4 border-blue-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 flex items-center justify-center shadow-2xl">
-                <span className="text-3xl">📦</span>
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 via-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
+                <span className="text-xl">📦</span>
               </div>
               <div>
-                <h1 className="text-4xl font-black text-white drop-shadow-lg">
+                <h1 className="text-2xl font-black text-white drop-shadow">
                   주문 관리 시스템
                 </h1>
-                <p className="mt-2 text-blue-200 text-lg font-medium">Enterprise Order Management</p>
+                <p className="mt-0.5 text-blue-200 text-xs font-medium">Enterprise Order Management</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -497,7 +497,7 @@ export default function AdminOrdersPage() {
                 <div className="text-sm text-blue-200 font-medium">관리자</div>
                 <div className="text-lg font-bold text-white">{user?.name}</div>
               </div>
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-2xl shadow-2xl ring-4 ring-white/20 hover:scale-110 transition-transform cursor-pointer">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-black text-lg shadow-lg ring-2 ring-white/20 hover:scale-105 transition-transform cursor-pointer">
                 {user?.name?.charAt(0)}
               </div>
             </div>
@@ -505,10 +505,10 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
         {/* Premium Navigation */}
-        <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-2xl p-3 flex flex-wrap gap-2 border border-gray-200">
+        <div className="mb-5">
+          <div className="bg-white rounded-2xl shadow-md p-2 flex flex-wrap gap-2 border border-gray-200">
             <Link href="/admin" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
               <span className="text-lg">📊</span>
               <span>대시보드</span>
@@ -541,34 +541,34 @@ export default function AdminOrdersPage() {
         </div>
 
         {/* Premium Statistics */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <div className="group bg-gradient-to-br from-white to-purple-50 rounded-3xl shadow-2xl p-6 border-t-4 border-purple-500 hover:shadow-purple-200 hover:scale-105 transition-all duration-300 cursor-pointer">
+        <div className="grid md:grid-cols-4 gap-4 mb-6">
+          <div className="group bg-gradient-to-br from-white to-purple-50 rounded-2xl shadow-lg p-4 border-t-4 border-purple-500 hover:shadow-purple-200 hover:scale-105 transition-all duration-300 cursor-pointer">
             <div className="text-xs font-black text-purple-600 uppercase tracking-wider mb-2">📊 전체 주문</div>
-            <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 group-hover:scale-110 transition-transform">
+            <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 group-hover:scale-110 transition-transform">
               {pagination.total}
             </div>
             <div className="text-xs text-gray-500 mt-2 font-semibold">Total Orders</div>
           </div>
 
-          <div className="group bg-gradient-to-br from-white to-yellow-50 rounded-3xl shadow-2xl p-6 border-t-4 border-yellow-500 hover:shadow-yellow-200 hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div className="group bg-gradient-to-br from-white to-yellow-50 rounded-2xl shadow-lg p-4 border-t-4 border-yellow-500 hover:shadow-yellow-200 hover:scale-105 transition-all duration-300 cursor-pointer">
             <div className="text-xs font-black text-yellow-600 uppercase tracking-wider mb-2">⏳ 발송준비</div>
-            <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 group-hover:scale-110 transition-transform">
+            <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-orange-600 group-hover:scale-110 transition-transform">
               {orders.filter(o => o.status === 'PENDING').length}
             </div>
             <div className="text-xs text-gray-500 mt-2 font-semibold">Pending</div>
           </div>
 
-          <div className="group bg-gradient-to-br from-white to-blue-50 rounded-3xl shadow-2xl p-6 border-t-4 border-blue-500 hover:shadow-blue-200 hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div className="group bg-gradient-to-br from-white to-blue-50 rounded-2xl shadow-lg p-4 border-t-4 border-blue-500 hover:shadow-blue-200 hover:scale-105 transition-all duration-300 cursor-pointer">
             <div className="text-xs font-black text-blue-600 uppercase tracking-wider mb-2">🚚 배송중</div>
-            <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 group-hover:scale-110 transition-transform">
+            <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600 group-hover:scale-110 transition-transform">
               {orders.filter(o => o.status === 'SHIPPING').length}
             </div>
             <div className="text-xs text-gray-500 mt-2 font-semibold">Shipping</div>
           </div>
 
-          <div className="group bg-gradient-to-br from-white to-emerald-50 rounded-3xl shadow-2xl p-6 border-t-4 border-emerald-500 hover:shadow-emerald-200 hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div className="group bg-gradient-to-br from-white to-emerald-50 rounded-2xl shadow-lg p-4 border-t-4 border-emerald-500 hover:shadow-emerald-200 hover:scale-105 transition-all duration-300 cursor-pointer">
             <div className="text-xs font-black text-emerald-600 uppercase tracking-wider mb-2">✅ 완료</div>
-            <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 group-hover:scale-110 transition-transform">
+            <div className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-green-600 group-hover:scale-110 transition-transform">
               {orders.filter(o => o.status === 'DELIVERED').length}
             </div>
             <div className="text-xs text-gray-500 mt-2 font-semibold">Delivered</div>
@@ -592,7 +592,7 @@ export default function AdminOrdersPage() {
                     : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 hover:from-blue-50 hover:to-blue-100 hover:scale-105'
                 }`}
               >
-                <span className="text-xl">{STATUS_ICONS[status] || '📋'}</span>
+                <span className="text-sm">{STATUS_ICONS[status] || '📋'}</span>
                 <span>{label}</span>
               </button>
             ))}
@@ -606,9 +606,9 @@ export default function AdminOrdersPage() {
                 placeholder="주문번호, 주문자, 수령인, 연락처, 이메일로 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-14 pr-6 py-5 border-3 border-gray-300 rounded-2xl focus:ring-4 focus:ring-blue-300 focus:border-blue-500 transition-all text-lg font-medium shadow-inner bg-white group-hover:border-blue-400 placeholder:text-gray-400"
+                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-300 focus:border-blue-500 transition-all text-sm font-medium bg-white group-hover:border-blue-400 placeholder:text-gray-400"
               />
-              <div className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-500 text-2xl group-hover:scale-125 transition-transform">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500 text-base">
                 🔍
               </div>
               {searchQuery && (
@@ -625,14 +625,14 @@ export default function AdminOrdersPage() {
                 </button>
               )}
             </div>
-            <button type="submit" className="px-8 py-5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 font-black shadow-lg hover:scale-110 transition-all">
+            <button type="submit" className="px-5 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 font-bold text-sm shadow hover:scale-105 transition-all">
               검색
             </button>
             <button
               type="button"
               onClick={handleExportExcel}
               disabled={exporting}
-              className="px-8 py-5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-2xl hover:from-emerald-600 hover:to-emerald-700 font-black shadow-lg hover:scale-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl hover:from-emerald-600 hover:to-emerald-700 font-bold text-sm shadow hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {exporting ? (
                 <>
@@ -641,16 +641,16 @@ export default function AdminOrdersPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-xl">📥</span>
+                  <span className="text-base">📥</span>
                   <span>엑셀 다운로드</span>
                 </>
               )}
             </button>
             <Link
               href="/admin/orders/bulk"
-              className="px-8 py-5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl hover:from-orange-600 hover:to-amber-600 font-black shadow-lg hover:scale-110 transition-all flex items-center space-x-2"
+              className="px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl hover:from-orange-600 hover:to-amber-600 font-bold text-sm shadow hover:scale-105 transition-all flex items-center space-x-2"
             >
-              <span className="text-xl">🚚</span>
+              <span className="text-base">🚚</span>
               <span>송장 대량등록</span>
             </Link>
             <button
@@ -658,7 +658,7 @@ export default function AdminOrdersPage() {
               onClick={handleDedupe}
               disabled={dedupeProcessing}
               title="같은 회원의 동일 상품·동일 금액 중복 주문을 마지막 1건만 남기고 취소·환불합니다"
-              className="px-8 py-5 bg-gradient-to-r from-rose-500 to-red-600 text-white rounded-2xl hover:from-rose-600 hover:to-red-700 font-black shadow-lg hover:scale-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              className="px-5 py-3 bg-gradient-to-r from-rose-500 to-red-600 text-white rounded-xl hover:from-rose-600 hover:to-red-700 font-bold text-sm shadow hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {dedupeProcessing ? (
                 <>
@@ -667,7 +667,7 @@ export default function AdminOrdersPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-xl">🧹</span>
+                  <span className="text-base">🧹</span>
                   <span>중복주문 정리</span>
                 </>
               )}
@@ -676,18 +676,18 @@ export default function AdminOrdersPage() {
               type="button"
               onClick={handleDeleteAllCancelled}
               title="현재 목록의 취소/환불된 주문을 모두 영구 삭제합니다"
-              className="px-8 py-5 bg-gradient-to-r from-gray-600 to-gray-800 text-white rounded-2xl hover:from-gray-700 hover:to-gray-900 font-black shadow-lg hover:scale-110 transition-all flex items-center space-x-2"
+              className="px-5 py-3 bg-gradient-to-r from-gray-600 to-gray-800 text-white rounded-xl hover:from-gray-700 hover:to-gray-900 font-bold text-sm shadow hover:scale-105 transition-all flex items-center space-x-2"
             >
-              <span className="text-xl">🗑</span>
+              <span className="text-base">🗑</span>
               <span>취소주문 삭제</span>
             </button>
           </form>
         </div>
 
         {/* Premium Orders Table */}
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-200">
-          <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50 border-b-2 border-gray-200 flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-2xl font-black text-gray-900 flex items-center">
+        <div className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-200">
+          <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-blue-50 border-b-2 border-gray-200 flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-lg font-black text-gray-900 flex items-center">
               <span className="text-3xl mr-3">📋</span>
               주문 목록 ({pagination.total}건)
             </h2>
@@ -777,46 +777,46 @@ export default function AdminOrdersPage() {
           )}
 
           {orders.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="text-8xl mb-6">📭</div>
-              <p className="text-gray-500 font-bold text-xl">주문이 없습니다</p>
+            <div className="text-center py-12">
+              <div className="text-5xl mb-3">📭</div>
+              <p className="text-gray-500 font-bold text-base">주문이 없습니다</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-slate-800 via-blue-900 to-indigo-900 border-b-4 border-blue-500">
-                    <th className="px-6 py-6 text-center">
+                    <th className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
                         checked={allSelected}
                         onChange={toggleSelectAll}
                         aria-label="전체 선택"
-                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-400 cursor-pointer accent-blue-600"
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-400 cursor-pointer accent-blue-600"
                       />
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       🔢 주문번호
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       👤 주문자
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       📬 수령인
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       💰 주문금액
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       💳 결제정보
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       📊 상태
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       🕐 주문일시
                     </th>
-                    <th className="px-8 py-6 text-left text-sm font-black text-white uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-bold text-white tracking-wide">
                       ⚙️ 관리
                     </th>
                   </tr>
@@ -831,29 +831,29 @@ export default function AdminOrdersPage() {
                           : 'hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50'
                       }`}
                     >
-                      <td className="px-6 py-6 text-center">
+                      <td className="px-3 py-3 text-center">
                         <input
                           type="checkbox"
                           checked={selectedIds.has(order.id)}
                           onChange={() => toggleSelectOne(order.id)}
                           aria-label={`주문 ${order.orderNumber} 선택`}
-                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-400 cursor-pointer accent-blue-600"
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-400 cursor-pointer accent-blue-600"
                         />
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-4 py-3">
                         <button
                           onClick={() => setSelectedOrder(order)}
-                          className="font-mono text-lg font-black text-blue-600 hover:text-blue-800 hover:underline"
+                          className="font-mono text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline text-left"
                         >
                           {order.orderNumber}
                         </button>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-4 py-3">
                         <div>
-                          <div className="text-base font-black text-gray-900">
+                          <div className="text-sm font-bold text-gray-900">
                             {order.user?.name || '비회원'}
                           </div>
-                          <div className="text-sm text-gray-600 font-medium mt-1">
+                          <div className="text-xs text-gray-600 font-medium mt-0.5">
                             {order.user?.email || order.guestEmail || '-'}
                           </div>
                           {order.guestPhone && (
@@ -866,22 +866,22 @@ export default function AdminOrdersPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-4 py-3">
                         <div>
                           <div className="text-sm font-bold text-gray-900">
                             {order.shippingName || '-'}
                           </div>
-                          <div className="text-xs text-gray-500 font-medium mt-1">
+                          <div className="text-xs text-gray-500 font-medium mt-0.5">
                             📱 {order.shippingPhone || '-'}
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
-                        <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
+                      <td className="px-4 py-3">
+                        <div className="text-base font-black text-purple-700">
                           {formatCurrency(order.total)}
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-4 py-3">
                         {order.paymentKey ? (
                           <div className="space-y-1">
                             <div className="text-xs font-bold text-gray-500">TID</div>
@@ -902,36 +902,37 @@ export default function AdminOrdersPage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-8 py-6">{getStatusBadge(order.status)}</td>
-                      <td className="px-8 py-6">
+                      <td className="px-4 py-3">{getStatusBadge(order.status)}</td>
+                      <td className="px-4 py-3">
                         <div className="text-sm text-gray-700 font-bold">
                           {formatDate(order.createdAt)}
                         </div>
                       </td>
-                      <td className="px-8 py-6">
-                        <select
-                          value={order.status}
-                          onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                          className="px-4 py-3 border-3 border-gray-300 rounded-xl text-sm font-bold focus:ring-4 focus:ring-blue-300 focus:border-blue-500 hover:border-blue-400 transition-all cursor-pointer bg-white shadow-sm"
-                        >
-                          <option value="PENDING">⏳ 발송준비</option>
-                          <option value="CONFIRMED">✅ 확인됨</option>
-                          <option value="SHIPPING">🚚 배송중</option>
-                          <option value="DELIVERED">📦 배송완료</option>
-                          <option value="CANCELLED">❌ 취소됨</option>
-                          <option value="REFUNDED">💸 환불됨</option>
-                        </select>
-                        {(order.status === 'CANCELLED' || order.status === 'REFUNDED') && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteOrder(order.id, order.orderNumber)}
-                            title="이 주문을 목록에서 영구 삭제"
-                            className="mt-2 w-full px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl text-xs font-black hover:from-gray-700 hover:to-gray-800 transition-all shadow-sm flex items-center justify-center gap-1"
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={order.status}
+                            onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                            className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-blue-300 focus:border-blue-500 hover:border-blue-400 transition-all cursor-pointer bg-white"
                           >
-                            <span>🗑</span>
-                            <span>삭제</span>
-                          </button>
-                        )}
+                            <option value="PENDING">⏳ 발송준비</option>
+                            <option value="CONFIRMED">✅ 확인됨</option>
+                            <option value="SHIPPING">🚚 배송중</option>
+                            <option value="DELIVERED">📦 배송완료</option>
+                            <option value="CANCELLED">❌ 취소됨</option>
+                            <option value="REFUNDED">💸 환불됨</option>
+                          </select>
+                          {(order.status === 'CANCELLED' || order.status === 'REFUNDED') && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteOrder(order.id, order.orderNumber)}
+                              title="이 주문을 목록에서 영구 삭제"
+                              className="px-2 py-1.5 bg-gray-100 text-gray-600 border border-gray-300 rounded-lg text-xs font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-all"
+                            >
+                              🗑
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -942,7 +943,7 @@ export default function AdminOrdersPage() {
 
           {/* Premium Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-blue-50 border-t-2 border-gray-200 flex items-center justify-between">
+            <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-blue-50 border-t-2 border-gray-200 flex items-center justify-between">
               <div className="text-base text-gray-700 font-bold">
                 전체 {pagination.total}개 중 {(pagination.page - 1) * pagination.limit + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} 표시
               </div>
@@ -984,7 +985,7 @@ export default function AdminOrdersPage() {
             className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border-4 border-blue-500 animate-scaleIn"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700 flex justify-between items-center">
+            <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 flex justify-between items-center">
               <h3 className="text-2xl font-black text-white flex items-center">
                 <span className="text-3xl mr-3">📋</span>
                 주문 상세 정보
@@ -997,7 +998,7 @@ export default function AdminOrdersPage() {
               </button>
             </div>
             
-            <div className="px-8 py-6 space-y-6">
+            <div className="px-4 py-3 space-y-6">
               <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-6 border-2 border-blue-200">
                 <h4 className="font-black text-gray-900 mb-4 text-lg flex items-center">
                   <span className="text-2xl mr-2">📝</span>
@@ -1446,7 +1447,7 @@ export default function AdminOrdersPage() {
               </div>
             </div>
 
-            <div className="px-8 py-6 bg-gray-50 border-t-2 border-gray-200">
+            <div className="px-4 py-3 bg-gray-50 border-t-2 border-gray-200">
               <button
                 onClick={() => setSelectedOrder(null)}
                 className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl hover:from-blue-700 hover:to-blue-800 font-black text-lg shadow-lg hover:scale-105 transition-all"
