@@ -457,7 +457,7 @@ export default function AdminOrdersPage() {
 
   const getStatusBadge = (status: string) => {
     return (
-      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm inline-flex items-center gap-1 ${STATUS_COLORS[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm inline-flex items-center justify-center gap-1 whitespace-nowrap min-w-[80px] ${STATUS_COLORS[status] || 'bg-gray-100 text-gray-800'}`}>
         <span>{STATUS_ICONS[status] || '📋'}</span>
         <span>{STATUS_LABELS[status] || status}</span>
       </span>
