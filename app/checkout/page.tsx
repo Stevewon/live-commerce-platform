@@ -67,6 +67,8 @@ export default function CheckoutPage() {
   );
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // ★ [중복 주문 방지] 버튼 연타·이중 제출 즉시 차단용 (state는 리렌더 전이라 늦을 수 있어 ref 사용)
+  const submittingRef = useRef(false);
   const [isGuest, setIsGuest] = useState(false);
 
   // 배송 정보
@@ -429,6 +431,9 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // ★ [중복 주문 방지] 이미 제출 처리 중이면 즉시 무시 (연타·중복 클릭 방지)
+    if (submittingRef.current || submitting) return;
+
     // [v1.0.22] 잔액 결제는 회원 전용
     if (isGuest || !user) {
       alert(t.checkout.balanceLoginAlert);
@@ -492,6 +497,7 @@ export default function CheckoutPage() {
     }
 
     try {
+      submittingRef.current = true;
       setSubmitting(true);
       const fullAddress = shippingAddressDetail
         ? `${shippingAddress} ${shippingAddressDetail}`
@@ -592,6 +598,7 @@ export default function CheckoutPage() {
       console.error('order failed:', error);
       alert(error.message || t.checkout.orderError);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
