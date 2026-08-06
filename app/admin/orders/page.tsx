@@ -104,6 +104,8 @@ export default function AdminOrdersPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkStatus, setBulkStatus] = useState('');
+  // [중복주문 정리] 처리 상태
+  const [dedupeProcessing, setDedupeProcessing] = useState(false);
 
   // 현재 페이지 주문이 바뀌면(검색/필터/페이지 이동) 선택을 초기화한다.
   useEffect(() => {
@@ -237,6 +239,84 @@ export default function AdminOrdersPage() {
       alert('주문 목록 다운로드에 실패했습니다.');
     } finally {
       setExporting(false);
+    }
+  };
+
+  // [중복주문 정리] 같은 회원의 "동일 상품 + 동일 금액" 중복 주문을
+  //   마지막(최신) 1건만 남기고 전부 취소 + 환불. 먼저보기(dryRun) → 확인 → 실행 2단계.
+  const handleDedupe = async () => {
+    if (dedupeProcessing) return;
+    try {
+      setDedupeProcessing(true);
+
+      // 1) 먼저보기: 무엇을 지울지 리포트만 (실제 취소 X)
+      const previewRes = await authFetch('/api/admin/orders/dedupe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: true }),
+      });
+      const preview = await previewRes.json();
+      if (!previewRes.ok || !preview?.success) {
+        throw new Error(preview?.error || '중복주문 검사에 실패했습니다.');
+      }
+
+      const clusters = Number(preview.duplicateClusters) || 0;
+      const toCancel = Number(preview.ordersToCancel) || 0;
+
+      if (toCancel === 0) {
+        alert('정리할 중복 주문이 없습니다. 👍');
+        return;
+      }
+
+      // 취소될 주문번호 미리보기 (최대 20건 표기)
+      const cancelList: string[] = [];
+      const keepList: string[] = [];
+      if (Array.isArray(preview.detail)) {
+        for (const c of preview.detail) {
+          if (c?.keep) keepList.push(c.keep);
+          if (Array.isArray(c?.cancel)) for (const x of c.cancel) if (x?.orderNumber) cancelList.push(x.orderNumber);
+        }
+      }
+      const sample = cancelList.slice(0, 20).map((n) => `• ${n}`).join('\n');
+      const more = cancelList.length > 20 ? `\n…외 ${cancelList.length - 20}건` : '';
+
+      const ok = window.confirm(
+        `중복 주문 ${clusters}개 그룹 발견\n` +
+        `→ 각 그룹의 "마지막(최신) 1건"만 남기고 총 ${toCancel}건을 취소·환불합니다.\n\n` +
+        `[취소될 주문]\n${sample}${more}\n\n` +
+        `정말 실행할까요? (되돌릴 수 없습니다)`
+      );
+      if (!ok) return;
+
+      // 2) 실제 실행
+      const runRes = await authFetch('/api/admin/orders/dedupe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: false }),
+      });
+      const run = await runRes.json();
+      if (!runRes.ok || !run?.success) {
+        throw new Error(run?.error || '중복주문 정리에 실패했습니다.');
+      }
+
+      const cancelled = Number(run.ordersCancelled) || 0;
+      const refunded = Number(run.ordersRefunded) || 0;
+      const failed = Array.isArray(run.failed) ? run.failed.length : 0;
+      alert(
+        `중복 주문 정리 완료 ✅\n\n` +
+        `• 취소: ${cancelled}건\n` +
+        `• 환불: ${refunded}건\n` +
+        (failed > 0 ? `• 실패: ${failed}건 (콘솔 확인)\n` : '') +
+        `\n각 그룹의 마지막 1건은 그대로 보존됐습니다.`
+      );
+
+      // 목록 새로고침
+      await loadOrders();
+    } catch (error: any) {
+      console.error('Dedupe error:', error);
+      alert(error?.message || '중복주문 정리 중 오류가 발생했습니다.');
+    } finally {
+      setDedupeProcessing(false);
     }
   };
 
@@ -536,6 +616,25 @@ export default function AdminOrdersPage() {
               <span className="text-xl">🚚</span>
               <span>송장 대량등록</span>
             </Link>
+            <button
+              type="button"
+              onClick={handleDedupe}
+              disabled={dedupeProcessing}
+              title="같은 회원의 동일 상품·동일 금액 중복 주문을 마지막 1건만 남기고 취소·환불합니다"
+              className="px-8 py-5 bg-gradient-to-r from-rose-500 to-red-600 text-white rounded-2xl hover:from-rose-600 hover:to-red-700 font-black shadow-lg hover:scale-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              {dedupeProcessing ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                  <span>정리 중...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xl">🧹</span>
+                  <span>중복주문 정리</span>
+                </>
+              )}
+            </button>
           </form>
         </div>
 
