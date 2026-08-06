@@ -12,7 +12,7 @@ import { ensureOrderPaymentColumns, ensureUserQrchatColumns } from '@/lib/ensure
 // [상품 스냅샷] OrderItem 에 주문 시점 상품명/썸네일 저장 (상품 삭제/변경돼도 주문내역 유지)
 import { ensureOrderItemSnapshotColumns, backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 // [QRChat 연동] B 회원(origin=QRCHAT) QKEY 를 Firebase 에서 직접 차감
-import { spendQkeyForQrlive, getQrchatQkeyBalance, linkQrchatWallet } from '@/lib/qrchat-bridge';
+import { spendQkeyForQrlive, getQrchatQkeyBalance, linkQrchatWallet, resolveCanonicalQrchatIdentity } from '@/lib/qrchat-bridge';
 // Cloudflare Workers compatible crypto
 
 // ─── 휴대전화번호 정규화 (KR) ───
@@ -916,21 +916,24 @@ export async function POST(req: NextRequest) {
         spend = { ok: false, error: 'bridge_error' } as any;
       }
 
-      // ★ 자가치유(1회 재시도): uid 드리프트/서명불일치 시 지갑+닉으로 실제 uid 재조회 후 재시도.
+      // ★ 자가치유(1회 재시도): uid 드리프트 + 지갑/닉 불일치(본인확인 실패) 자동 복구.
+      //   실패코드가 user_not_found / bad_signature / wallet_mismatch / nickname_mismatch 이면
+      //   QRChat 실제 신원(uid·지갑·닉)을 재조회해 D1 을 정정하고 한 번 더 차감을 시도한다.
       if ((!spend || !spend.ok)
-          && (spend?.error === 'user_not_found' || spend?.error === 'bad_signature')
-          && qrchatWallet && qrchatNick) {
+          && ['user_not_found', 'bad_signature', 'wallet_mismatch', 'nickname_mismatch'].includes(String(spend?.error))) {
         try {
-          const relink = await linkQrchatWallet(qrchatWallet, qrchatNick);
-          if (relink.ok && relink.uid && String(relink.uid) !== String(qrchatUid)) {
-            qrchatUid = String(relink.uid);
+          const canon = await resolveCanonicalQrchatIdentity({ uid: qrchatUid, wallet: qrchatWallet, nick: qrchatNick });
+          if (canon.changed && canon.uid && canon.wallet && canon.nick) {
+            qrchatUid = canon.uid;
+            qrchatWallet = canon.wallet;
+            qrchatNick = canon.nick;
             try {
               await d1
-                .prepare(`UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
-                .bind(qrchatUid, userId)
+                .prepare(`UPDATE "User" SET "qrchatUid" = ?, "securetQrUrl" = ?, "nickname" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
+                .bind(qrchatUid, qrchatWallet, qrchatNick, userId)
                 .run();
-            } catch (uidErr) {
-              console.error('[QKEY] qrchatUid 정정 D1 반영 실패(무시)', uidErr);
+            } catch (healErr) {
+              console.error('[QKEY] 신원 정정 D1 반영 실패(무시)', healErr);
             }
             spend = await spendQkeyForQrlive({
               uid: qrchatUid,
@@ -942,7 +945,7 @@ export async function POST(req: NextRequest) {
             });
           }
         } catch (relinkErr) {
-          console.error('[QKEY] uid 자가치유 재시도 실패(무시)', relinkErr);
+          console.error('[QKEY] 신원 자가치유 재시도 실패(무시)', relinkErr);
         }
       }
 
@@ -1022,23 +1025,24 @@ export async function POST(req: NextRequest) {
         spend = { ok: false, error: 'bridge_error' } as any;
       }
 
-      // ★ 자가치유(1회 재시도): uid 드리프트/서명불일치로 실패하면 지갑+닉으로
-      //   Firebase 실제 uid 를 다시 조회해 정정한 뒤 한 번 더 차감을 시도한다.
-      //   (앱 재설치/재가입으로 D1 의 qrchatUid 가 옛 값인 계정 대응 — "오로로 사건")
+      // ★ 자가치유(1회 재시도): uid 드리프트 + 지갑/닉 불일치(본인확인 실패) 자동 복구.
+      //   실패코드가 user_not_found / bad_signature / wallet_mismatch / nickname_mismatch 이면
+      //   QRChat 실제 신원(uid·지갑·닉)을 재조회해 D1 을 정정하고 한 번 더 차감을 시도한다.
       if ((!spend || !spend.ok)
-          && (spend?.error === 'user_not_found' || spend?.error === 'bad_signature')
-          && qrchatWallet && qrchatNick) {
+          && ['user_not_found', 'bad_signature', 'wallet_mismatch', 'nickname_mismatch'].includes(String(spend?.error))) {
         try {
-          const relink = await linkQrchatWallet(qrchatWallet, qrchatNick);
-          if (relink.ok && relink.uid && String(relink.uid) !== String(qrchatUid)) {
-            qrchatUid = String(relink.uid);
+          const canon = await resolveCanonicalQrchatIdentity({ uid: qrchatUid, wallet: qrchatWallet, nick: qrchatNick });
+          if (canon.changed && canon.uid && canon.wallet && canon.nick) {
+            qrchatUid = canon.uid;
+            qrchatWallet = canon.wallet;
+            qrchatNick = canon.nick;
             try {
               await d1
-                .prepare(`UPDATE "User" SET "qrchatUid" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
-                .bind(qrchatUid, userId)
+                .prepare(`UPDATE "User" SET "qrchatUid" = ?, "securetQrUrl" = ?, "nickname" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`)
+                .bind(qrchatUid, qrchatWallet, qrchatNick, userId)
                 .run();
-            } catch (uidErr) {
-              console.error('[SPLIT] qrchatUid 정정 D1 반영 실패(무시)', uidErr);
+            } catch (healErr) {
+              console.error('[SPLIT] 신원 정정 D1 반영 실패(무시)', healErr);
             }
             spend = await spendQkeyForQrlive({
               uid: qrchatUid,
@@ -1050,7 +1054,7 @@ export async function POST(req: NextRequest) {
             });
           }
         } catch (relinkErr) {
-          console.error('[SPLIT] uid 자가치유 재시도 실패(무시)', relinkErr);
+          console.error('[SPLIT] 신원 자가치유 재시도 실패(무시)', relinkErr);
         }
       }
 
