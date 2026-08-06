@@ -2,135 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 // [v1.0.22] KISPG PG 취소 제거 → 잔액 환불로 전환
-import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
+import { newId, getD1, ensureQtaColumn } from '@/lib/balance';
 // [상품 스냅샷] 상품 삭제/변경돼도 주문 상세에 상품명 유지
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 // [QRChat 연동] B 회원 QKEY 는 Firebase 실쿠키에서 결제됨 → 취소 시 Firebase 로 되돌림.
 import { refundQkeyForQrlive, normWallet, normNick } from '@/lib/qrchat-bridge';
+// [공용] 취소/환불 핵심 로직 (중복주문 정리와 동일 로직 공유)
+import { refundOrderBalance, recoverOrderQta } from '@/lib/orderRefund';
 
-// [v1.0.22] 주문 취소/환불 시 결제했던 잔액을 원자적으로 환불 (중복 방지)
-// - paymentMethod 가 KRW_BALANCE / QKEY_BALANCE / SPLIT_BALANCE 인 주문만 환불
-// - order.refundedAt 이 이미 있으면 재환불하지 않음 (멱등)
-// - Prisma 트랜잭션 tx 컨텍스트 내부에서 raw 로 처리하여 원자성 보장
-// - [병행결제] SPLIT_BALANCE 는 주문에 기록된 paidQkey/paidKrw 를 각각 되돌려준다.
-// - [QRChat 연동] B 회원(qrchatUser 전달) 의 QKEY 는 로컬 환불을 건너뛰고
-//   pendingFirebaseQkey 로 반환 → 호출부가 커밋 후 Firebase 로 재적립.
-async function refundOrderBalance(
-  tx: any,
-  order: { id: string; userId: string | null; paymentMethod: string | null; total: number; refundedAt: any; paidQkey?: number; paidKrw?: number },
-  reason: string,
-  qrchatUser?: { uid: string; wallet: string; nick: string } | null
-): Promise<{ refunded: boolean; currency?: 'KRW' | 'QKEY' | 'SPLIT'; amount?: number; qkey?: number; krw?: number; pendingFirebaseQkey?: number }> {
-  const method = order.paymentMethod || '';
-  const isKrw = method === 'KRW_BALANCE';
-  const isQkey = method === 'QKEY_BALANCE';
-  const isSplit = method === 'SPLIT_BALANCE';
-
-  // 잔액 결제가 아니거나, 회원이 아니거나, 이미 환불된 경우 → 스킵
-  if ((!isKrw && !isQkey && !isSplit) || !order.userId || order.refundedAt) {
-    return { refunded: false };
-  }
-
-  // 환불할 통화·금액 산정 (결제 시 규칙과 동일)
-  const refundQkey = isQkey
-    ? Math.ceil(order.total / QKEY_TO_KRW)
-    : isSplit
-      ? (Number(order.paidQkey) || 0)
-      : 0;
-  const refundKrw = isKrw
-    ? order.total
-    : isSplit
-      ? (Number(order.paidKrw) || 0)
-      : 0;
-  if (refundQkey <= 0 && refundKrw <= 0) return { refunded: false };
-
-  // 통화 1개 환불 헬퍼
-  const refundOne = async (column: 'krwBalance' | 'qkeyBalance', currency: 'KRW' | 'QKEY', amount: number) => {
-    if (amount <= 0) return;
-    const balRows: any = await tx.$queryRawUnsafe(
-      `SELECT "${column}" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
-      order.userId
-    );
-    const balRow = Array.isArray(balRows) ? balRows[0] : balRows;
-    const afterBal = (Number(balRow?.bal) || 0) + amount;
-    await tx.$executeRawUnsafe(
-      `UPDATE "User" SET "${column}" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
-      afterBal, order.userId
-    );
-    await tx.$executeRawUnsafe(
-      `INSERT INTO "BalanceLedger"
-         ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
-       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
-      newId(), order.userId, currency, amount /* 양수 = 환불 */, afterBal, reason, order.id
-    );
-  };
-
-  // [QRChat 연동] B 회원 QKEY 는 로컬 환불 건너뛰고 Firebase 재적립 대상으로 반환.
-  let pendingFirebaseQkey = 0;
-  if (qrchatUser && refundQkey > 0) {
-    pendingFirebaseQkey = refundQkey;
-  } else {
-    await refundOne('qkeyBalance', 'QKEY', refundQkey);
-  }
-  await refundOne('krwBalance', 'KRW', refundKrw);
-
-  if (isSplit) {
-    return { refunded: true, currency: 'SPLIT', amount: order.total, qkey: refundQkey, krw: refundKrw, pendingFirebaseQkey };
-  }
-  return {
-    refunded: true,
-    currency: isKrw ? 'KRW' : 'QKEY',
-    amount: isKrw ? refundKrw : refundQkey,
-    pendingFirebaseQkey,
-  };
-}
-
-// [QTA 적립 회수] 취소/환불 시 해당 주문으로 적립된 QTA 를 자동 회수 (멱등)
-// - 적립분(양수) 합계 - 이미 회수한 분(음수) 합계 = 남은 회수 대상
-// - 사용자 QTA 잔액이 음수가 되지 않도록 가드
-async function recoverOrderQta(
-  tx: any,
-  order: { id: string; userId: string | null },
-): Promise<{ recovered: boolean; amount?: number }> {
-  if (!order.userId) return { recovered: false };
-
-  const qtaSumRows: any = await tx.$queryRawUnsafe(
-    `SELECT
-       COALESCE(SUM(CASE WHEN "amount" > 0 THEN "amount" ELSE 0 END), 0) AS earned,
-       COALESCE(SUM(CASE WHEN "amount" < 0 THEN -"amount" ELSE 0 END), 0) AS reversed
-     FROM "BalanceLedger"
-     WHERE "relatedOrderId" = ? AND "currency" = 'QTA'`,
-    order.id
-  );
-  const qtaSumRow = Array.isArray(qtaSumRows) ? qtaSumRows[0] : qtaSumRows;
-  const earnedQta = Number(qtaSumRow?.earned) || 0;
-  const reversedQta = Number(qtaSumRow?.reversed) || 0;
-  const recoverTarget = earnedQta - reversedQta;
-  if (recoverTarget <= 0) return { recovered: false };
-
-  const qtaBalRows: any = await tx.$queryRawUnsafe(
-    `SELECT "qtaBalance" AS bal FROM "User" WHERE "id" = ? LIMIT 1`,
-    order.userId
-  );
-  const qtaBalRow = Array.isArray(qtaBalRows) ? qtaBalRows[0] : qtaBalRows;
-  const curQta = Number(qtaBalRow?.bal) || 0;
-  const recoverAmount = Math.min(recoverTarget, curQta); // 음수 방지
-  if (recoverAmount <= 0) return { recovered: false };
-
-  const afterQta = curQta - recoverAmount;
-  await tx.$executeRawUnsafe(
-    `UPDATE "User" SET "qtaBalance" = ?, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ?`,
-    afterQta, order.userId
-  );
-  await tx.$executeRawUnsafe(
-    `INSERT INTO "BalanceLedger"
-       ("id","userId","currency","amount","balanceAfter","reason","relatedOrderId","relatedRequestId","createdAt")
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
-    newId(), order.userId, 'QTA', -recoverAmount, afterQta, '구매 적립 취소', order.id
-  );
-
-  return { recovered: true, amount: recoverAmount };
-}
+/* [refactor] refundOrderBalance / recoverOrderQta 는 lib/orderRefund.ts 로 이전.
+   아래 구버전 정의 블록 제거됨 — 중복주문 정리(dedupe)와 동일 로직 공유. */
+// (refundOrderBalance / recoverOrderQta 는 @/lib/orderRefund 에서 import)
 
 
 
