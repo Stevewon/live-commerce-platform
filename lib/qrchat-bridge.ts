@@ -78,10 +78,38 @@ async function postJson(fnName: string, body: Record<string, any>): Promise<any>
     json = { ok: false, error: 'invalid_response', status: res.status };
   }
   if (!res.ok || json?.ok === false) {
+    // ⚠️ QRChat Functions 는 실패 사유를 `reason` 필드로 돌려준다.
+    //    (예: {"ok":false,"reason":"bad request signature"} / "insufficient balance" 등)
+    //    기존 코드는 `error` 만 읽어 항상 undefined → http_400/http_5xx 로 뭉개져
+    //    상위 결제 로직이 원인을 구분하지 못하고 "처리 중 오류" 로만 응답했다.
+    //    → reason 을 표준 코드로 정규화해 error 에 담아 원인이 드러나게 한다.
+    const rawReason = String(json?.error || json?.reason || json?.message || '')
+      .trim()
+      .toLowerCase();
+    let mapped = rawReason;
+    if (!rawReason) {
+      mapped = `http_${res.status}`;
+    } else if (rawReason.includes('signature')) {
+      mapped = 'bad_signature';
+    } else if (rawReason.includes('insufficient')) {
+      mapped = 'insufficient_balance';
+    } else if (rawReason.includes('wallet') && rawReason.includes('mismatch')) {
+      mapped = 'wallet_mismatch';
+    } else if (rawReason.includes('nick') && rawReason.includes('mismatch')) {
+      mapped = 'nickname_mismatch';
+    } else if (rawReason.includes('not found') || rawReason.includes('no_user') || rawReason.includes('user_not_found')) {
+      mapped = 'user_not_found';
+    } else if (rawReason.includes('ban')) {
+      mapped = 'banned';
+    } else {
+      // 공백을 언더스코어로 정규화 (예: "bad request" → "bad_request")
+      mapped = rawReason.replace(/\s+/g, '_');
+    }
     return {
       ok: false,
       status: res.status,
-      error: json?.error || `http_${res.status}`,
+      error: mapped,
+      reason: json?.reason || json?.error || json?.message || null, // 원문 보존(디버그용)
       raw: json,
     };
   }
