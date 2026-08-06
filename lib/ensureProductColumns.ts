@@ -11,6 +11,7 @@ let _productIndexesEnsured = false;
 let _orderPaymentColumnsEnsured = false;
 let _userQrchatColumnsEnsured = false;
 let _overseasBlockedColumnEnsured = false;
+let _orderIndexesEnsured = false;
 
 // D1 바인딩을 가져오는 함수 (lib/prisma.ts 와 동일 패턴)
 async function getD1(): Promise<any> {
@@ -112,6 +113,52 @@ export async function ensureProductIndexes(db?: any): Promise<void> {
     }
   } finally {
     _productIndexesEnsured = true;
+  }
+}
+
+/**
+ * [2026-08-06 PERF] 주문/정산 관련 조회 성능 인덱스 보장 (셀프 힐링).
+ *
+ * 프로덕션 D1 의 Order/OrderItem/Settlement/PartnerProduct 테이블에는
+ * FK/필터/정렬 컬럼 인덱스가 전혀 없어(주문번호 unique 제외) 어드민의
+ * status/createdAt/userId/partnerId 필터·집계가 매번 풀스캔이었다.
+ * Product 인덱스와 동일하게 CREATE INDEX IF NOT EXISTS 로 런타임 자동 생성한다.
+ * - Order: status(상태필터), createdAt(기간/정렬), userId(회원별), partnerId(정산),
+ *          복합 (status,createdAt) 는 대시보드/리포트의 "기간+상태" 집계 가속.
+ * - OrderItem: orderId(주문 조인), productId(상품별 판매 집계) — charts/analytics.
+ * - Settlement: partnerId, status — 정산 목록 필터.
+ * - PartnerProduct: partnerId — 스토어/파트너 상품 목록.
+ * 프로세스 당 1회만 시도. 실패해도 조회 자체는 진행되도록 예외를 삼킨다. (멱등)
+ */
+export async function ensureOrderIndexes(db?: any): Promise<void> {
+  if (_orderIndexesEnsured) return;
+  const d1 = db || (await getD1());
+  if (!d1) return;
+  const statements = [
+    `CREATE INDEX IF NOT EXISTS "Order_status_idx" ON "Order" ("status")`,
+    `CREATE INDEX IF NOT EXISTS "Order_createdAt_idx" ON "Order" ("createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "Order_userId_idx" ON "Order" ("userId")`,
+    `CREATE INDEX IF NOT EXISTS "Order_partnerId_idx" ON "Order" ("partnerId")`,
+    `CREATE INDEX IF NOT EXISTS "Order_status_createdAt_idx" ON "Order" ("status", "createdAt")`,
+    `CREATE INDEX IF NOT EXISTS "OrderItem_orderId_idx" ON "OrderItem" ("orderId")`,
+    `CREATE INDEX IF NOT EXISTS "OrderItem_productId_idx" ON "OrderItem" ("productId")`,
+    `CREATE INDEX IF NOT EXISTS "Settlement_partnerId_idx" ON "Settlement" ("partnerId")`,
+    `CREATE INDEX IF NOT EXISTS "Settlement_status_idx" ON "Settlement" ("status")`,
+    `CREATE INDEX IF NOT EXISTS "PartnerProduct_partnerId_idx" ON "PartnerProduct" ("partnerId")`,
+  ];
+  try {
+    for (const sql of statements) {
+      try {
+        await d1.prepare(sql).run();
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (!/already exists/i.test(msg)) {
+          console.warn('[ensureOrderIndexes] 인덱스 생성 실패(무시):', msg);
+        }
+      }
+    }
+  } finally {
+    _orderIndexesEnsured = true;
   }
 }
 

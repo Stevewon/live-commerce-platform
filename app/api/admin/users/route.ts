@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { ensureOrderIndexes } from '@/lib/ensureProductColumns';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +34,9 @@ export async function GET(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // [PERF] 주문/정산 조회 인덱스 셀프 힐링 (Order.userId 등)
+    try { await ensureOrderIndexes(); } catch { /* 실패해도 조회는 진행 */ }
 
     // ★ 모든 쿼리를 병렬 실행하여 응답 시간 최소화
     const [users, orderCounts, roleCounts] = await Promise.all([

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { ensureOrderIndexes } from '@/lib/ensureProductColumns';
 
 export async function GET(request: NextRequest) {
   const prisma = await getPrisma();
@@ -13,6 +14,9 @@ export async function GET(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // [PERF] 정산 조회 인덱스 셀프 힐링 (Settlement.partnerId/status)
+    try { await ensureOrderIndexes(); } catch { /* 실패해도 조회는 진행 */ }
 
     // 쿼리 파라미터
     const { searchParams } = new URL(request.url);

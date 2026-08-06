@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { ensureOrderIndexes } from '@/lib/ensureProductColumns';
 
 /**
  * GET /api/admin/dashboard
@@ -25,6 +26,9 @@ export async function GET(request: NextRequest) {
         { status: 403 }
       )
     }
+
+    // [PERF] 주문/정산 조회 인덱스 셀프 힐링 (없으면 생성, 프로세스당 1회)
+    try { await ensureOrderIndexes(); } catch { /* 실패해도 조회는 진행 */ }
 
     // 오늘 날짜 계산 (한국 시간 기준 자정 → UTC 변환)
     // [D1_TYPE_ERROR FIX] D1 (Cloudflare SQLite) 가 Date 객체 바인딩 거부 → 반드시 ISO string 사용
