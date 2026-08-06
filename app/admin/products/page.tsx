@@ -329,9 +329,7 @@ function AdminProductsPageInner() {
               <p className="text-sm text-gray-500 mt-1">전체 {totalCount}개 상품</p>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => router.push('/admin/dashboard')} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition">
-                대시보드
-              </button>
+              {/* 대시보드 이동은 AdminNav 로 통일됨 */}
               <Link
                 href="/admin/products/bulk"
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium text-sm flex items-center gap-1"
