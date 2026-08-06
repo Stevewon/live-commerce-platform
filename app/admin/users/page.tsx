@@ -204,29 +204,7 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 프리미엄 네비게이션 */}
-        <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-lg p-2 flex flex-wrap gap-2">
-            <Link href="/admin" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
-              📊 대시보드
-            </Link>
-            <Link href="/admin/users" className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl shadow-md font-semibold text-sm whitespace-nowrap">
-              👥 회원 관리
-            </Link>
-            <Link href="/admin/orders" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
-              📦 주문 관리
-            </Link>
-            <Link href="/admin/balance-requests" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
-              💳 충전 신청
-            </Link>
-            <Link href="/admin/partners" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
-              🤝 파트너 관리
-            </Link>
-            <Link href="/admin/products" className="px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm whitespace-nowrap">
-              🛍️ 상품 관리
-            </Link>
-          </div>
-        </div>
+        {/* 상단 내비게이션은 app/admin/layout.tsx 의 AdminNav 로 통일됨 */}
 
         {/* 프리미엄 통계 카드 */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

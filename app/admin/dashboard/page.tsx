@@ -242,51 +242,7 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Premium Navigation */}
-        <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-xl p-2 flex flex-wrap gap-2 border border-gray-200">
-            <Link href="/admin" className="group px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-700 text-white rounded-xl shadow-md font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
-              <span className="text-lg">📊</span>
-              <span>대시보드</span>
-            </Link>
-            <Link href="/admin/users" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
-              <span className="text-lg">👥</span>
-              <span>회원 관리</span>
-            </Link>
-            <Link href="/admin/balance-requests" className="group px-4 py-2.5 text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
-              <span className="text-lg">💳</span>
-              <span>무통장입금 승인</span>
-            </Link>
-            <Link href="/admin/orders" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
-              <span className="text-lg">📦</span>
-              <span>주문 관리</span>
-            </Link>
-            <Link href="/admin/inquiries" className="group px-4 py-2.5 text-white bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
-              <span className="text-lg">💬</span>
-              <span>고객 문의</span>
-            </Link>
-            <Link href="/admin/japan-shipping" className="group px-4 py-2.5 text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
-              <span className="text-lg">🚢</span>
-              <span>일본 배송비</span>
-            </Link>
-            <Link href="/admin/partners" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
-              <span className="text-lg">🤝</span>
-              <span>파트너 관리</span>
-            </Link>
-            <Link href="/admin/products" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
-              <span className="text-lg">🛍️</span>
-              <span>상품 관리</span>
-            </Link>
-            <Link href="/admin/categories" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
-              <span className="text-lg">🏷️</span>
-              <span>카테고리 관리</span>
-            </Link>
-            <Link href="/admin/reports" className="group px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors font-semibold text-sm flex items-center gap-2 whitespace-nowrap">
-              <span className="text-lg">📈</span>
-              <span>매출 리포트</span>
-            </Link>
-          </div>
-        </div>
+        {/* 상단 내비게이션은 app/admin/layout.tsx 의 AdminNav 로 통일됨 */}
 
         {/* Premium Stats Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

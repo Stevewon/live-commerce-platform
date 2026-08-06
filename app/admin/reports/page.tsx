@@ -176,27 +176,7 @@ export default function AdminReportsPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Navigation */}
-        <div className="mb-8">
-          <div className="bg-white rounded-2xl shadow-2xl p-3 flex flex-wrap gap-2 border border-gray-200 flex-wrap">
-            <Link href="/admin" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
-              <span className="text-lg">📊</span>
-              <span>대시보드</span>
-            </Link>
-            <Link href="/admin/orders" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
-              <span className="text-lg">📦</span>
-              <span>주문 관리</span>
-            </Link>
-            <Link href="/admin/partners" className="group px-4 py-2.5 text-gray-700 hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50 rounded-xl transition-all font-semibold text-sm flex items-center gap-2 whitespace-nowrap hover:scale-105 duration-200">
-              <span className="text-lg">🤝</span>
-              <span>파트너 관리</span>
-            </Link>
-            <Link href="/admin/reports" className="group px-4 py-2.5 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white rounded-xl shadow-xl font-semibold text-sm flex items-center gap-2 whitespace-nowrap shadow-md">
-              <span className="text-lg">📈</span>
-              <span>매출 리포트</span>
-            </Link>
-          </div>
-        </div>
+        {/* 상단 내비게이션은 app/admin/layout.tsx 의 AdminNav 로 통일됨 */}
 
         {/* Tab + Year Selector */}
         <div className="bg-white rounded-3xl shadow-2xl p-6 mb-8 border border-gray-200">
