@@ -220,3 +220,83 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '중복 주문 정리 실패: ' + (error?.message || '') }, { status: 500 });
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// DELETE /api/admin/orders/dedupe  — 취소/환불된 주문 "전체" 일괄 삭제 (관리자 전용)
+//   현재 페이지가 아니라 DB 전체에서 status IN (CANCELLED, REFUNDED) 인 주문을
+//   모두 찾아 OrderItem → Order 순으로 삭제한다.
+//   (사장님 지시: "취소된거 왜 일괄 삭제기능이 없냐고!!!!!!!")
+//
+//   Body (선택):
+//     { dryRun?: boolean }  // true 면 삭제하지 않고 몇 건이 지워질지만 리포트 (기본 false)
+//
+//   ※ 삭제는 취소/환불 완료 주문에 한함. 살아있는 주문(결제/배송 등)은 절대 건드리지 않음.
+//   ※ OrderItem 은 onDelete Cascade 가 없으므로 반드시 OrderItem 먼저 삭제.
+// ─────────────────────────────────────────────────────────────────────────
+export async function DELETE(req: NextRequest) {
+  const prisma = await getPrisma();
+  try {
+    const authResult = await verifyAuthToken(req);
+    if (authResult instanceof NextResponse) return authResult;
+    if (authResult.role !== 'ADMIN') {
+      return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+    }
+
+    let body: any = {};
+    try { body = await req.json(); } catch { /* 빈 바디 허용 */ }
+    const dryRun = body?.dryRun === true; // 기본 false (버튼은 명시적으로 실행)
+
+    // DB 전체에서 취소/환불된 주문만 조회 (페이지 무관)
+    const targets = await prisma.order.findMany({
+      where: { status: { in: ['CANCELLED', 'REFUNDED'] } },
+      select: { id: true, orderNumber: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (dryRun) {
+      return NextResponse.json({
+        success: true,
+        dryRun: true,
+        ordersToDelete: targets.length,
+        detail: targets.map((t) => ({ orderNumber: t.orderNumber, status: t.status })),
+        message: `삭제 예정: 취소/환불 주문 ${targets.length}건.`,
+      });
+    }
+
+    if (targets.length === 0) {
+      return NextResponse.json({
+        success: true,
+        dryRun: false,
+        ordersDeleted: 0,
+        message: '삭제할 취소/환불 주문이 없습니다.',
+      });
+    }
+
+    const ids = targets.map((t) => t.id);
+    // 대량 삭제: OrderItem 먼저(자식) → Order(부모). raw SQL 로 한 번에 처리.
+    const placeholders = ids.map(() => '?').join(',');
+    let deleted = 0;
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "OrderItem" WHERE "orderId" IN (${placeholders})`,
+        ...ids,
+      );
+      const res: any = await tx.$executeRawUnsafe(
+        `DELETE FROM "Order" WHERE "id" IN (${placeholders})`,
+        ...ids,
+      );
+      deleted = typeof res === 'number' ? res : ids.length;
+    });
+
+    return NextResponse.json({
+      success: true,
+      dryRun: false,
+      ordersDeleted: deleted || ids.length,
+      deletedOrderNumbers: targets.map((t) => t.orderNumber),
+      message: `취소/환불 주문 ${deleted || ids.length}건을 모두 삭제했습니다.`,
+    });
+  } catch (error: any) {
+    console.error('Admin bulk-delete cancelled error:', error);
+    return NextResponse.json({ error: '취소주문 일괄삭제 실패: ' + (error?.message || '') }, { status: 500 });
+  }
+}

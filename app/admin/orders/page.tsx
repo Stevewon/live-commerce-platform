@@ -336,25 +336,44 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // [취소주문 전체삭제] 현재 필터/검색 조건의 취소·환불 주문을 한꺼번에 삭제한다.
+  // [취소주문 전체삭제] DB 전체의 취소·환불 주문을 서버에서 한 번에 삭제한다.
+  //   (현재 페이지만이 아니라, 모든 페이지의 CANCELLED/REFUNDED 주문 전부)
   const handleDeleteAllCancelled = async () => {
-    // 화면상 취소/환불 상태인 주문만 대상
-    const targets = orders.filter((o) => o.status === 'CANCELLED' || o.status === 'REFUNDED');
-    if (targets.length === 0) {
-      alert('현재 목록에 삭제할 취소/환불 주문이 없습니다.');
-      return;
+    try {
+      // 1) 먼저 dryRun 으로 DB 전체 삭제 대상 건수 확인
+      const previewRes = await authFetch('/api/admin/orders/dedupe', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: true }),
+      });
+      const preview = await previewRes.json();
+      if (!previewRes.ok || !preview?.success) {
+        alert('삭제 대상 조회 실패: ' + (preview?.error || '알 수 없는 오류'));
+        return;
+      }
+      const total = preview.ordersToDelete || 0;
+      if (total === 0) {
+        alert('삭제할 취소/환불 주문이 없습니다.');
+        return;
+      }
+      if (!window.confirm(`취소·환불된 주문 전체 ${total}건을 영구 삭제할까요?\n(현재 페이지가 아니라 DB 전체 · 되돌릴 수 없습니다)`)) return;
+
+      // 2) 실제 삭제 실행
+      const res = await authFetch('/api/admin/orders/dedupe', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dryRun: false }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        alert('삭제 실패: ' + (data?.error || '알 수 없는 오류'));
+        return;
+      }
+      alert(`삭제 완료 ✅\n\n• 삭제: ${data.ordersDeleted || 0}건 (DB 전체)`);
+      await loadOrders();
+    } catch (e: any) {
+      alert('삭제 중 오류: ' + (e?.message || e));
     }
-    if (!window.confirm(`현재 목록의 취소/환불 주문 ${targets.length}건을 영구 삭제할까요?\n(되돌릴 수 없습니다)`)) return;
-    let ok = 0, fail = 0;
-    for (const o of targets) {
-      try {
-        const res = await authFetch(`/api/admin/orders/${o.id}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (res.ok && data?.success) ok++; else fail++;
-      } catch { fail++; }
-    }
-    alert(`삭제 완료 ✅\n\n• 삭제: ${ok}건${fail > 0 ? `\n• 실패: ${fail}건` : ''}`);
-    await loadOrders();
   };
 
   // [선택 다운로드] 체크한 주문만 엑셀(CSV)로 내려받는다.
