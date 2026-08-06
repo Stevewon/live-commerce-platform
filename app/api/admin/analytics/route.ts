@@ -35,81 +35,130 @@ export async function GET(request: NextRequest) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // 일별 매출 및 주문 수
-    const dailyStats = await prisma.$queryRaw<Array<{
-      date: Date;
-      revenue: number;
-      orders: number;
-    }>>`
-      SELECT 
-        DATE(createdAt) as date,
-        SUM(total) as revenue,
-        COUNT(*) as orders
-      FROM Order
-      WHERE createdAt >= ${startDate}
-      GROUP BY DATE(createdAt)
-      ORDER BY date ASC
-    `;
+    // [2026-08-06 PERF FIX] 독립적인 집계 쿼리들을 Promise.all 로 병렬 실행.
+    // - 이전: dailyStats → ordersByStatus → salesByCategory → topPartners →
+    //   topProducts → newCustomers 를 순차 await → 총 응답 = 각 쿼리 합계.
+    // - 수정: 서로 의존성이 없는 6개 집계 쿼리를 한 번에 병렬 실행 → 총 응답 = 최댓값.
+    const [
+      dailyStats,
+      ordersByStatus,
+      salesByCategory,
+      topPartners,
+      topProducts,
+      newCustomers,
+    ] = await Promise.all([
+      // 일별 매출 및 주문 수
+      prisma.$queryRaw<Array<{
+        date: Date;
+        revenue: number;
+        orders: number;
+      }>>`
+        SELECT 
+          DATE(createdAt) as date,
+          SUM(total) as revenue,
+          COUNT(*) as orders
+        FROM Order
+        WHERE createdAt >= ${startDate}
+        GROUP BY DATE(createdAt)
+        ORDER BY date ASC
+      `,
 
-    // 상태별 주문 수
-    const ordersByStatus = await prisma.order.groupBy({
-      by: ['status'],
-      _count: {
-        id: true
-      },
-      where: {
-        createdAt: {
-          gte: startDate
-        }
-      }
-    });
-
-    // 카테고리별 매출
-    const salesByCategory = await prisma.$queryRaw<Array<{
-      categoryName: string;
-      revenue: number;
-      orders: number;
-    }>>`
-      SELECT 
-        c.name as categoryName,
-        SUM(oi.price * oi.quantity) as revenue,
-        COUNT(DISTINCT o.id) as orders
-      FROM Order o
-      JOIN OrderItem oi ON oi.orderId = o.id
-      JOIN Product p ON p.id = oi.productId
-      JOIN Category c ON c.id = p.categoryId
-      WHERE o.createdAt >= ${startDate}
-      GROUP BY c.name
-      ORDER BY revenue DESC
-    `;
-
-    // 파트너별 매출 TOP 10
-    const topPartners = await prisma.order.groupBy({
-      by: ['partnerId'],
-      _sum: {
-        total: true,
-        partnerRevenue: true
-      },
-      _count: {
-        id: true
-      },
-      where: {
-        createdAt: {
-          gte: startDate
+      // 상태별 주문 수
+      prisma.order.groupBy({
+        by: ['status'],
+        _count: {
+          id: true
         },
-        partnerId: {
-          not: null
+        where: {
+          createdAt: {
+            gte: startDate
+          }
         }
-      },
-      orderBy: {
-        _sum: {
-          total: 'desc'
-        }
-      },
-      take: 10
-    });
+      }),
 
-    // 파트너 정보 가져오기
+      // 카테고리별 매출
+      prisma.$queryRaw<Array<{
+        categoryName: string;
+        revenue: number;
+        orders: number;
+      }>>`
+        SELECT 
+          c.name as categoryName,
+          SUM(oi.price * oi.quantity) as revenue,
+          COUNT(DISTINCT o.id) as orders
+        FROM Order o
+        JOIN OrderItem oi ON oi.orderId = o.id
+        JOIN Product p ON p.id = oi.productId
+        JOIN Category c ON c.id = p.categoryId
+        WHERE o.createdAt >= ${startDate}
+        GROUP BY c.name
+        ORDER BY revenue DESC
+      `,
+
+      // 파트너별 매출 TOP 10
+      prisma.order.groupBy({
+        by: ['partnerId'],
+        _sum: {
+          total: true,
+          partnerRevenue: true
+        },
+        _count: {
+          id: true
+        },
+        where: {
+          createdAt: {
+            gte: startDate
+          },
+          partnerId: {
+            not: null
+          }
+        },
+        orderBy: {
+          _sum: {
+            total: 'desc'
+          }
+        },
+        take: 10
+      }),
+
+      // 인기 상품 TOP 10
+      prisma.$queryRaw<Array<{
+        productId: string;
+        productName: string;
+        totalQuantity: number;
+        revenue: number;
+      }>>`
+        SELECT 
+          p.id as productId,
+          p.name as productName,
+          SUM(oi.quantity) as totalQuantity,
+          SUM(oi.price * oi.quantity) as revenue
+        FROM OrderItem oi
+        JOIN Product p ON p.id = oi.productId
+        JOIN Order o ON o.id = oi.orderId
+        WHERE o.createdAt >= ${startDate}
+        GROUP BY p.id, p.name
+        ORDER BY revenue DESC
+        LIMIT 10
+      `,
+
+      // 신규 고객 추이
+      prisma.$queryRaw<Array<{
+        date: Date;
+        count: number;
+      }>>`
+        SELECT 
+          DATE(createdAt) as date,
+          COUNT(*) as count
+        FROM User
+        WHERE role = 'CUSTOMER'
+          AND createdAt >= ${startDate}
+        GROUP BY DATE(createdAt)
+        ORDER BY date ASC
+      `,
+    ]);
+
+    // 파트너 정보 가져오기 (topPartners 결과에 의존 → 병렬 블록 이후 실행)
     const partnerIds = topPartners.map(p => p.partnerId).filter(Boolean);
     const partners = await prisma.partner.findMany({
       where: {
@@ -135,42 +184,6 @@ export async function GET(request: NextRequest) {
         orders: p._count.id
       };
     });
-
-    // 인기 상품 TOP 10
-    const topProducts = await prisma.$queryRaw<Array<{
-      productId: string;
-      productName: string;
-      totalQuantity: number;
-      revenue: number;
-    }>>`
-      SELECT 
-        p.id as productId,
-        p.name as productName,
-        SUM(oi.quantity) as totalQuantity,
-        SUM(oi.price * oi.quantity) as revenue
-      FROM OrderItem oi
-      JOIN Product p ON p.id = oi.productId
-      JOIN Order o ON o.id = oi.orderId
-      WHERE o.createdAt >= ${startDate}
-      GROUP BY p.id, p.name
-      ORDER BY revenue DESC
-      LIMIT 10
-    `;
-
-    // 신규 고객 추이
-    const newCustomers = await prisma.$queryRaw<Array<{
-      date: Date;
-      count: number;
-    }>>`
-      SELECT 
-        DATE(createdAt) as date,
-        COUNT(*) as count
-      FROM User
-      WHERE role = 'CUSTOMER'
-        AND createdAt >= ${startDate}
-      GROUP BY DATE(createdAt)
-      ORDER BY date ASC
-    `;
 
     return NextResponse.json({
       success: true,
