@@ -255,6 +255,56 @@ export async function PATCH(
   }
 }
 
+// DELETE /api/admin/orders/[id] - 주문 영구 삭제 (관리자 전용)
+//   ⚠️ 안전장치: 취소/환불된 주문(CANCELLED / REFUNDED)만 삭제 가능.
+//     진행 중인 주문(결제/배송 등)은 실수 삭제 방지를 위해 삭제 거부.
+//   OrderItem 은 onDelete Cascade 가 없으므로 먼저 삭제 후 Order 삭제(트랜잭션).
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const prisma = await getPrisma();
+  const { id } = await params;
+  try {
+    const authResult = await verifyAuthToken(req);
+    if (authResult instanceof NextResponse) return authResult;
+    if (authResult.role !== 'ADMIN') {
+      return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      select: { id: true, orderNumber: true, status: true },
+    });
+    if (!order) {
+      return NextResponse.json({ error: '주문을 찾을 수 없습니다' }, { status: 404 });
+    }
+
+    // 취소/환불된 주문만 삭제 허용 (진행 중 주문 보호)
+    if (order.status !== 'CANCELLED' && order.status !== 'REFUNDED') {
+      return NextResponse.json(
+        { error: '취소 또는 환불된 주문만 삭제할 수 있습니다. 먼저 주문을 취소해주세요.', code: 'NOT_CANCELLED' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // OrderItem 먼저 삭제 (Cascade 없음)
+      await tx.$executeRawUnsafe(`DELETE FROM "OrderItem" WHERE "orderId" = ?`, id);
+      await tx.$executeRawUnsafe(`DELETE FROM "Order" WHERE "id" = ?`, id);
+    });
+
+    return NextResponse.json({
+      success: true,
+      deletedOrderNumber: order.orderNumber,
+      message: '주문이 삭제되었습니다',
+    });
+  } catch (error: any) {
+    console.error('Admin order delete error:', error);
+    return NextResponse.json({ error: '주문 삭제 실패: ' + (error?.message || '') }, { status: 500 });
+  }
+}
+
 // GET /api/admin/orders/[id] - 주문 상세 조회
 export async function GET(
   req: NextRequest,
