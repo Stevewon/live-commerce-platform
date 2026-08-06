@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth/jwt';
+import { ensureOrderIndexes } from '@/lib/ensureProductColumns';
 
 export async function GET(request: NextRequest) {
   const prisma = await getPrisma();
@@ -24,6 +25,9 @@ export async function GET(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // [PERF] 주문/주문아이템 조회 인덱스 셀프 힐링
+    try { await ensureOrderIndexes(); } catch { /* 실패해도 조회는 진행 */ }
 
     // 쿼리 파라미터에서 기간 가져오기
     const { searchParams } = new URL(request.url);

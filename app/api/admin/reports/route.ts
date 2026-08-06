@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { ensureOrderIndexes } from '@/lib/ensureProductColumns';
 
 // GET /api/admin/reports - 월별 매출/취소 리포트
 export async function GET(req: NextRequest) {
@@ -14,6 +15,9 @@ export async function GET(req: NextRequest) {
     if (authResult.role !== 'ADMIN') {
       return NextResponse.json({ error: '관리자 권한이 필요합니다' }, { status: 403 });
     }
+
+    // [PERF] 주문 조회 인덱스 셀프 힐링 (Order.status/createdAt 집계 가속)
+    try { await ensureOrderIndexes(); } catch { /* 실패해도 조회는 진행 */ }
 
     const { searchParams } = new URL(req.url);
     const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());

@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
+import { ensureOrderIndexes } from '@/lib/ensureProductColumns';
 
 export async function GET(req: NextRequest) {
   const prisma = await getPrisma();
@@ -24,6 +25,9 @@ export async function GET(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    // [PERF] 주문/주문아이템 조회 인덱스 셀프 힐링 (OrderItem 조인 집계 가속)
+    try { await ensureOrderIndexes(); } catch { /* 실패해도 조회는 진행 */ }
 
     // 최근 7일 범위
     // [D1_TYPE_ERROR FIX] D1 가 Date 객체 바인딩 거부 → ISO string 사용
