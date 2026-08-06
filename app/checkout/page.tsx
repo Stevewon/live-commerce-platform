@@ -136,6 +136,15 @@ export default function CheckoutPage() {
   ];
   const [memoPreset, setMemoPreset] = useState('direct');
 
+  // [배송지 자동완성] 이전에 주문했던 배송지 목록 (쿠팡/카톡처럼 골라서 채우기)
+  type SavedAddress = {
+    id: string; name: string; phone: string; address: string;
+    zipCode: string; memo: string; lastUsedAt: string | null; useCount: number;
+  };
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+  const [showNewAddress, setShowNewAddress] = useState(false);
+
   // 배송비 설정 로드
   useEffect(() => {
     fetch('/api/settings/shipping')
@@ -192,6 +201,60 @@ export default function CheckoutPage() {
       .catch(() => {})
       .finally(() => setBalanceLoading(false));
   }, [user, authLoading]);
+
+  // [배송지 자동완성] 로그인 회원의 이전 주문 배송지 목록 로드
+  //   → 1회 이상 구매한 회원은 지난 배송지를 골라서 바로 채울 수 있게 한다(쿠팡/카톡 방식).
+  useEffect(() => {
+    if (authLoading || !user) return;
+    authFetch('/api/my/addresses')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          setSavedAddresses(data.data);
+          // 가장 최근 배송지를 기본 선택 + 자동 채움 (비회원/신규회원은 목록이 비어 그대로 입력)
+          const first = data.data[0];
+          setSelectedAddressId(first.id);
+          setShowNewAddress(false);
+          applySavedAddress(first);
+        } else {
+          setShowNewAddress(true); // 저장된 배송지 없으면 바로 새 주소 입력
+        }
+      })
+      .catch(() => setShowNewAddress(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
+
+  // 선택한 저장 배송지를 입력폼에 채운다. (국내 배송 기준)
+  const applySavedAddress = (a: SavedAddress) => {
+    if (!a) return;
+    setShippingCountry('KR');
+    setShippingName(a.name || '');
+    setShippingPhone(a.phone || '');
+    setShippingZipCode(a.zipCode || '');
+    // 저장된 주소는 "기본주소 + 상세주소" 가 합쳐진 한 문자열 → 기본주소 칸에 넣고 상세는 비운다.
+    setShippingAddress(a.address || '');
+    setShippingAddressDetail('');
+    if (a.memo) { setMemoPreset('direct'); setShippingMemo(a.memo); }
+  };
+
+  // 배송지 선택 핸들러 (드롭다운/카드 클릭)
+  const handleSelectSavedAddress = (id: string) => {
+    if (id === '__new__') {
+      setSelectedAddressId('');
+      setShowNewAddress(true);
+      // 새 주소 입력을 위해 폼 비우기 (이름/전화는 남겨두면 편의상 좋지만 주소만 비움)
+      setShippingZipCode('');
+      setShippingAddress('');
+      setShippingAddressDetail('');
+      return;
+    }
+    const a = savedAddresses.find(x => x.id === id);
+    if (a) {
+      setSelectedAddressId(id);
+      setShowNewAddress(false);
+      applySavedAddress(a);
+    }
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -645,6 +708,57 @@ export default function CheckoutPage() {
                   <span>🚚</span> {t.checkout.deliveryInfo}
                 </h2>
                 <div className="space-y-4">
+                  {/* [배송지 자동완성] 이전 주문 배송지 선택 (쿠팡/카톡처럼) */}
+                  {savedAddresses.length > 0 && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-blue-700 text-sm font-semibold">
+                        <span>📍</span>
+                        <span>저장된 배송지</span>
+                        <span className="text-xs font-normal text-blue-500">이전에 주문한 주소로 바로 배송하세요</span>
+                      </div>
+                      <div className="space-y-2">
+                        {savedAddresses.map((a) => {
+                          const active = selectedAddressId === a.id && !showNewAddress;
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => handleSelectSavedAddress(a.id)}
+                              className={`w-full text-left rounded-lg border px-3 py-2 transition ${
+                                active
+                                  ? 'border-blue-600 bg-white ring-2 ring-blue-200'
+                                  : 'border-gray-200 bg-white hover:border-blue-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-semibold text-gray-900 text-sm">
+                                  {a.name || '받는 분'}
+                                  {a.phone && <span className="ml-2 text-gray-500 font-normal">{a.phone}</span>}
+                                </span>
+                                {active && <span className="text-blue-600 text-xs font-bold shrink-0">✓ 선택됨</span>}
+                              </div>
+                              <div className="text-xs text-gray-600 mt-0.5 break-keep">
+                                {a.zipCode ? `[${a.zipCode}] ` : ''}{a.address}
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {/* 새 주소 입력 옵션 */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectSavedAddress('__new__')}
+                          className={`w-full text-center rounded-lg border border-dashed px-3 py-2 text-sm font-semibold transition ${
+                            showNewAddress
+                              ? 'border-blue-600 bg-white text-blue-700 ring-2 ring-blue-200'
+                              : 'border-gray-300 bg-white text-gray-600 hover:border-blue-300'
+                          }`}
+                        >
+                          ➕ 새 배송지 입력
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* [해외배송] 배송 국가 선택 */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
