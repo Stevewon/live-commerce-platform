@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { useLanguage } from '@/lib/i18n/LanguageContext';
-import { useIsAppEmbed, shouldShowInEmbed } from '@/lib/embed/useIsAppEmbed';
+import { useIsAppEmbed } from '@/lib/embed/useIsAppEmbed';
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
@@ -18,11 +18,16 @@ export default function MobileBottomNav() {
     return null;
   }
 
-  // ★★★ 큐알쳇 앱 WebView 안에서는 하단 탭 숨김 (카톡 스타일).
+  // ★★★ 큐알쳇 앱 WebView 안에서도 하단 탭은 유지한다.
+  //   (헤더/푸터는 앱바와 중복되어 숨기지만, 하단 탭은 앱 화면 최하단에 위치해
+  //    Flutter 앱바와 겹치지 않으며, 마이페이지·주문내역 등 핵심 진입 동선이라
+  //    반드시 노출해야 한다. 예전엔 이걸 통째로 숨겨서 앱에서 마이페이지 진입이 불가했음.)
   //   서버단 kill-switch: lib/embed/useIsAppEmbed.ts 로 언제든 on/off.
-  if (isAppEmbed && !shouldShowInEmbed(pathname)) {
-    return null;
-  }
+  //   앱에서 하단탭까지 숨기고 싶으면 아래 주석을 해제하면 됨.
+  // if (isAppEmbed && !shouldShowInEmbed(pathname)) {
+  //   return null;
+  // }
+  void isAppEmbed; // (감지값 유지: 향후 임베드별 스타일 분기 대비)
 
   const navItems = [
     { href: '/products', icon: '🏠', label: t.nav.home, activeCheck: (p: string) => p === '/products' || p === '/' },
