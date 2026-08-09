@@ -146,9 +146,20 @@ export default function ShopNavigation() {
             
             {user ? (
               <>
-                <span className="hidden sm:inline text-sm text-gray-700">
+                <Link
+                  href="/my"
+                  prefetch={false}
+                  className="hidden sm:inline text-sm text-gray-700 hover:text-purple-600 transition-colors"
+                >
                   <span className="font-semibold">{user.name}</span>{t.nav.greeting}
-                </span>
+                </Link>
+                <Link
+                  href="/my"
+                  prefetch={false}
+                  className="hidden sm:inline-block px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-purple-700 border border-gray-300 hover:border-purple-500 rounded-md hover:bg-purple-50 transition-colors whitespace-nowrap"
+                >
+                  👤 {t.nav.myPageFull}
+                </Link>
                 {user.role === 'ADMIN' && (
                   <Link
                     href="/admin"
