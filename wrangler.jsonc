@@ -31,9 +31,14 @@
     }
   ],
   // Cloudflare Workers AI (상품명/카테고리 자동 번역용 - 별도 API 키 불필요)
-  "ai": {
-    "binding": "AI"
-  },
+  // [임시 비활성화] AI 바인딩은 "always-remote" 라 배포 시 getPlatformProxy 가
+  // Cloudflare 원격 preview 세션을 강제로 열며, CF API 토큰 권한 문제로 배포가 실패함
+  // (Error: Failed to create a preview token). 배포를 통과시키기 위해 임시 제거.
+  // 코드측(app/api/translate, lib/translateCache)은 env?.AI 옵셔널 처리라
+  // 바인딩이 없으면 번역을 원문 그대로 폴백 → 앱 안전. 토큰 복구 후 재활성화할 것.
+  // "ai": {
+  //   "binding": "AI"
+  // },
   "vars": {
     "NODE_ENV": "production",
     "NEXT_PUBLIC_APP_URL": "https://qrlive.io",
