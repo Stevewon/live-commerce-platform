@@ -13,7 +13,7 @@
     "postinstall": "prisma generate",
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts",
     "preview": "npm run clean && opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "npm run clean && opennextjs-cloudflare build && wrangler deploy",
+    "deploy": "npm run clean && opennextjs-cloudflare build && OPEN_NEXT_DEPLOY=true wrangler deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "prisma": {
