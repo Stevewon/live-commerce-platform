@@ -474,14 +474,19 @@ function ProductsContent() {
 
             {/* 페이지네이션 */}
             {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-8">
+              <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-10">
+                {/* 이전 */}
                 <button
                   onClick={() => router.push(buildUrl({ page: String(Math.max(1, currentPage - 1)) }))}
                   disabled={currentPage <= 1}
-                  className="px-3 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition"
+                  aria-label={tp.prev}
+                  className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition-all hover:border-purple-400 hover:text-purple-600 hover:shadow-md active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-600 disabled:hover:shadow-sm"
                 >
-                  {tp.prev}
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
                 </button>
+
                 {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                   let pageNum: number;
                   if (pagination.totalPages <= 5) {
@@ -493,26 +498,33 @@ function ProductsContent() {
                   } else {
                     pageNum = currentPage - 2 + i;
                   }
+                  const isCurrent = currentPage === pageNum;
                   return (
                     <button
                       key={pageNum}
                       onClick={() => router.push(buildUrl({ page: String(pageNum) }))}
-                      className={`w-10 h-10 rounded-lg text-sm font-medium transition ${
-                        currentPage === pageNum
-                          ? 'bg-blue-500 text-white'
-                          : 'border text-gray-700 hover:bg-gray-50'
+                      aria-current={isCurrent ? 'page' : undefined}
+                      className={`w-10 h-10 rounded-full text-sm font-semibold transition-all active:scale-95 ${
+                        isCurrent
+                          ? 'bg-gradient-to-br from-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/30 scale-105'
+                          : 'bg-white border border-gray-200 text-gray-700 shadow-sm hover:border-purple-400 hover:text-purple-600 hover:shadow-md'
                       }`}
                     >
                       {pageNum}
                     </button>
                   );
                 })}
+
+                {/* 다음 */}
                 <button
                   onClick={() => router.push(buildUrl({ page: String(Math.min(pagination.totalPages, currentPage + 1)) }))}
                   disabled={currentPage >= pagination.totalPages}
-                  className="px-3 py-2 border rounded-lg text-sm disabled:opacity-30 hover:bg-gray-50 transition"
+                  aria-label={tp.next}
+                  className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition-all hover:border-purple-400 hover:text-purple-600 hover:shadow-md active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-600 disabled:hover:shadow-sm"
                 >
-                  {tp.next}
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
                 </button>
               </div>
             )}
