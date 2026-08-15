@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { authFetch } from '@/lib/auth/clientFetch';
+import ReviewForm from '@/components/ReviewForm';
 
 interface Review {
   id: string;
@@ -19,10 +23,107 @@ interface Review {
 
 interface ProductReviewsProps {
   productId: string;
+  productName?: string;
   initialReviews?: Review[];
 }
 
-export default function ProductReviews({ productId, initialReviews }: ProductReviewsProps) {
+export default function ProductReviews({ productId, productName, initialReviews }: ProductReviewsProps) {
+  const router = useRouter();
+  const { user } = useAuth();
+  // 리뷰 작성 자격/폼 상태
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
+  const [eligibleOrderId, setEligibleOrderId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  // "이 상품 리뷰 쓸 자격" 판별: 로그인 + 이 상품 포함 + 배송완료 + 아직 리뷰 안 쓴 주문 찾기
+  const startWriteReview = useCallback(async () => {
+    setNotice('');
+
+    if (!user) {
+      setNotice('리뷰를 작성하려면 로그인이 필요합니다.');
+      setTimeout(() => {
+        router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      }, 900);
+      return;
+    }
+
+    try {
+      setCheckingEligibility(true);
+      const res = await authFetch('/api/orders');
+      const data = await res.json();
+      const orders: any[] = Array.isArray(data?.data) ? data.data : [];
+
+      // 이 상품이 담긴 배송완료 주문 중, 아직 리뷰를 쓰지 않은 주문
+      const target = orders.find((o) =>
+        String(o.status).toUpperCase() === 'DELIVERED' &&
+        !o.review &&
+        Array.isArray(o.items) &&
+        o.items.some((it: any) => it.productId === productId)
+      );
+
+      if (target) {
+        setEligibleOrderId(target.id);
+        setShowForm(true);
+        return;
+      }
+
+      // 자격 없음 → 사유별 안내
+      const hasThisProduct = orders.some((o) =>
+        Array.isArray(o.items) && o.items.some((it: any) => it.productId === productId)
+      );
+      const alreadyReviewed = orders.some((o) =>
+        o.review && Array.isArray(o.items) && o.items.some((it: any) => it.productId === productId)
+      );
+
+      if (alreadyReviewed) {
+        setNotice('이미 이 상품에 리뷰를 작성하셨습니다. 감사합니다!');
+      } else if (hasThisProduct) {
+        setNotice('배송이 완료된 후에 리뷰를 작성하실 수 있습니다.');
+      } else {
+        setNotice('구매하고 배송이 완료된 상품만 리뷰를 작성할 수 있습니다.');
+      }
+    } catch (err) {
+      console.error('리뷰 자격 확인 실패:', err);
+      setNotice('리뷰 작성 자격을 확인하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setCheckingEligibility(false);
+    }
+  }, [user, productId, router]);
+
+  return <ProductReviewsInner
+    productId={productId}
+    productName={productName}
+    initialReviews={initialReviews}
+    startWriteReview={startWriteReview}
+    checkingEligibility={checkingEligibility}
+    notice={notice}
+    showForm={showForm}
+    eligibleOrderId={eligibleOrderId}
+    onFormClose={() => setShowForm(false)}
+  />;
+}
+
+interface InnerProps extends ProductReviewsProps {
+  startWriteReview: () => void;
+  checkingEligibility: boolean;
+  notice: string;
+  showForm: boolean;
+  eligibleOrderId: string | null;
+  onFormClose: () => void;
+}
+
+function ProductReviewsInner({
+  productId,
+  productName,
+  initialReviews,
+  startWriteReview,
+  checkingEligibility,
+  notice,
+  showForm,
+  eligibleOrderId,
+  onFormClose,
+}: InnerProps) {
   // Safely ensure initialReviews is always an array
   const safeInitial = Array.isArray(initialReviews) ? initialReviews : [];
   const [reviews, setReviews] = useState<Review[]>(safeInitial);
@@ -93,7 +194,30 @@ export default function ProductReviews({ productId, initialReviews }: ProductRev
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-6">상품 리뷰</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-bold text-gray-900">상품 리뷰</h2>
+        <button
+          onClick={startWriteReview}
+          disabled={checkingEligibility}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold text-white bg-gradient-to-br from-purple-500 to-indigo-500 shadow-md shadow-purple-500/30 transition-all hover:shadow-lg hover:brightness-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {checkingEligibility ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              확인 중...
+            </>
+          ) : (
+            <>✍️ 리뷰 작성</>
+          )}
+        </button>
+      </div>
+
+      {/* 리뷰 작성 자격 안내 */}
+      {notice && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-700">{notice}</p>
+        </div>
+      )}
 
       {/* Error message */}
       {error && (
@@ -130,7 +254,14 @@ export default function ProductReviews({ productId, initialReviews }: ProductRev
         <div className="text-center py-12 text-gray-400">
           <span className="text-5xl block mb-4">📝</span>
           <p className="text-lg font-medium text-gray-500 mb-2">아직 리뷰가 없습니다</p>
-          <p className="text-sm">첫 번째 리뷰를 작성해보세요!</p>
+          <p className="text-sm mb-5">첫 번째 리뷰를 작성해보세요!</p>
+          <button
+            onClick={startWriteReview}
+            disabled={checkingEligibility}
+            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-gradient-to-br from-purple-500 to-indigo-500 shadow-md shadow-purple-500/30 transition-all hover:shadow-lg hover:brightness-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {checkingEligibility ? '확인 중...' : '✍️ 리뷰 작성하기'}
+          </button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -175,6 +306,21 @@ export default function ProductReviews({ productId, initialReviews }: ProductRev
             다음
           </button>
         </div>
+      )}
+
+      {/* 리뷰 작성 모달 */}
+      {showForm && eligibleOrderId && (
+        <ReviewForm
+          orderId={eligibleOrderId}
+          productId={productId}
+          productName={productName || '상품'}
+          onSuccess={() => {
+            onFormClose();
+            setPage(1);
+            loadReviews();
+          }}
+          onCancel={onFormClose}
+        />
       )}
     </div>
   );

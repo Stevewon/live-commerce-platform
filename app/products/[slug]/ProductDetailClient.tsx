@@ -928,7 +928,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
 
             {/* Reviews tab */}
             {activeTab === 'reviews' && (
-              <ProductReviews productId={product.id} initialReviews={safeReviews} />
+              <ProductReviews productId={product.id} productName={product.name} initialReviews={safeReviews} />
             )}
 
             {/* Q&A tab */}
