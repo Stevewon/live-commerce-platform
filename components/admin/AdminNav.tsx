@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/japan-shipping', label: '일본 배송비', icon: '🚢' },
   { href: '/admin/partners', label: '파트너 관리', icon: '🤝' },
   { href: '/admin/products', label: '상품 관리', icon: '🛍️' },
+  { href: '/admin/reviews', label: '리뷰 관리', icon: '⭐' },
   { href: '/admin/categories', label: '카테고리 관리', icon: '🏷️' },
   { href: '/admin/settlements', label: '정산 관리', icon: '💰' },
   { href: '/admin/coupons', label: '쿠폰 관리', icon: '🎟️' },
