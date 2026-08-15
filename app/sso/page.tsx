@@ -39,6 +39,28 @@ function SsoInner() {
           setError(json?.error || '자동로그인에 실패했습니다.');
           return;
         }
+
+        // ★★★ 2026-08-15 수정 (WebView 자동로그인 세션 유실 사건):
+        //   ─ 증상: 큐알쳇 앱 WebView 에서 SSO 로 자동로그인 "화면상 성공" 했는데도
+        //           바로구매/리뷰작성 등 API 호출이 전부 "로그인 요구" 로 튕김.
+        //   ─ 원인: 서버는 auth-token 을 쿠키(SameSite=Lax)로만 세팅했다.
+        //           앱 WebView 는 큐알쳇 도메인 ↔ qrlive.io 크로스사이트라
+        //           SameSite=Lax 쿠키가 이후 fetch 요청에 실리지 않는다.
+        //           일반 로그인(AuthContext)은 localStorage 에 토큰을 저장해
+        //           authFetch 가 Authorization 헤더로 보내는데, SSO 경로만
+        //           이 저장을 안 해서 헤더 폴백조차 없었다.
+        //   ─ 수정: 일반 로그인과 동일하게 응답의 token/user 를 localStorage 에 저장
+        //           → 이후 authFetch 가 Authorization: Bearer 헤더로 전송(크로스사이트 안전).
+        //           (쿠키는 서버에서 SameSite=None; Secure 로 별도 보강)
+        try {
+          const tokenData = json?.data?.token || json?.token;
+          const userData = json?.data?.user || json?.user;
+          if (tokenData) localStorage.setItem('auth-token', tokenData);
+          if (userData) localStorage.setItem('user', JSON.stringify(userData));
+        } catch {
+          /* localStorage 접근 실패(Safari private 등) — 쿠키 폴백에 의존 */
+        }
+
         // 쿠키 세팅 완료 → 컨텍스트 갱신 후 이동
         await refreshUser().catch(() => {});
         router.replace(redirect.startsWith('/') ? redirect : '/products');

@@ -222,20 +222,28 @@ export async function loginQrchatIdentity(
     name: user.name,
   });
 
+  // ★★★ 2026-08-15 수정 (WebView 자동로그인 세션 유실 사건):
+  //   큐알쳇 앱 WebView 는 큐알쳇 도메인 ↔ qrlive.io 크로스사이트다.
+  //   SameSite=Lax 쿠키는 크로스사이트 fetch/XHR 요청에 실리지 않아,
+  //   SSO 로 auth-token 을 심어도 바로구매/리뷰 API 가 "로그인 요구" 로 튕겼다.
+  //   → 크로스사이트에서도 쿠키가 실리도록 SameSite=None; Secure 로 세팅한다.
+  //   (SameSite=None 은 반드시 Secure 동반 필수 → 프로덕션 https 에서만 적용.
+  //    로컬 http 개발환경은 None+Secure 가 거부되므로 lax 로 폴백)
+  const isProd = process.env.NODE_ENV === 'production';
+  const crossSiteCookie = {
+    secure: isProd,
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+    maxAge: 60 * 60 * 24 * 30,
+    path: '/',
+  };
   const cookieStore = await cookies();
   cookieStore.set('auth-token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30,
-    path: '/',
+    ...crossSiteCookie,
   });
   cookieStore.set('user-role', user.role, {
     httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30,
-    path: '/',
+    ...crossSiteCookie,
   });
 
   const { password: _pw, ...userSafe } = user as any;
