@@ -11,6 +11,7 @@ interface Review {
   rating: number;
   content: string;
   createdAt: string;
+  images?: string[] | string | null;
   user?: {
     name?: string;
   } | null;
@@ -19,6 +20,20 @@ interface Review {
     slug: string;
     thumbnail: string;
   };
+}
+
+// images 값(배열 or JSON 문자열 or null)을 문자열 URL 배열로 정규화
+function toImageArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((u) => typeof u === 'string');
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((u) => typeof u === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 interface ProductReviewsProps {
@@ -132,6 +147,7 @@ function ProductReviewsInner({
   const [rating, setRating] = useState({ average: 0, count: 0 });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   const loadReviews = useCallback(async () => {
     try {
@@ -280,8 +296,54 @@ function ProductReviewsInner({
                 </span>
               </div>
               <p className="text-gray-700 text-sm leading-relaxed">{review.content}</p>
+
+              {/* 첨부 사진 */}
+              {(() => {
+                const imgs = toImageArray(review.images);
+                if (imgs.length === 0) return null;
+                return (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {imgs.map((url, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setLightbox(url)}
+                        className="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 hover:opacity-90 transition"
+                        aria-label={`리뷰 사진 ${i + 1} 크게 보기`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`리뷰 사진 ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 사진 확대 라이트박스 */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox}
+            alt="리뷰 사진 확대"
+            className="max-w-full max-h-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 text-white text-xl hover:bg-white/30"
+            aria-label="닫기"
+          >
+            ✕
+          </button>
         </div>
       )}
 
