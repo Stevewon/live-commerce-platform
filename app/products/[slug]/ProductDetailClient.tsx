@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -99,6 +99,15 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<'detail' | 'specs' | 'sellers' | 'reviews' | 'qna'>('detail');
+  const tabsSectionRef = useRef<HTMLDivElement>(null);
+
+  // 리뷰 탭으로 전환 + 해당 섹션으로 스크롤
+  const goToReviews = () => {
+    setActiveTab('reviews');
+    setTimeout(() => {
+      tabsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartMessage, setCartMessage] = useState('');
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
@@ -448,8 +457,8 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   const tabs = [
     { id: 'detail' as const, label: '상세정보' },
     { id: 'specs' as const, label: '상품정보' },
+    { id: 'reviews' as const, label: `⭐ 리뷰 (${safeReviews.length})` },
     { id: 'sellers' as const, label: `판매자 (${(product.partnerProducts || []).length})` },
-    { id: 'reviews' as const, label: `리뷰 (${safeReviews.length})` },
     { id: 'qna' as const, label: 'Q&A' },
   ];
 
@@ -564,16 +573,28 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
             {/* Name */}
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug">{tr(product.name)}</h1>
 
-            {/* Rating */}
-            {avgRating && (
-              <div className="flex items-center gap-2">
-                <div className="flex text-yellow-400 text-sm">
-                  {'★'.repeat(Math.round(Number(avgRating)))}
-                  {'☆'.repeat(5 - Math.round(Number(avgRating)))}
-                </div>
-                <span className="text-sm text-gray-600">{avgRating} ({safeReviews.length}개 리뷰)</span>
-              </div>
-            )}
+            {/* Rating — 클릭하면 리뷰 탭으로 이동 */}
+            <button
+              type="button"
+              onClick={goToReviews}
+              className="flex items-center gap-2 group"
+            >
+              {avgRating ? (
+                <>
+                  <div className="flex text-yellow-400 text-sm">
+                    {'★'.repeat(Math.round(Number(avgRating)))}
+                    {'☆'.repeat(5 - Math.round(Number(avgRating)))}
+                  </div>
+                  <span className="text-sm text-gray-600 group-hover:text-blue-600 underline-offset-2 group-hover:underline">
+                    {avgRating} ({safeReviews.length}개 리뷰) 보기 ›
+                  </span>
+                </>
+              ) : (
+                <span className="text-sm text-purple-600 font-medium group-hover:underline underline-offset-2">
+                  ⭐ 리뷰 {safeReviews.length}개 · 리뷰 보기/작성 ›
+                </span>
+              )}
+            </button>
 
             {/* Price */}
             <div className="bg-gray-50 rounded-lg p-4">
@@ -774,17 +795,19 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
         </div>
 
         {/* Tabs section */}
-        <div className="mt-10">
+        <div className="mt-10" ref={tabsSectionRef}>
           <div className="bg-white border-b sticky top-0 z-20 rounded-t-xl">
-            <div className="flex overflow-x-auto">
+            <div className="flex overflow-x-auto no-scrollbar">
               {tabs.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 min-w-fit px-6 py-4 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                  className={`flex-1 min-w-fit px-3 sm:px-6 py-4 text-sm font-medium border-b-2 transition whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                      ? 'border-blue-600 text-blue-600 bg-blue-50/60'
+                      : tab.id === 'reviews'
+                        ? 'border-transparent text-purple-600 hover:text-purple-700'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
                   {tab.label}
