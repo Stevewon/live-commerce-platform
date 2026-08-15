@@ -126,6 +126,19 @@ function ProductsContent() {
     return `/products?${params.toString()}`;
   }, [currentCategory, currentSort, currentSearch, currentPage, currentBrand, currentMinPrice, currentMaxPrice, currentInStock]);
 
+  // 목록 내 이동(카테고리/정렬/검색/페이지 등)용 네비게이터.
+  // 【큐알쳇 앱 WebView】앱 진입 시에는 router.replace 로 history 를 쌓지 않는다.
+  //   → 앱 상단 네이티브 뒤로가기(←)를 누르면 웹 내부로 되돌아가지 않고
+  //     곧바로 앱(QTA Apps 목록)으로 나가게 된다.
+  //   일반 웹 브라우저에서는 기존처럼 push(뒤로가기로 목록 상태 복원 가능).
+  const navigate = useCallback((url: string) => {
+    if (isAppEmbed) {
+      router.replace(url);
+    } else {
+      router.push(url);
+    }
+  }, [isAppEmbed, router]);
+
   useEffect(() => {
     fetchCategories();
     // locale 이 바뀌면 서버 번역된 카테고리명으로 다시 조회
@@ -177,18 +190,18 @@ function ProductsContent() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push(buildUrl({ search: searchInput, page: '1' }));
+    navigate(buildUrl({ search: searchInput, page: '1' }));
   };
 
   const handlePriceFilter = () => {
-    router.push(buildUrl({ minPrice: priceMin, maxPrice: priceMax, page: '1' }));
+    navigate(buildUrl({ minPrice: priceMin, maxPrice: priceMax, page: '1' }));
   };
 
   const clearFilters = () => {
     setSearchInput('');
     setPriceMin('');
     setPriceMax('');
-    router.push('/products');
+    navigate('/products');
   };
 
   const hasActiveFilters = currentSearch || currentBrand || currentMinPrice || currentMaxPrice || currentInStock;
@@ -242,7 +255,7 @@ function ProductsContent() {
                 <h3 className="text-sm font-bold text-gray-900 mb-3">{tp.category}</h3>
                 <div className="space-y-1.5">
                   <button
-                    onClick={() => router.push(buildUrl({ category: 'all', page: '1' }))}
+                    onClick={() => navigate(buildUrl({ category: 'all', page: '1' }))}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${currentCategory === 'all' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
                   >
                     {tp.allWithIcon}
@@ -250,7 +263,7 @@ function ProductsContent() {
                   {categories.map(cat => (
                     <button
                       key={cat.id}
-                      onClick={() => router.push(buildUrl({ category: cat.slug, page: '1' }))}
+                      onClick={() => navigate(buildUrl({ category: cat.slug, page: '1' }))}
                       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition ${currentCategory === cat.slug ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
                     >
                       {CATEGORY_ICONS[cat.slug] || '📦'} {tr(cat.name)}
@@ -290,7 +303,7 @@ function ProductsContent() {
                     {brands.map(b => (
                       <button
                         key={b}
-                        onClick={() => router.push(buildUrl({ brand: currentBrand === b ? '' : b, page: '1' }))}
+                        onClick={() => navigate(buildUrl({ brand: currentBrand === b ? '' : b, page: '1' }))}
                         className={`w-full text-left px-3 py-1.5 rounded text-sm transition ${currentBrand === b ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
                       >
                         {tr(b)}
@@ -305,7 +318,7 @@ function ProductsContent() {
                 <input
                   type="checkbox"
                   checked={currentInStock === 'true'}
-                  onChange={e => router.push(buildUrl({ inStock: e.target.checked ? 'true' : '', page: '1' }))}
+                  onChange={e => navigate(buildUrl({ inStock: e.target.checked ? 'true' : '', page: '1' }))}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600"
                 />
                 <span className="text-sm text-gray-700">{tp.inStockOnly}</span>
@@ -326,7 +339,7 @@ function ProductsContent() {
             <div className="lg:hidden mb-4 -mx-4 px-4 overflow-x-auto">
               <div className="flex gap-2 pb-2">
                 <button
-                  onClick={() => router.push(buildUrl({ category: 'all', page: '1' }))}
+                  onClick={() => navigate(buildUrl({ category: 'all', page: '1' }))}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition ${currentCategory === 'all' ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
                 >
                   {tp.all}
@@ -334,7 +347,7 @@ function ProductsContent() {
                 {categories.map(cat => (
                   <button
                     key={cat.id}
-                    onClick={() => router.push(buildUrl({ category: cat.slug, page: '1' }))}
+                    onClick={() => navigate(buildUrl({ category: cat.slug, page: '1' }))}
                     className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition ${currentCategory === cat.slug ? 'bg-blue-500 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}
                   >
                     {CATEGORY_ICONS[cat.slug] || '📦'} {tr(cat.name)}
@@ -360,7 +373,7 @@ function ProductsContent() {
               </div>
               <select
                 value={currentSort}
-                onChange={e => router.push(buildUrl({ sort: e.target.value, page: '1' }))}
+                onChange={e => navigate(buildUrl({ sort: e.target.value, page: '1' }))}
                 className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 text-gray-700"
               >
                 {SORT_OPTIONS.map(opt => (
@@ -477,7 +490,7 @@ function ProductsContent() {
               <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-10">
                 {/* 이전 */}
                 <button
-                  onClick={() => router.push(buildUrl({ page: String(Math.max(1, currentPage - 1)) }))}
+                  onClick={() => navigate(buildUrl({ page: String(Math.max(1, currentPage - 1)) }))}
                   disabled={currentPage <= 1}
                   aria-label={tp.prev}
                   className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition-all hover:border-purple-400 hover:text-purple-600 hover:shadow-md active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-600 disabled:hover:shadow-sm"
@@ -502,7 +515,7 @@ function ProductsContent() {
                   return (
                     <button
                       key={pageNum}
-                      onClick={() => router.push(buildUrl({ page: String(pageNum) }))}
+                      onClick={() => navigate(buildUrl({ page: String(pageNum) }))}
                       aria-current={isCurrent ? 'page' : undefined}
                       className={`w-10 h-10 rounded-full text-sm font-semibold transition-all active:scale-95 ${
                         isCurrent
@@ -517,7 +530,7 @@ function ProductsContent() {
 
                 {/* 다음 */}
                 <button
-                  onClick={() => router.push(buildUrl({ page: String(Math.min(pagination.totalPages, currentPage + 1)) }))}
+                  onClick={() => navigate(buildUrl({ page: String(Math.min(pagination.totalPages, currentPage + 1)) }))}
                   disabled={currentPage >= pagination.totalPages}
                   aria-label={tp.next}
                   className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition-all hover:border-purple-400 hover:text-purple-600 hover:shadow-md active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:text-gray-600 disabled:hover:shadow-sm"
