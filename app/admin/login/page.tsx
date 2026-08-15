@@ -108,15 +108,6 @@ export default function AdminLoginPage() {
             ← {t.nav.home}
           </Link>
         </div>
-
-        {/* Test account info */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800 font-medium mb-2">📋 Admin Account</p>
-          <p className="text-xs text-blue-700">
-            Nickname: admin<br />
-            Password: admin123
-          </p>
-        </div>
       </div>
     </div>
   )
