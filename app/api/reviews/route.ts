@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getPrisma } from '@/lib/prisma';
 
+// images 컬럼(JSON 문자열)을 안전하게 문자열 URL 배열로 파싱
+function parseImages(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((u) => typeof u === 'string');
+  if (typeof raw === 'string' && raw.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((u) => typeof u === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // 리뷰 생성 (POST)
 export async function POST(request: NextRequest) {
   const prisma = await getPrisma();
@@ -14,6 +28,15 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { orderId, productId, rating, comment, images } = body;
+
+    // images: 문자열 URL 배열 → JSON 문자열로 정규화 (D1 String 컬럼 저장용)
+    let imagesJson = '[]';
+    if (Array.isArray(images)) {
+      const cleaned = images.filter((u: unknown) => typeof u === 'string' && u.length > 0).slice(0, 5);
+      imagesJson = JSON.stringify(cleaned);
+    } else if (typeof images === 'string' && images.trim().startsWith('[')) {
+      imagesJson = images;
+    }
 
     // 유효성 검사
     if (!orderId || !productId || !rating) {
@@ -92,7 +115,7 @@ export async function POST(request: NextRequest) {
         orderId,
         rating,
         content: comment || '',
-        images: images || []
+        images: imagesJson
       },
       include: {
         user: {
@@ -130,7 +153,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: '리뷰가 등록되었습니다',
-      data: review
+      data: { ...review, images: parseImages((review as any).images) }
     });
 
   } catch (error) {
@@ -189,9 +212,11 @@ export async function GET(request: NextRequest) {
       prisma.review.count({ where })
     ]);
 
+    const dataWithImages = reviews.map((r: any) => ({ ...r, images: parseImages(r.images) }));
+
     return NextResponse.json({
       success: true,
-      data: reviews,
+      data: dataWithImages,
       pagination: {
         page,
         limit,
