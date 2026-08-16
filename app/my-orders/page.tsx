@@ -270,7 +270,11 @@ export default function MyOrdersPage() {
                   )}
 
                   {/* Order footer */}
-                  <div className="px-4 sm:px-6 py-3 border-t flex items-center justify-between">
+                  {/* ★★★ 2026-08-15 수정 (모바일 버튼 최적화):
+                      기존 flex justify-between 이라 좁은 모바일에서 금액+버튼이 한 줄에 몰려
+                      버튼이 찌그러지고 눌기 힘들었다. → 모바일은 세로 스택(금액 위, 버튼 아래 가로 균등),
+                      데스크톱(sm~)은 종전대로 좌우 배치. 버튼은 터치 영역 확대(py-2.5)+줄바꿈 방지. */}
+                  <div className="px-4 sm:px-6 py-3 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <span className="text-sm text-gray-500">총 결제금액</span>
                       <span className="ml-2 text-lg font-bold text-gray-900">₩{(Number(order.total) || 0).toLocaleString()}</span>
@@ -278,14 +282,14 @@ export default function MyOrdersPage() {
                     <div className="flex gap-2">
                       <Link
                         href={`/my-orders/${order.id}`}
-                        className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                        className="flex-1 sm:flex-none text-center whitespace-nowrap px-4 py-2.5 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
                       >
                         상세보기
                       </Link>
                       {canCancel && (
                         <button
                           onClick={() => handleCancel(order.id)}
-                          className="px-4 py-2 text-sm text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition"
+                          className="flex-1 sm:flex-none text-center whitespace-nowrap px-4 py-2.5 text-sm text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition"
                         >
                           주문취소
                         </button>
@@ -293,9 +297,9 @@ export default function MyOrdersPage() {
                       {order.status === 'DELIVERED' && (
                         <Link
                           href={`/my-orders/${order.id}?review=true`}
-                          className="px-4 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
+                          className="flex-1 sm:flex-none text-center whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition"
                         >
-                          리뷰작성
+                          ⭐ 리뷰작성
                         </Link>
                       )}
                     </div>

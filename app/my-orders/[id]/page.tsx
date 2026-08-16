@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
+import ReviewForm from '@/components/ReviewForm';
 import { ORDER_STATUS_MAP, COURIER_COMPANIES, getTrackingUrl } from '@/lib/utils/courier';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import { paymentMethodLabel } from '@/lib/utils/orders';
@@ -59,6 +60,7 @@ interface Order {
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const orderId = params.id as string;
 
@@ -68,6 +70,22 @@ export default function OrderDetailPage() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // ★★★ 2026-08-15 추가 (리뷰작성 버튼이 주문상세로만 보내고 리뷰폼이 안 뜨던 문제):
+  //   주문목록의 '리뷰작성'은 /my-orders/[id]?review=true 로 이동하는데,
+  //   기존 주문상세 페이지엔 review 파라미터 처리도, ReviewForm 도 전혀 없어
+  //   리뷰 쓰는 곳이 아예 안 보였다. → 여기서 리뷰폼을 띄운다.
+  const [reviewTarget, setReviewTarget] = useState<{ productId: string; productName: string } | null>(null);
+
+  // ?review=true 로 진입하면 첫 상품 리뷰폼을 자동으로 연다.
+  useEffect(() => {
+    if (!order) return;
+    if (searchParams?.get('review') === 'true' && order.status === 'DELIVERED' && order.items.length > 0) {
+      const first = order.items[0];
+      setReviewTarget({ productId: first.product.id, productName: first.product.name });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -278,6 +296,15 @@ export default function OrderDetailPage() {
                     <p className="text-sm text-gray-500 mt-1">
                       ₩{item.price.toLocaleString()} x {item.quantity}개
                     </p>
+                    {/* ★ 배송완료 상품에 리뷰 작성 버튼 (상품 단위) */}
+                    {order.status === 'DELIVERED' && (
+                      <button
+                        onClick={() => setReviewTarget({ productId: item.product.id, productName: item.product.name })}
+                        className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition"
+                      >
+                        ⭐ 리뷰 작성
+                      </button>
+                    )}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="font-bold text-gray-900">₩{(item.price * item.quantity).toLocaleString()}</p>
@@ -395,6 +422,21 @@ export default function OrderDetailPage() {
           )}
         </div>
       </div>
+
+      {/* 리뷰 작성 모달 */}
+      {reviewTarget && (
+        <ReviewForm
+          orderId={order.id}
+          productId={reviewTarget.productId}
+          productName={reviewTarget.productName}
+          onSuccess={() => {
+            setReviewTarget(null);
+            alert('리뷰가 등록되었습니다. 감사합니다!');
+            fetchOrder();
+          }}
+          onCancel={() => setReviewTarget(null)}
+        />
+      )}
     </div>
   );
 }
