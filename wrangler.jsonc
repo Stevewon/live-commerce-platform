@@ -55,6 +55,15 @@
     "QRLIVE_BRIDGE_SECRET": "b5b5a4399206f67cdee8367ca0e57d15ecc1b98f02a150f63b0d8f83722a08eb",
     "QRLIVE_APP_BRIDGE_KEY": "b51336e52f66591a2c0446b671d9de1727d07c94e1d2f2917e9fa57777888899",
     "QRCHAT_FUNCTIONS_BASE_URL": "https://asia-northeast3-qrchat-b7a67.cloudfunctions.net"
+
+    // [2026-08-16 인앱 배송추적] Delivery Tracker(tracker.delivery) 연동
+    //   외부 CJ대한통운 사이트로 안 나가고 앱 안에서 배송추적을 보여주기 위함.
+    //   ⚠️ 아래 2개는 secret 이므로 여기(vars, git 커밋됨)에 값을 넣지 말 것!
+    //      반드시 wrangler secret 으로 주입 (또는 프로덕션 대시보드 Variables):
+    //        wrangler secret put DELIVERY_TRACKER_CLIENT_ID
+    //        wrangler secret put DELIVERY_TRACKER_CLIENT_SECRET
+    //   발급: https://console.tracker.delivery/  (프로젝트 생성 → Credentials)
+    //   두 값이 없으면 인앱 추적 자동 비활성 → 기존처럼 외부 링크로 폴백.
   }
   // [2026-05-11 MED 3 패치] PENDING 30분 자동 취소 cron
   // OpenNext(.open-next/worker.js) 는 scheduled() 핸들러를 자동 생성하지 않으므로

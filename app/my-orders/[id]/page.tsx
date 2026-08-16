@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import ShopNavigation from '@/components/ShopNavigation';
 import ReviewForm from '@/components/ReviewForm';
-import { ORDER_STATUS_MAP, COURIER_COMPANIES, getTrackingUrl } from '@/lib/utils/courier';
+import TrackingModal from '@/components/TrackingModal';
+import { ORDER_STATUS_MAP } from '@/lib/utils/courier';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 import { paymentMethodLabel } from '@/lib/utils/orders';
 import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
@@ -76,6 +77,8 @@ export default function OrderDetailPage() {
   //   기존 주문상세 페이지엔 review 파라미터 처리도, ReviewForm 도 전혀 없어
   //   리뷰 쓰는 곳이 아예 안 보였다. → 여기서 리뷰폼을 띄운다.
   const [reviewTarget, setReviewTarget] = useState<{ productId: string; productName: string } | null>(null);
+  // ★ 2026-08-16: 인앱 배송추적 모달 (외부 CJ대한통운 사이트 대신)
+  const [trackingOpen, setTrackingOpen] = useState(false);
 
   // ?review=true 로 진입하면 첫 상품 리뷰폼을 자동으로 연다.
   useEffect(() => {
@@ -157,9 +160,8 @@ export default function OrderDetailPage() {
 
   const statusInfo = ORDER_STATUS_MAP[order.status] || ORDER_STATUS_MAP.PENDING;
   const canCancel = order.status === 'PENDING' || order.status === 'CONFIRMED';
-  const trackingUrl = order.trackingCompany && order.trackingNumber
-    ? getTrackingUrl(order.trackingCompany, order.trackingNumber)
-    : null;
+  // 배송추적은 인앱 모달(TrackingModal)에서 /api/orders/[id]/tracking 로 처리한다.
+  // 외부 링크(getTrackingUrl)는 API 응답의 externalUrl 로 폴백된다.
 
   // Order timeline
   const timeline = [
@@ -240,19 +242,19 @@ export default function OrderDetailPage() {
                 <p className="text-sm font-mono font-medium text-indigo-900">{order.trackingNumber}</p>
               </div>
             </div>
-            {trackingUrl && (
-              <a
-                href={trackingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
-              >
-                🔍 실시간 배송조회
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
-            )}
+            {/* ★ 2026-08-16: 외부 CJ대한통운 사이트(모바일 좌우로 퍼짐)로 나가는 대신
+                인앱 모달로 배송추적을 모바일 최적화 타임라인으로 표시.
+                (미지원/미설정 택배사는 모달 안에서 외부 링크로 폴백) */}
+            <button
+              type="button"
+              onClick={() => setTrackingOpen(true)}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
+            >
+              🔍 실시간 배송조회
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
         )}
 
@@ -436,6 +438,11 @@ export default function OrderDetailPage() {
           }}
           onCancel={() => setReviewTarget(null)}
         />
+      )}
+
+      {/* 인앱 배송추적 모달 */}
+      {trackingOpen && (
+        <TrackingModal orderId={order.id} onClose={() => setTrackingOpen(false)} />
       )}
     </div>
   );

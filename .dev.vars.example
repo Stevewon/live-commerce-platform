@@ -1,0 +1,18 @@
+# .dev.vars 예시 (로컬 개발용). 실제 .dev.vars 는 git 에 커밋되지 않음(.gitignore).
+# 아래 값을 채워 .dev.vars 로 복사해서 사용하세요.
+
+DATABASE_URL=file:./prisma/dev.db
+JWT_SECRET=dev-jwt-secret
+NEXTAUTH_SECRET=dev-nextauth-secret
+NEXTAUTH_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NODE_ENV=development
+
+# [인앱 배송추적] Delivery Tracker(tracker.delivery) Credentials
+#   발급: https://console.tracker.delivery/  (프로젝트 생성 → Credentials)
+#   ⚠️ 프로덕션에서는 wrangler secret 으로 주입:
+#        wrangler secret put DELIVERY_TRACKER_CLIENT_ID
+#        wrangler secret put DELIVERY_TRACKER_CLIENT_SECRET
+#   두 값이 없으면 인앱 추적 비활성 → 기존처럼 외부 택배사 링크로 폴백.
+DELIVERY_TRACKER_CLIENT_ID=
+DELIVERY_TRACKER_CLIENT_SECRET=
