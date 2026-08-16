@@ -739,8 +739,13 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
               </div>
             )}
 
-            {/* Action buttons */}
-            <div className="flex gap-3">
+            {/* Action buttons (데스크톱 전용) */}
+            {/* ★★★ 2026-08-15 수정 (구매 버튼 2개 중복 노출 사건):
+                모바일에는 화면 하단 고정 액션바(장바구니/바로구매)가 별도로 있어서,
+                본문의 이 액션 버튼까지 모바일에 보이면 '장바구니/구매'가 2세트로 중복됐다.
+                → 본문 액션 버튼은 hidden md:flex 로 데스크톱에서만 표시.
+                  (모바일은 하단 고정바만, 데스크톱은 하단바가 md:hidden 이라 이 본문 버튼만 노출) */}
+            <div className="hidden md:flex gap-3">
               {currentStock > 0 ? (
                 <>
                   <button
