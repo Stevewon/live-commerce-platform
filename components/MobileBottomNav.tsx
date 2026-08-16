@@ -18,6 +18,21 @@ export default function MobileBottomNav() {
     return null;
   }
 
+  // ★★★ 2026-08-15 수정 (바로구매 버튼 클릭 불가 사건):
+  //   상품 상세페이지(/products/[slug])와 체크아웃/장바구니에는 화면 최하단에
+  //   자체 고정 액션 바(장바구니/바로구매/결제 버튼: fixed bottom-0 z-50)가 있다.
+  //   이 하단 탭 네비도 fixed bottom-0 z-50 이라 같은 위치에서 겹쳐,
+  //   탭 네비(특히 '찜' 링크)가 구매 버튼 위를 덮어 클릭을 통째로 가로챘다.
+  //   → 실제 증상: "기절베개 검색 후 바로구매를 눌러도 아무 반응 없음".
+  //   해결: 하단 액션 바가 있는 상품 상세페이지에서만 이 탭 네비를 숨겨 겹침을 제거한다.
+  //   (/products 목록·/cart·/checkout 에는 하단 고정 액션바가 없으므로 탭 네비 유지 —
+  //    정확히 상세페이지 /products/[slug] 만 제외)
+  const isProductDetail =
+    pathname.startsWith('/products/') && pathname !== '/products';
+  if (isProductDetail) {
+    return null;
+  }
+
   // ★★★ 큐알쳇 앱 WebView 안에서도 하단 탭은 유지한다.
   //   (헤더/푸터는 앱바와 중복되어 숨기지만, 하단 탭은 앱 화면 최하단에 위치해
   //    Flutter 앱바와 겹치지 않으며, 마이페이지·주문내역 등 핵심 진입 동선이라
