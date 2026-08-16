@@ -338,18 +338,26 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   // 옵션이 있는 상품인지 (옵션 선택 필수 판정)
   const optionRequired = !!(product.hasOptions && Array.isArray(product.variants) && product.variants.length > 0);
 
-  const handleAddToCart = async () => {
-    if (currentStock <= 0) return;
-    // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 담기/구매 가능
+  // ★★★ 2026-08-15 수정 (사장님 요구): 옵션이 있는 상품인데 옵션을 안 고르고
+  //   담기/구매를 누르면 반드시 "경고창(alert)"을 띄워 옵션 선택을 요구한다.
+  //   (기존엔 작은 인라인 메시지라 모바일/앱에서 눈에 안 띄어 '반응 없음'처럼 느껴졌음)
+  //   alert 은 앱 WebView에서도 화면 중앙에 확실히 뜨는 네이티브 다이얼로그다.
+  //   반환값 true = 옵션 미선택으로 진행을 막아야 함.
+  const warnIfOptionNotSelected = (): boolean => {
     if (optionRequired && !selectedVariant) {
-      setCartMessage('옵션을 선택해주세요.');
-      setTimeout(() => setCartMessage(''), 3000);
-      // 옵션 영역으로 스크롤 (사용자가 어디를 골라야 하는지 바로 보이도록)
-      if (typeof document !== 'undefined') {
+      if (typeof window !== 'undefined') {
+        window.alert('옵션을 선택해주세요.');
         document.getElementById('product-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-      return;
+      return true;
     }
+    return false;
+  };
+
+  const handleAddToCart = async () => {
+    if (currentStock <= 0) return;
+    // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 담기/구매 가능 → 경고창
+    if (warnIfOptionNotSelected()) return;
     setAddingToCart(true);
     setCartMessage('');
 
@@ -409,15 +417,8 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   };
 
   const handleBuyNow = async () => {
-    // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 구매 가능
-    if (optionRequired && !selectedVariant) {
-      setCartMessage('옵션을 선택해주세요.');
-      setTimeout(() => setCartMessage(''), 3000);
-      if (typeof document !== 'undefined') {
-        document.getElementById('product-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-      return;
-    }
+    // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 구매 가능 → 경고창
+    if (warnIfOptionNotSelected()) return;
     // 바로구매: 장바구니에 넣지 않고 sessionStorage에 바로구매 상품만 저장 후 checkout으로 이동
     let optionLabel: string | null = null;
     if (selectedVariant) {
@@ -963,6 +964,15 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
       </div>
 
       {/* Mobile bottom action bar */}
+      {/* ★ 장바구니 담기 성공/실패 메시지를 모바일 하단 바 '바로 위'에도 노출.
+          (옵션 미선택은 별도 경고창(alert)으로 처리 — 사장님 요구) */}
+      {cartMessage && (
+        <div className={`fixed bottom-[72px] left-0 right-0 mx-3 rounded-lg px-4 py-2.5 text-sm font-semibold text-center shadow-lg md:hidden z-50 ${
+          cartMessage.includes('실패') ? 'bg-red-500 text-white' : 'bg-gray-900 text-white'
+        }`}>
+          {cartMessage}
+        </div>
+      )}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-3 flex gap-3 md:hidden z-50">
         {currentStock > 0 ? (
           <>
