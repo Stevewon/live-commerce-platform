@@ -46,7 +46,9 @@ export default function MobileBottomNav() {
 
   const navItems = [
     { href: '/products', icon: '🏠', label: t.nav.home, activeCheck: (p: string) => p === '/products' || p === '/' },
-    { href: '/lives', icon: '📺', label: t.nav.liveBroadcast, activeCheck: (p: string) => p.startsWith('/lives') },
+    // ★ 2026-08-16 사장님 요청: 하단 '라이브방송' → '큐박스쇼핑' 텍스트 변경 +
+    //   외부 링크 https://qbox.shop 로 이동 (외부라 <a> 로 렌더).
+    { href: 'https://qbox.shop', icon: '🛍️', label: '큐박스쇼핑', external: true, activeCheck: () => false },
     { href: '/cart', icon: '🛒', label: t.nav.cart, activeCheck: (p: string) => p === '/cart' },
     { href: '/wishlist', icon: '💖', label: t.nav.wishlist, activeCheck: (p: string) => p === '/wishlist' },
     { href: '/my', icon: '👤', label: user ? t.nav.myPage : t.nav.login, activeCheck: (p: string) => p.startsWith('/my') || p === '/login' || p === '/register', dynamicHref: !user ? '/login' : '/my' },
@@ -58,22 +60,38 @@ export default function MobileBottomNav() {
         {navItems.map((item) => {
           const href = item.dynamicHref || item.href;
           const isActive = item.activeCheck(pathname + (typeof window !== 'undefined' ? window.location.search : ''));
-          
-          return (
-            <Link
-              key={item.href}
-              href={href}
-              prefetch={false}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
-                isActive 
-                  ? 'text-blue-600' 
-                  : 'text-gray-500 active:text-blue-600'
-              }`}
-            >
+          const className = `flex flex-col items-center justify-center flex-1 py-1 transition-colors ${
+            isActive
+              ? 'text-blue-600'
+              : 'text-gray-500 active:text-blue-600'
+          }`;
+          const inner = (
+            <>
               <span className="text-xl leading-none mb-0.5">{item.icon}</span>
               <span className={`text-[10px] font-medium leading-none ${isActive ? 'font-bold' : ''}`}>
                 {item.label}
               </span>
+            </>
+          );
+
+          // 외부 링크(큐박스쇼핑)는 <a> 로 새 탭 이동
+          if (item.external) {
+            return (
+              <a
+                key={item.href}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={className}
+              >
+                {inner}
+              </a>
+            );
+          }
+
+          return (
+            <Link key={item.href} href={href} prefetch={false} className={className}>
+              {inner}
             </Link>
           );
         })}
