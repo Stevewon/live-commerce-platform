@@ -54,6 +54,9 @@ interface ProductFormData {
   hasOptions: boolean
   optionNames: string[]
   variants: VariantData[]
+  // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크)
+  bottomBannerImage: string
+  bottomBannerLink: string
 }
 
 interface Props {
@@ -90,10 +93,14 @@ export default function ProductForm({ mode, initialData }: Props) {
   const [activeTab, setActiveTab] = useState<'basic' | 'detail' | 'images' | 'shipping' | 'seo' | 'options'>('basic')
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadingDetail, setUploadingDetail] = useState(false)
+  const [uploadingBanner, setUploadingBanner] = useState(false)
   const [detailHtmlInput, setDetailHtmlInput] = useState('')
+  // 하단 배너를 전체 상품에 일괄 적용할지 여부 (체크 시 저장과 동시에 전체 상품에 반영)
+  const [bannerApplyAll, setBannerApplyAll] = useState(false)
   const thumbnailRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
   const detailImgRef = useRef<HTMLInputElement>(null)
+  const bannerRef = useRef<HTMLInputElement>(null)
 
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [dragType, setDragType] = useState<'images' | 'detailImages' | null>(null)
@@ -126,6 +133,8 @@ export default function ProductForm({ mode, initialData }: Props) {
     hasOptions: false,
     optionNames: [],
     variants: [],
+    bottomBannerImage: '',
+    bottomBannerLink: '',
   })
 
   // Load categories
@@ -198,6 +207,8 @@ export default function ProductForm({ mode, initialData }: Props) {
             }))
           } catch { return [] }
         })(),
+        bottomBannerImage: (initialData as any).bottomBannerImage || '',
+        bottomBannerLink: (initialData as any).bottomBannerLink || '',
       })
     }
   }, [initialData, mode])
@@ -297,6 +308,20 @@ export default function ProductForm({ mode, initialData }: Props) {
     setForm(prev => ({ ...prev, images: [...prev.images, ...urls] }))
     setUploadingImage(false)
     if (galleryRef.current) galleryRef.current.value = ''
+  }
+
+  // 하단 배너 이미지 업로드 (가로로 넓은 배너이므로 1200px 로 리사이즈)
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingBanner(true)
+    setError('')
+    const url = await uploadImage(file, 1200)
+    if (url) {
+      setForm(prev => ({ ...prev, bottomBannerImage: url }))
+    }
+    setUploadingBanner(false)
+    if (bannerRef.current) bannerRef.current.value = ''
   }
 
   // Detail images upload
@@ -477,6 +502,9 @@ export default function ProductForm({ mode, initialData }: Props) {
           thumbnail: v.thumbnail || null,
           isActive: v.isActive,
         })) : [],
+        // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크)
+        bottomBannerImage: form.bottomBannerImage.trim() || null,
+        bottomBannerLink: form.bottomBannerLink.trim() || null,
       }
 
       const url = mode === 'edit' && initialData?.id
@@ -493,7 +521,33 @@ export default function ProductForm({ mode, initialData }: Props) {
       const data = await res.json()
 
       if (data.success) {
-        setSuccess(mode === 'create' ? '상품이 등록되었습니다!' : '상품이 수정되었습니다!')
+        // [일괄 등록] 하단 배너를 전체 상품에 동시 적용 옵션이 켜져 있으면 별도 API 호출
+        if (bannerApplyAll && form.bottomBannerImage.trim()) {
+          try {
+            const bulkRes = await fetch('/api/admin/products/bulk-banner', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                bottomBannerImage: form.bottomBannerImage.trim(),
+                bottomBannerLink: form.bottomBannerLink.trim() || null,
+              })
+            })
+            const bulkData = await bulkRes.json()
+            if (!bulkData.success) {
+              setError(`상품은 저장되었으나 일괄 적용 실패: ${bulkData.error || '알 수 없는 오류'}`)
+              setSaving(false)
+              return
+            }
+            setSuccess(`${mode === 'create' ? '상품이 등록되었습니다!' : '상품이 수정되었습니다!'} 배너를 전체 ${bulkData.data?.updated ?? ''}개 상품에 일괄 적용했습니다.`)
+          } catch (e: any) {
+            setError(`상품은 저장되었으나 일괄 적용 중 오류: ${e?.message || e}`)
+            setSaving(false)
+            return
+          }
+        } else {
+          setSuccess(mode === 'create' ? '상품이 등록되었습니다!' : '상품이 수정되었습니다!')
+        }
         if (mode === 'create') {
           setTimeout(() => router.push('/admin/products'), 1500)
         }
@@ -1247,6 +1301,86 @@ export default function ProductForm({ mode, initialData }: Props) {
                   )}
                 </div>
                 <input ref={galleryRef} type="file" accept="image/*" multiple onChange={handleGalleryUpload} className="hidden" />
+              </div>
+
+              {/* ===== 상세페이지 하단 배너 ===== */}
+              <div className="border-t pt-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  🖼️ 상세페이지 하단 배너 <span className="text-gray-400 font-normal text-xs">(선택)</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  상품 상세페이지 <b>맨 아래</b>에 노출되는 별도 배너입니다. 모바일/PC 화면 폭에 맞춰 자동으로 조절됩니다.
+                  배너를 클릭하면 아래 링크가 <b>새 창</b>으로 열립니다. <br />
+                  <span className="text-gray-400">권장 사이즈: 가로 1200px 이상, 가로:세로 비율 3:1 ~ 4:1 (예: 1200×360)</span>
+                </p>
+
+                {form.bottomBannerImage ? (
+                  <div className="relative inline-block w-full max-w-2xl">
+                    {/* 실제 노출과 유사하게 가로 꽉 찬 미리보기 */}
+                    <img
+                      src={form.bottomBannerImage}
+                      alt="하단 배너 미리보기"
+                      className="w-full h-auto rounded-lg border object-contain bg-gray-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm(prev => ({ ...prev, bottomBannerImage: '' }))}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => bannerRef.current?.click()}
+                    className="w-full max-w-2xl h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 transition"
+                  >
+                    {uploadingBanner ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    ) : (
+                      <>
+                        <svg className="w-9 h-9 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                        </svg>
+                        <span className="mt-2 text-xs text-gray-400">배너 이미지 업로드 (클릭)</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                <input ref={bannerRef} type="file" accept="image/*" onChange={handleBannerUpload} className="hidden" />
+
+                {/* 배너 클릭 시 이동할 링크 (새 창) */}
+                <div className="mt-4 max-w-2xl">
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    배너 클릭 링크 <span className="text-gray-400">(클릭 시 새 창으로 열림)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={form.bottomBannerLink}
+                    onChange={(e) => setForm(prev => ({ ...prev, bottomBannerLink: e.target.value }))}
+                    placeholder="https://example.com"
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    링크를 비워두면 배너는 이미지로만 노출되며 클릭해도 이동하지 않습니다.
+                  </p>
+                </div>
+
+                {/* 일괄 등록 체크박스 */}
+                <label className="mt-4 flex items-start gap-2.5 max-w-2xl cursor-pointer select-none bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <input
+                    type="checkbox"
+                    checked={bannerApplyAll}
+                    onChange={(e) => setBannerApplyAll(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    <b className="text-amber-700">전체 상품에 이 배너를 일괄 적용</b>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      체크 후 저장하면 이 상품뿐 아니라 <b>모든 상품</b>의 하단 배너가 위 이미지/링크로 한 번에 교체됩니다. (개별 등록은 체크 해제)
+                    </span>
+                  </span>
+                </label>
               </div>
             </div>
           )}

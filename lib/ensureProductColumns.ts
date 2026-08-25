@@ -12,6 +12,7 @@ let _orderPaymentColumnsEnsured = false;
 let _userQrchatColumnsEnsured = false;
 let _overseasBlockedColumnEnsured = false;
 let _orderIndexesEnsured = false;
+let _bottomBannerColumnsEnsured = false;
 
 // D1 바인딩을 가져오는 함수 (lib/prisma.ts 와 동일 패턴)
 async function getD1(): Promise<any> {
@@ -86,6 +87,45 @@ export async function ensureOverseasBlockedColumn(db?: any): Promise<void> {
     console.warn('[ensureOverseasBlockedColumn] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
   } finally {
     _overseasBlockedColumnEnsured = true;
+  }
+}
+
+/**
+ * [2026-08-25 사장님 요청] Product 하단 배너 컬럼 보장 (셀프 힐링).
+ * 각 상품 상세페이지 맨 아래에 노출되는 별도 배너 이미지 + 클릭 시 이동할 링크.
+ *   - bottomBannerImage: 배너 이미지 URL (TEXT, nullable)
+ *   - bottomBannerLink:  클릭 시 새 창으로 열릴 링크 URL (TEXT, nullable)
+ * 프로세스 당 1회만 실제 시도. 이미 있으면 duplicate 에러를 무시한다. (멱등)
+ */
+export async function ensureBottomBannerColumns(db?: any): Promise<void> {
+  if (_bottomBannerColumnsEnsured) return;
+  const d1 = db || (await getD1());
+  if (!d1) return;
+  try {
+    const cols: any = await d1.prepare(`PRAGMA table_info("Product")`).all();
+    const rows: any[] = cols?.results || cols || [];
+    const names = new Set((Array.isArray(rows) ? rows : []).map((r) => r && r.name));
+    const toAdd: string[] = [];
+    if (!names.has('bottomBannerImage')) {
+      toAdd.push(`ALTER TABLE "Product" ADD COLUMN "bottomBannerImage" TEXT`);
+    }
+    if (!names.has('bottomBannerLink')) {
+      toAdd.push(`ALTER TABLE "Product" ADD COLUMN "bottomBannerLink" TEXT`);
+    }
+    for (const sql of toAdd) {
+      try {
+        await d1.prepare(sql).run();
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (!/duplicate column|already exists/i.test(msg)) {
+          console.warn('[ensureBottomBannerColumns] ALTER 실패(무시):', msg);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('[ensureBottomBannerColumns] PRAGMA 확인 실패(무시):', String(e?.message || e || ''));
+  } finally {
+    _bottomBannerColumnsEnsured = true;
   }
 }
 

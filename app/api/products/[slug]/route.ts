@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
+import { ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
 
 // GET /api/products/[slug] - 상품 상세 조회
 export async function GET(
@@ -10,6 +11,9 @@ export async function GET(
   try {
     const resolvedParams = await context.params;
     const { slug } = resolvedParams;
+
+    // 하단 배너 컬럼 자동 보정 (없으면 조회 시 Prisma 오류 방지)
+    try { await ensureBottomBannerColumns(); } catch {}
     const product = await prisma.product.findUnique({
       where: {
         slug: slug,

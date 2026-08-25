@@ -1,5 +1,6 @@
 import { getPrisma } from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
+import { ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
 
 /**
  * slug 로 단일 상품을 조회한다(파트너/리뷰/변형/카테고리 포함).
@@ -8,6 +9,8 @@ import { unstable_cache } from 'next/cache';
  */
 async function fetchProductBySlug(slug: string): Promise<any | null> {
   const prisma = await getPrisma();
+  // 하단 배너 등 신규 컬럼 자동 보정 (없으면 전체 조회 시 Prisma 오류 방지)
+  try { await ensureBottomBannerColumns(); } catch {}
   const product = await prisma.product.findFirst({
     where: { slug, isActive: true },
     include: {

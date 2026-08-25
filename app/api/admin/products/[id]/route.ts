@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn } from '@/lib/ensureProductColumns';
+import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn, ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
 
 // 관리자 상품 상세 조회 (GET)
 export async function GET(
@@ -23,6 +23,9 @@ export async function GET(
         { status: 403 }
       );
     }
+
+    // 하단 배너 등 신규 컬럼 자동 보정 (없으면 전체 조회 시 오류 방지)
+    try { await ensureBottomBannerColumns(); } catch {}
 
     const product = await prisma.product.findUnique({
       where: { id: id },
@@ -102,7 +105,8 @@ export async function PATCH(
       categoryId, isActive, isFeatured, overseasBlocked,
       imageUrl, // 하위호환
       origin, manufacturer, brand, tags,
-      hasOptions, optionNames, variants
+      hasOptions, optionNames, variants,
+      bottomBannerImage, bottomBannerLink
     } = body;
 
     // 상품 존재 확인
@@ -130,9 +134,10 @@ export async function PATCH(
       }
     }
 
-    // 공급가(supplyPrice) + 해외배송불가(overseasBlocked) 컬럼 자동 보정 (셀프 힐링)
+    // 공급가(supplyPrice) + 해외배송불가(overseasBlocked) + 하단배너 컬럼 자동 보정 (셀프 힐링)
     await ensureSupplyPriceColumn();
     await ensureOverseasBlockedColumn();
+    await ensureBottomBannerColumns();
 
     // 업데이트 데이터 구성 (전달된 필드만 업데이트)
     const updateData: any = {};
@@ -162,6 +167,9 @@ export async function PATCH(
     if (tags !== undefined) updateData.tags = tags || null;
     if (hasOptions !== undefined) updateData.hasOptions = hasOptions;
     if (optionNames !== undefined) updateData.optionNames = optionNames ? (typeof optionNames === 'string' ? optionNames : JSON.stringify(optionNames)) : null;
+    // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크). 빈 문자열은 null 로 저장(배너 제거).
+    if (bottomBannerImage !== undefined) updateData.bottomBannerImage = (typeof bottomBannerImage === 'string' && bottomBannerImage.trim()) ? bottomBannerImage.trim() : null;
+    if (bottomBannerLink !== undefined) updateData.bottomBannerLink = (typeof bottomBannerLink === 'string' && bottomBannerLink.trim()) ? bottomBannerLink.trim() : null;
 
     // 변형(variants) 처리: 기존 삭제 후 새로 생성 (upsert 패턴)
     if (hasOptions !== undefined && Array.isArray(variants)) {
