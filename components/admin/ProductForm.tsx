@@ -54,9 +54,10 @@ interface ProductFormData {
   hasOptions: boolean
   optionNames: string[]
   variants: VariantData[]
-  // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크)
+  // 상세페이지 배너 (이미지 + 클릭 시 새 창 링크 + 노출 위치)
   bottomBannerImage: string
   bottomBannerLink: string
+  bottomBannerPosition: 'top' | 'bottom' | 'both'
 }
 
 interface Props {
@@ -135,6 +136,7 @@ export default function ProductForm({ mode, initialData }: Props) {
     variants: [],
     bottomBannerImage: '',
     bottomBannerLink: '',
+    bottomBannerPosition: 'bottom',
   })
 
   // Load categories
@@ -209,6 +211,9 @@ export default function ProductForm({ mode, initialData }: Props) {
         })(),
         bottomBannerImage: (initialData as any).bottomBannerImage || '',
         bottomBannerLink: (initialData as any).bottomBannerLink || '',
+        bottomBannerPosition: (['top', 'bottom', 'both'].includes((initialData as any).bottomBannerPosition)
+          ? (initialData as any).bottomBannerPosition
+          : 'bottom') as 'top' | 'bottom' | 'both',
       })
     }
   }, [initialData, mode])
@@ -502,9 +507,10 @@ export default function ProductForm({ mode, initialData }: Props) {
           thumbnail: v.thumbnail || null,
           isActive: v.isActive,
         })) : [],
-        // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크)
+        // 상세페이지 배너 (이미지 + 클릭 시 새 창 링크 + 노출 위치)
         bottomBannerImage: form.bottomBannerImage.trim() || null,
         bottomBannerLink: form.bottomBannerLink.trim() || null,
+        bottomBannerPosition: form.bottomBannerPosition,
       }
 
       const url = mode === 'edit' && initialData?.id
@@ -531,6 +537,7 @@ export default function ProductForm({ mode, initialData }: Props) {
               body: JSON.stringify({
                 bottomBannerImage: form.bottomBannerImage.trim(),
                 bottomBannerLink: form.bottomBannerLink.trim() || null,
+                bottomBannerPosition: form.bottomBannerPosition,
               })
             })
             const bulkData = await bulkRes.json()
@@ -1364,6 +1371,35 @@ export default function ProductForm({ mode, initialData }: Props) {
                   <p className="mt-1 text-[11px] text-gray-400">
                     링크를 비워두면 배너는 이미지로만 노출되며 클릭해도 이동하지 않습니다.
                   </p>
+                </div>
+
+                {/* 배너 노출 위치 선택 */}
+                <div className="mt-4 max-w-2xl">
+                  <label className="block text-xs font-medium text-gray-600 mb-2">
+                    배너 노출 위치
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'top' as const, label: '맨 위', icon: '⬆️', desc: '상세 내용 위' },
+                      { value: 'bottom' as const, label: '맨 아래', icon: '⬇️', desc: '상세 내용 아래' },
+                      { value: 'both' as const, label: '위+아래', icon: '⬍', desc: '동시 노출' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, bottomBannerPosition: opt.value }))}
+                        className={`flex flex-col items-center justify-center gap-0.5 py-3 px-2 rounded-lg border-2 transition text-center ${
+                          form.bottomBannerPosition === opt.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                      >
+                        <span className="text-lg leading-none">{opt.icon}</span>
+                        <span className="text-sm font-semibold">{opt.label}</span>
+                        <span className="text-[10px] text-gray-400">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* 일괄 등록 체크박스 */}

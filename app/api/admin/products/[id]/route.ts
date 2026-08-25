@@ -106,7 +106,7 @@ export async function PATCH(
       imageUrl, // 하위호환
       origin, manufacturer, brand, tags,
       hasOptions, optionNames, variants,
-      bottomBannerImage, bottomBannerLink
+      bottomBannerImage, bottomBannerLink, bottomBannerPosition
     } = body;
 
     // 상품 존재 확인
@@ -167,9 +167,10 @@ export async function PATCH(
     if (tags !== undefined) updateData.tags = tags || null;
     if (hasOptions !== undefined) updateData.hasOptions = hasOptions;
     if (optionNames !== undefined) updateData.optionNames = optionNames ? (typeof optionNames === 'string' ? optionNames : JSON.stringify(optionNames)) : null;
-    // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크). 빈 문자열은 null 로 저장(배너 제거).
+    // 상세페이지 배너 (이미지 + 클릭 시 새 창 링크 + 노출 위치). 빈 문자열은 null 로 저장(배너 제거).
     if (bottomBannerImage !== undefined) updateData.bottomBannerImage = (typeof bottomBannerImage === 'string' && bottomBannerImage.trim()) ? bottomBannerImage.trim() : null;
     if (bottomBannerLink !== undefined) updateData.bottomBannerLink = (typeof bottomBannerLink === 'string' && bottomBannerLink.trim()) ? bottomBannerLink.trim() : null;
+    if (bottomBannerPosition !== undefined) updateData.bottomBannerPosition = ['top', 'bottom', 'both'].includes(bottomBannerPosition) ? bottomBannerPosition : 'bottom';
 
     // 변형(variants) 처리: 기존 삭제 후 새로 생성 (upsert 패턴)
     if (hasOptions !== undefined && Array.isArray(variants)) {

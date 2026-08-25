@@ -91,10 +91,11 @@ export async function ensureOverseasBlockedColumn(db?: any): Promise<void> {
 }
 
 /**
- * [2026-08-25 사장님 요청] Product 하단 배너 컬럼 보장 (셀프 힐링).
- * 각 상품 상세페이지 맨 아래에 노출되는 별도 배너 이미지 + 클릭 시 이동할 링크.
- *   - bottomBannerImage: 배너 이미지 URL (TEXT, nullable)
- *   - bottomBannerLink:  클릭 시 새 창으로 열릴 링크 URL (TEXT, nullable)
+ * [2026-08-25 사장님 요청] Product 배너 컬럼 보장 (셀프 힐링).
+ * 각 상품 상세페이지에 노출되는 별도 배너 이미지 + 클릭 시 이동할 링크 + 노출 위치.
+ *   - bottomBannerImage:    배너 이미지 URL (TEXT, nullable)
+ *   - bottomBannerLink:     클릭 시 새 창으로 열릴 링크 URL (TEXT, nullable)
+ *   - bottomBannerPosition: 노출 위치 'top' | 'bottom' | 'both' (TEXT, default 'bottom')
  * 프로세스 당 1회만 실제 시도. 이미 있으면 duplicate 에러를 무시한다. (멱등)
  */
 export async function ensureBottomBannerColumns(db?: any): Promise<void> {
@@ -111,6 +112,9 @@ export async function ensureBottomBannerColumns(db?: any): Promise<void> {
     }
     if (!names.has('bottomBannerLink')) {
       toAdd.push(`ALTER TABLE "Product" ADD COLUMN "bottomBannerLink" TEXT`);
+    }
+    if (!names.has('bottomBannerPosition')) {
+      toAdd.push(`ALTER TABLE "Product" ADD COLUMN "bottomBannerPosition" TEXT DEFAULT 'bottom'`);
     }
     for (const sql of toAdd) {
       try {

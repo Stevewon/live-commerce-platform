@@ -70,6 +70,7 @@ interface Product {
   returnInfo: string | null;
   bottomBannerImage: string | null;
   bottomBannerLink: string | null;
+  bottomBannerPosition: string | null;
   isActive: boolean;
   isFeatured: boolean;
   category: { id: string; name: string; slug: string };
@@ -465,9 +466,46 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     { id: 'qna' as const, label: 'Q&A' },
   ];
 
+  // ===== 상세페이지 배너 (상품별 개별 프로모션 배너) =====
+  //   위치(bottomBannerPosition): 'top' | 'bottom' | 'both' (기본 'bottom')
+  //   클릭 시 반드시 새 창(target=_blank)으로 링크 이동. 링크 없으면 이미지로만 노출.
+  const bannerPosition = product.bottomBannerPosition || 'bottom';
+  const showTopBanner = !!product.bottomBannerImage && (bannerPosition === 'top' || bannerPosition === 'both');
+  const showBottomBanner = !!product.bottomBannerImage && (bannerPosition === 'bottom' || bannerPosition === 'both');
+  const renderBanner = (extraClass = '') => {
+    if (!product.bottomBannerImage) return null;
+    const img = (
+      <img
+        src={product.bottomBannerImage}
+        alt={`${product.name} 배너`}
+        className="w-full h-auto object-cover block"
+        loading="lazy"
+      />
+    );
+    return (
+      <div className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 ${extraClass}`}>
+        {product.bottomBannerLink ? (
+          <a
+            href={product.bottomBannerLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+          >
+            {img}
+          </a>
+        ) : (
+          <div className="block rounded-xl overflow-hidden shadow-sm">{img}</div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24 md:pb-0">
       <ShopNavigation />
+
+      {/* 상단 배너 (position: top | both) */}
+      {showTopBanner && renderBanner('mt-4 mb-2')}
 
       <div className="max-w-6xl mx-auto px-4 py-4 sm:py-8">
         {/* 파트너 스토어 경유 배너 */}
@@ -970,37 +1008,8 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
         </div>
       </div>
 
-      {/* ===== 상세페이지 하단 배너 (상품별 개별 프로모션 배너) =====
-          클릭 시 반드시 새 창(target=_blank)으로 링크 이동. 링크 없으면 이미지로만 노출.
-          모바일/PC 모두 컨테이너 폭에 맞춰 반응형으로 조절됨. */}
-      {product.bottomBannerImage && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 mb-24 md:mb-8">
-          {product.bottomBannerLink ? (
-            <a
-              href={product.bottomBannerLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-            >
-              <img
-                src={product.bottomBannerImage}
-                alt={`${product.name} 배너`}
-                className="w-full h-auto object-cover block"
-                loading="lazy"
-              />
-            </a>
-          ) : (
-            <div className="block rounded-xl overflow-hidden shadow-sm">
-              <img
-                src={product.bottomBannerImage}
-                alt={`${product.name} 배너`}
-                className="w-full h-auto object-cover block"
-                loading="lazy"
-              />
-            </div>
-          )}
-        </div>
-      )}
+      {/* 하단 배너 (position: bottom | both) */}
+      {showBottomBanner && renderBanner('mt-6 mb-24 md:mb-8')}
 
       {/* Mobile bottom action bar */}
       {/* ★ 장바구니 담기 성공/실패 메시지를 모바일 하단 바 '바로 위'에도 노출.
