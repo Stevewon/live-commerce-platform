@@ -10,10 +10,11 @@ import { ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
  * 한 번에 적용한다. (개별 등록은 기존 상품 POST/PATCH 에서 처리)
  *
  * body:
- *   - bottomBannerImage: string  (필수, 배너 이미지 URL)
- *   - bottomBannerLink:  string  (선택, 클릭 시 새 창으로 열릴 링크)
- *   - onlyActive:        boolean (선택, true 면 isActive=true 상품에만 적용. 기본 false=전체)
- *   - clear:             boolean (선택, true 면 배너를 전체에서 제거. image/link 무시)
+ *   - bottomBannerImage:    string  (필수, 배너 이미지 URL)
+ *   - bottomBannerLink:     string  (선택, 클릭 시 새 창으로 열릴 링크)
+ *   - bottomBannerPosition: string  (선택, 'top'|'bottom'|'both'. 기본 'bottom')
+ *   - onlyActive:           boolean (선택, true 면 isActive=true 상품에만 적용. 기본 false=전체)
+ *   - clear:                boolean (선택, true 면 배너를 전체에서 제거. image/link 무시)
  */
 export async function POST(req: NextRequest) {
   const prisma = await getPrisma();
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     const onlyActive = body?.onlyActive === true;
     const image = typeof body?.bottomBannerImage === 'string' ? body.bottomBannerImage.trim() : '';
     const link = typeof body?.bottomBannerLink === 'string' ? body.bottomBannerLink.trim() : '';
+    const position = ['top', 'bottom', 'both'].includes(body?.bottomBannerPosition) ? body.bottomBannerPosition : 'bottom';
 
     if (!clear && !image) {
       return NextResponse.json(
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
     const where = onlyActive ? { isActive: true } : {};
     const data = clear
       ? { bottomBannerImage: null, bottomBannerLink: null }
-      : { bottomBannerImage: image, bottomBannerLink: link || null };
+      : { bottomBannerImage: image, bottomBannerLink: link || null, bottomBannerPosition: position };
 
     const result = await prisma.product.updateMany({ where, data });
 

@@ -278,9 +278,10 @@ model Product {
   optionNames String? // JSON array of option names
   hasOptions  Boolean @default(false) // 옵션 사용 여부
 
-  // 상세페이지 하단 배너 (상품별 개별 프로모션 배너)
-  bottomBannerImage String? // 배너 이미지 URL
-  bottomBannerLink  String? // 클릭 시 새 창으로 이동할 링크 URL
+  // 상세페이지 배너 (상품별 개별 프로모션 배너)
+  bottomBannerImage    String? // 배너 이미지 URL
+  bottomBannerLink     String? // 클릭 시 새 창으로 이동할 링크 URL
+  bottomBannerPosition String? @default("bottom") // 노출 위치: top | bottom | both
 
   // 배송 정보
   shippingInfo String? // 배송 안내

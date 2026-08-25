@@ -141,7 +141,8 @@ export async function POST(req: NextRequest) {
       optionNames,
       variants,
       bottomBannerImage,
-      bottomBannerLink
+      bottomBannerLink,
+      bottomBannerPosition
     } = body;
 
     // 필수 필드 검증
@@ -188,9 +189,10 @@ export async function POST(req: NextRequest) {
         tags: tags || null,
         hasOptions: hasOptions || false,
         optionNames: optionNames || null,
-        // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크)
+        // 상세페이지 배너 (이미지 + 클릭 시 새 창 링크 + 노출 위치)
         bottomBannerImage: (typeof bottomBannerImage === 'string' && bottomBannerImage.trim()) ? bottomBannerImage.trim() : null,
         bottomBannerLink: (typeof bottomBannerLink === 'string' && bottomBannerLink.trim()) ? bottomBannerLink.trim() : null,
+        bottomBannerPosition: ['top', 'bottom', 'both'].includes(bottomBannerPosition) ? bottomBannerPosition : 'bottom',
         // 변형(variants) 동시 생성
         ...(hasOptions && Array.isArray(variants) && variants.length > 0 ? {
           variants: {
