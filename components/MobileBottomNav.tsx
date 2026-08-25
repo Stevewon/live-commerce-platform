@@ -46,9 +46,9 @@ export default function MobileBottomNav() {
 
   const navItems = [
     { href: '/products', icon: '🏠', label: t.nav.home, activeCheck: (p: string) => p === '/products' || p === '/' },
-    // ★ 2026-08-16 사장님 요청: 하단 '라이브방송' → '큐박스쇼핑' 텍스트 변경 +
-    //   외부 링크 https://qbox.shop 로 이동 (외부라 <a> 로 렌더).
-    { href: 'https://qbox.shop', icon: '🛍️', label: '큐박스쇼핑', external: true, activeCheck: () => false },
+    // ★ 2026-08-16 사장님 요청: 하단 '라이브방송' → '큐알박스' 텍스트 변경 +
+    //   외부 링크 https://qrbox.shop/ 로 이동 (외부라 <a> 로 렌더).
+    { href: 'https://qrbox.shop/', icon: '🛍️', label: '큐알박스', external: true, activeCheck: () => false },
     { href: '/cart', icon: '🛒', label: t.nav.cart, activeCheck: (p: string) => p === '/cart' },
     { href: '/wishlist', icon: '💖', label: t.nav.wishlist, activeCheck: (p: string) => p === '/wishlist' },
     { href: '/my', icon: '👤', label: user ? t.nav.myPage : t.nav.login, activeCheck: (p: string) => p.startsWith('/my') || p === '/login' || p === '/register', dynamicHref: !user ? '/login' : '/my' },
