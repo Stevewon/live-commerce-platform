@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
-import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn } from '@/lib/ensureProductColumns';
+import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn, ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
 
 // 관리자 상품 조회 (GET)
 export async function GET(req: NextRequest) {
@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    // 하단 배너 등 신규 컬럼 자동 보정 (없으면 전체 조회 시 오류 방지)
+    try { await ensureBottomBannerColumns(); } catch {}
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status'); // 'active', 'inactive', 'all'
@@ -136,7 +139,9 @@ export async function POST(req: NextRequest) {
       tags,
       hasOptions,
       optionNames,
-      variants
+      variants,
+      bottomBannerImage,
+      bottomBannerLink
     } = body;
 
     // 필수 필드 검증
@@ -150,9 +155,10 @@ export async function POST(req: NextRequest) {
     // slug 자동 생성 (제공되지 않은 경우)
     const productSlug = slug || (name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'product') + '-' + Date.now();
 
-    // 공급가(supplyPrice) + 해외배송불가(overseasBlocked) 컬럼 자동 보정 (셀프 힐링)
+    // 공급가(supplyPrice) + 해외배송불가(overseasBlocked) + 하단배너 컬럼 자동 보정 (셀프 힐링)
     await ensureSupplyPriceColumn();
     await ensureOverseasBlockedColumn();
+    await ensureBottomBannerColumns();
 
     // 상품 생성
     const product = await prisma.product.create({
@@ -182,6 +188,9 @@ export async function POST(req: NextRequest) {
         tags: tags || null,
         hasOptions: hasOptions || false,
         optionNames: optionNames || null,
+        // 상세페이지 하단 배너 (이미지 + 클릭 시 새 창 링크)
+        bottomBannerImage: (typeof bottomBannerImage === 'string' && bottomBannerImage.trim()) ? bottomBannerImage.trim() : null,
+        bottomBannerLink: (typeof bottomBannerLink === 'string' && bottomBannerLink.trim()) ? bottomBannerLink.trim() : null,
         // 변형(variants) 동시 생성
         ...(hasOptions && Array.isArray(variants) && variants.length > 0 ? {
           variants: {

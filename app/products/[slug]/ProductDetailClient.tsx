@@ -68,6 +68,8 @@ interface Product {
   optionNames: string | null;
   shippingInfo: string | null;
   returnInfo: string | null;
+  bottomBannerImage: string | null;
+  bottomBannerLink: string | null;
   isActive: boolean;
   isFeatured: boolean;
   category: { id: string; name: string; slug: string };
@@ -967,6 +969,38 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
           </div>
         </div>
       </div>
+
+      {/* ===== 상세페이지 하단 배너 (상품별 개별 프로모션 배너) =====
+          클릭 시 반드시 새 창(target=_blank)으로 링크 이동. 링크 없으면 이미지로만 노출.
+          모바일/PC 모두 컨테이너 폭에 맞춰 반응형으로 조절됨. */}
+      {product.bottomBannerImage && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 mb-24 md:mb-8">
+          {product.bottomBannerLink ? (
+            <a
+              href={product.bottomBannerLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+            >
+              <img
+                src={product.bottomBannerImage}
+                alt={`${product.name} 배너`}
+                className="w-full h-auto object-cover block"
+                loading="lazy"
+              />
+            </a>
+          ) : (
+            <div className="block rounded-xl overflow-hidden shadow-sm">
+              <img
+                src={product.bottomBannerImage}
+                alt={`${product.name} 배너`}
+                className="w-full h-auto object-cover block"
+                loading="lazy"
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mobile bottom action bar */}
       {/* ★ 장바구니 담기 성공/실패 메시지를 모바일 하단 바 '바로 위'에도 노출.
