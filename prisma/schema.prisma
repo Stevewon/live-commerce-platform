@@ -226,6 +226,22 @@ model Partner {
 }
 
 // 제품 카테고리
+// 공지사항 (관리자 작성 → 고객 노출)
+model Notice {
+  id          String  @id @default(uuid())
+  title       String
+  content     String  // 본문 (일반 텍스트/개행)
+  isPinned    Boolean @default(false) // 상단 고정
+  isPublished Boolean @default(true)  // 노출 여부 (false=임시저장/숨김)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isPublished])
+  @@index([isPinned])
+  @@index([createdAt])
+}
+
 model Category {
   id          String     @id @default(uuid())
   name        String

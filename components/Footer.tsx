@@ -72,6 +72,9 @@ export default function Footer() {
                 <Link href="/orders/lookup" className="text-gray-400 hover:text-white transition">
                   {t.footer.orderLookup}
                 </Link>
+                <Link href="/notices" className="text-gray-400 hover:text-white transition">
+                  공지사항
+                </Link>
                 <Link href="/terms" className="text-gray-400 hover:text-white transition">
                   {t.footer.terms}
                 </Link>
