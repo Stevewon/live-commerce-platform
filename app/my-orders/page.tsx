@@ -214,8 +214,8 @@ export default function MyOrdersPage() {
                         const itemQty = Number(item?.quantity) || 0;
                         return (
                           <div key={item?.id || Math.random().toString(36)} className="flex gap-4 py-2">
-                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                              {productThumb ? (
+                            {(() => {
+                              const thumbInner = productThumb ? (
                                 <img
                                   src={thumbUrl(productThumb, 200)}
                                   alt={productName}
@@ -230,8 +230,20 @@ export default function MyOrdersPage() {
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
-                              )}
-                            </div>
+                              );
+                              return productSlug ? (
+                                <Link
+                                  href={`/products/${productSlug}`}
+                                  className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 block cursor-pointer"
+                                >
+                                  {thumbInner}
+                                </Link>
+                              ) : (
+                                <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                                  {thumbInner}
+                                </div>
+                              );
+                            })()}
                             <div className="flex-1 min-w-0">
                               {productSlug ? (
                                 <Link href={`/products/${productSlug}`} className="text-sm font-medium text-gray-900 hover:text-blue-600 line-clamp-1">
