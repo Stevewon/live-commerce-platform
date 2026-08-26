@@ -1,6 +1,7 @@
 import { getPrisma } from '@/lib/prisma';
 import { unstable_cache } from 'next/cache';
 import { ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
+import { maskName } from '@/lib/maskName';
 
 /**
  * slug 로 단일 상품을 조회한다(파트너/리뷰/변형/카테고리 포함).
@@ -41,6 +42,10 @@ async function fetchProductBySlug(slug: string): Promise<any | null> {
   // 클라이언트가 항상 배열을 기대하는 관계 필드 보장
   const p: any = product;
   if (!Array.isArray(p.reviews)) p.reviews = [];
+  // ★ 리뷰 작성자 이름 마스킹 (개인정보 보호: 오로로 -> 오**) — 사장님 지시
+  p.reviews = p.reviews.map((r: any) =>
+    r?.user ? { ...r, user: { ...r.user, name: maskName(r.user.name) } } : r
+  );
   if (!Array.isArray(p.partnerProducts)) p.partnerProducts = [];
   if (!Array.isArray(p.variants)) p.variants = [];
 

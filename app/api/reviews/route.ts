@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getPrisma } from '@/lib/prisma';
+import { maskName } from '@/lib/maskName';
 
 // images 컬럼(JSON 문자열)을 안전하게 문자열 URL 배열로 파싱
 function parseImages(raw: unknown): string[] {
@@ -212,7 +213,12 @@ export async function GET(request: NextRequest) {
       prisma.review.count({ where })
     ]);
 
-    const dataWithImages = reviews.map((r: any) => ({ ...r, images: parseImages(r.images) }));
+    const dataWithImages = reviews.map((r: any) => ({
+      ...r,
+      images: parseImages(r.images),
+      // 작성자 이름 마스킹 (개인정보 보호: 오로로 -> 오**)
+      user: r.user ? { ...r.user, name: maskName(r.user.name) } : r.user,
+    }));
 
     return NextResponse.json({
       success: true,
