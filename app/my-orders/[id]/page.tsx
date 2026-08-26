@@ -274,7 +274,10 @@ export default function OrderDetailPage() {
               }
               return (
                 <div key={item.id} className="flex gap-4 py-2">
-                  <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                  <Link
+                    href={`/products/${item.product.slug}`}
+                    className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 block cursor-pointer"
+                  >
                     <img
                       src={thumbUrl(item.product.thumbnail, 200)}
                       alt={item.product.name}
@@ -287,7 +290,7 @@ export default function OrderDetailPage() {
                         e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-3xl">📦</div>';
                       }}
                     />
-                  </div>
+                  </Link>
                   <div className="flex-1 min-w-0">
                     <Link href={`/products/${item.product.slug}`} className="font-medium text-gray-900 hover:text-blue-600 line-clamp-2">
                       {tr(item.product.name)}

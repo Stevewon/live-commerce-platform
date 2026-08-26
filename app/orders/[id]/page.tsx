@@ -152,18 +152,20 @@ export default function OrderDetailPage() {
           <div className="space-y-4">
             {order.items.map((item) => (
               <div key={item.id} className="flex gap-4 pb-4 border-b last:border-b-0">
-                <img
-                  src={thumbUrl(item.product.thumbnail, 200) || 'https://via.placeholder.com/100'}
-                  alt={item.product.name}
-                  loading="lazy"
-                  width={80}
-                  height={80}
-                  className="w-20 h-20 object-cover rounded"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.parentElement!.innerHTML = '<div class="w-20 h-20 rounded bg-gray-100 flex items-center justify-center text-3xl">📦</div>' + e.currentTarget.parentElement!.innerHTML;
-                  }}
-                />
+                <Link href={`/products/${item.product.slug}`} className="flex-shrink-0 block cursor-pointer">
+                  <img
+                    src={thumbUrl(item.product.thumbnail, 200) || 'https://via.placeholder.com/100'}
+                    alt={item.product.name}
+                    loading="lazy"
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 object-cover rounded"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.parentElement!.innerHTML = '<div class="w-20 h-20 rounded bg-gray-100 flex items-center justify-center text-3xl">📦</div>';
+                    }}
+                  />
+                </Link>
                 <div className="flex-1">
                   <Link
                     href={`/products/${item.product.slug}`}
