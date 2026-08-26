@@ -136,7 +136,8 @@ function convertRow(row: any): any {
     // SQLite stores booleans as 0/1
     if (key === 'isActive' || key === 'isFeatured' || key === 'isLive' || 
         key === 'isRead' || key === 'isDeleted' || key === 'isReported' || key === 'hasOptions' ||
-        key === 'isSecret' || key === 'overseasBlocked') {
+        key === 'isSecret' || key === 'overseasBlocked' ||
+        key === 'isPinned' || key === 'isPublished') {
       result[key] = value === 1 || value === true;
     } else {
       result[key] = value;
@@ -849,6 +850,7 @@ function createDbProxy(db: D1DB) {
     siteSetting: 'SiteSetting',
     inquiry: 'Inquiry',
     japanShippingFee: 'JapanShippingFee',
+    notice: 'Notice',
   };
   
   const proxy: any = {
