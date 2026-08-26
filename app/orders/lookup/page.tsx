@@ -7,7 +7,7 @@ import { useAutoTranslate } from '@/lib/i18n/useAutoTranslate';
 import { proxyImg, thumbUrl } from '@/lib/utils/imgProxy';
 
 interface OrderItem {
-  product: { name: string; thumbnail: string; price: number };
+  product: { name: string; thumbnail: string; price: number; slug?: string };
   quantity: number;
   price: number;
 }
@@ -240,30 +240,46 @@ export default function OrderLookupPage() {
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="font-bold text-gray-900 mb-4">주문 상품</h3>
               <div className="space-y-3">
-                {order.items.map((item, idx) => (
+                {order.items.map((item, idx) => {
+                  const slug = item.product.slug || '';
+                  const thumbImg = (
+                    <img
+                      src={thumbUrl(item.product.thumbnail, 200)}
+                      alt={item.product.name}
+                      loading="lazy"
+                      width={64}
+                      height={64}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  );
+                  return (
                   <div key={idx} className="flex gap-3">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                      <img
-                        src={thumbUrl(item.product.thumbnail, 200)}
-                        alt={item.product.name}
-                        loading="lazy"
-                        width={64}
-                        height={64}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
+                    {slug ? (
+                      <Link href={`/products/${slug}`} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 block cursor-pointer">
+                        {thumbImg}
+                      </Link>
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                        {thumbImg}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 line-clamp-1">{tr(item.product.name)}</p>
+                      {slug ? (
+                        <Link href={`/products/${slug}`} className="font-medium text-gray-900 hover:text-blue-600 line-clamp-1">{tr(item.product.name)}</Link>
+                      ) : (
+                        <p className="font-medium text-gray-900 line-clamp-1">{tr(item.product.name)}</p>
+                      )}
                       <p className="text-sm text-gray-500">₩{item.price.toLocaleString()} x {item.quantity}개</p>
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="font-bold text-gray-900">₩{(item.price * item.quantity).toLocaleString()}</p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="border-t mt-4 pt-4 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600">
