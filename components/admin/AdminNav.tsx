@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/balance-requests', label: '무통장입금 승인', icon: '💳' },
   { href: '/admin/orders', label: '주문 관리', icon: '📦' },
   { href: '/admin/inquiries', label: '고객 문의', icon: '💬' },
+  { href: '/admin/notices', label: '공지사항 관리', icon: '📢' },
   { href: '/admin/japan-shipping', label: '일본 배송비', icon: '🚢' },
   { href: '/admin/partners', label: '파트너 관리', icon: '🤝' },
   { href: '/admin/products', label: '상품 관리', icon: '🛍️' },
