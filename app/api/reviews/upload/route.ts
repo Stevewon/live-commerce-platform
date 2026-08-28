@@ -77,8 +77,17 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 4. 파일 검증 ──
+  // 모바일/앱 WebView 카메라·갤러리에서 올라오는 이미지는 file.type 이
+  // 비어있거나(image/*), image/heic 등으로 오는 경우가 있다.
+  // → MIME 우선 검증하되, MIME 이 애매하면 파일 확장자로 폴백 검증한다.
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-  if (!allowedTypes.includes(file.type)) {
+  const allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  const fileExt = (file.name.split('.').pop() || '').toLowerCase();
+  const typeOk = allowedTypes.includes(file.type);
+  const extOk = allowedExts.includes(fileExt);
+  // MIME 이 정확히 이미지 계열(image/*)이면 확장자로 통과 허용.
+  const looksLikeImage = typeof file.type === 'string' && file.type.startsWith('image/');
+  if (!typeOk && !(extOk && (looksLikeImage || file.type === ''))) {
     return fail('JPG, PNG, GIF, WEBP 형식의 이미지만 업로드할 수 있습니다', 'INVALID_TYPE', 400);
   }
   const MAX_SIZE = 8 * 1024 * 1024; // 8MB
@@ -98,6 +107,13 @@ export async function POST(req: NextRequest) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\s+/g, '_');
   const key = `reviews/${timestamp}_${rand}_${safeName}`;
 
+  // MIME 이 비어있거나 image/* 형태로만 온 경우, 확장자로 실제 타입을 보정한다.
+  const extToMime: Record<string, string> = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+  };
+  const resolvedType =
+    allowedTypes.includes(file.type) ? file.type : (extToMime[fileExt] || 'image/jpeg');
+
   // ── 5. R2 업로드 시도 ──
   let r2Error: string | null = null;
   try {
@@ -111,7 +127,7 @@ export async function POST(req: NextRequest) {
     } else {
       const r2 = env.R2_BUCKET as any;
       await r2.put(key, buffer, {
-        httpMetadata: { contentType: file.type },
+        httpMetadata: { contentType: resolvedType },
       });
 
       const r2PublicUrl = env.R2_PUBLIC_URL as string | undefined;
@@ -139,7 +155,7 @@ export async function POST(req: NextRequest) {
       }
     }
     const base64 = btoa(binary);
-    const dataUrl = `data:${file.type};base64,${base64}`;
+    const dataUrl = `data:${resolvedType};base64,${base64}`;
 
     return ok(
       { url: dataUrl, storage: 'base64', fileName: safeName, fileSize: file.size, fileType: file.type },
