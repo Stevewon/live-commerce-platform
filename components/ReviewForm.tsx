@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { authFetch } from '@/lib/auth/clientFetch';
+import { useIsAppEmbed } from '@/lib/embed/useIsAppEmbed';
 
 interface ReviewFormProps {
   orderId: string;
@@ -14,18 +15,53 @@ interface ReviewFormProps {
 const MAX_IMAGES = 5;
 
 export default function ReviewForm({ orderId, productId, productName, onSuccess, onCancel }: ReviewFormProps) {
+  const isAppEmbed = useIsAppEmbed();
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // 앱 WebView 에서 파일선택창이 안 뜨는 경우 안내를 노출하기 위한 상태
+  const [pickerHint, setPickerHint] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pickerOpenedAt = useRef<number>(0);
+
+  // ＋사진 버튼 클릭 → 파일 선택창 열기 시도.
+  // 앱 WebView(Flutter)에서 onShowFileChooser/WKUIDelegate 미구현이면
+  // input.click() 을 해도 파일창이 안 뜨고 onChange 도 focus 도 안 온다.
+  // → 일정 시간 내 아무 반응(파일선택 or 창 focus 복귀)이 없으면 안내를 띄운다.
+  const openFilePicker = () => {
+    setPickerHint('');
+    setError('');
+    pickerOpenedAt.current = Date.now();
+    const input = fileInputRef.current;
+    if (!input) return;
+    input.click();
+
+    if (isAppEmbed) {
+      // 파일 선택창이 뜨면 보통 window blur 가 발생한다.
+      // 1.2초 안에 blur 도 change 도 없으면 "앱에서 사진 첨부가 막혀있다"고 판단.
+      let interacted = false;
+      const onBlur = () => { interacted = true; };
+      window.addEventListener('blur', onBlur, { once: true });
+      setTimeout(() => {
+        window.removeEventListener('blur', onBlur);
+        if (!interacted && images.length === 0) {
+          setPickerHint(
+            '앱에서 사진 첨부가 열리지 않으면 큐알쳇 앱을 최신 버전으로 업데이트해 주세요. (또는 웹 브라우저에서 리뷰를 작성하실 수 있습니다.)'
+          );
+        }
+      }, 1200);
+    }
+  };
 
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     // 파일 input 초기화 (같은 파일 다시 선택 가능하게)
     if (fileInputRef.current) fileInputRef.current.value = '';
+    // 파일이 실제로 선택됐다면 앱 안내는 필요 없음
+    setPickerHint('');
     if (files.length === 0) return;
 
     const remaining = MAX_IMAGES - images.length;
@@ -182,7 +218,7 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
               {canAddMore && (
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={openFilePicker}
                   disabled={uploading}
                   className="w-20 h-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-purple-400 hover:text-purple-500 transition disabled:opacity-50"
                 >
@@ -198,10 +234,23 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
               )}
             </div>
 
+            {/* 앱 WebView 파일선택 미지원 안내 */}
+            {pickerHint && (
+              <p className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md p-2">
+                {pickerHint}
+              </p>
+            )}
+
+            {/*
+              accept 를 image/* 로 넓힘:
+              일부 안드로이드 WebView 는 구체적 MIME 리스트(image/jpeg,...)를
+              제대로 처리하지 못해 갤러리/카메라 선택지가 안 뜨는 경우가 있다.
+              서버(/api/reviews/upload)에서 최종 확장자/타입을 다시 검증하므로 안전.
+            */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
+              accept="image/*"
               multiple
               onChange={handleFilesSelected}
               className="hidden"
