@@ -22,12 +22,6 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ＋사진 버튼 → 파일 선택창 열기 (가장 단순하게 바로 클릭)
-  const openFilePicker = () => {
-    setError('');
-    fileInputRef.current?.click();
-  };
-
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     // 파일 input 초기화 (같은 파일 다시 선택 가능하게)
@@ -190,11 +184,16 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
               ))}
 
               {canAddMore && (
-                <button
-                  type="button"
-                  onClick={openFilePicker}
-                  disabled={uploading}
-                  className="w-20 h-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-purple-400 hover:text-purple-500 transition disabled:opacity-50"
+                /*
+                  ★ 사진 첨부 버튼을 <label htmlFor> 방식으로 구현.
+                  버튼 + JS input.click() 방식은 일부 브라우저/모바일에서
+                  hidden(display:none) input 을 무시해 파일창이 안 뜨는 문제가 있다.
+                  <label htmlFor="review-photo-input"> 은 브라우저 네이티브 동작으로
+                  파일 선택창을 열기 때문에 JS 없이도 항상 확실하게 작동한다.
+                */
+                <label
+                  htmlFor="review-photo-input"
+                  className={`w-20 h-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-purple-400 hover:text-purple-500 transition cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
                 >
                   {uploading ? (
                     <span className="text-xs">업로드중</span>
@@ -204,23 +203,26 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
                       <span className="text-[11px] mt-0.5">사진</span>
                     </>
                   )}
-                </button>
+                </label>
               )}
             </div>
 
             {/*
-              accept 를 image/* 로 넓힘:
-              일부 안드로이드 WebView 는 구체적 MIME 리스트를 제대로 처리하지 못해
-              갤러리/카메라 선택지가 안 뜨는 경우가 있다.
-              서버(/api/reviews/upload)에서 최종 타입을 다시 검증하므로 안전.
+              input 은 label(htmlFor) 로 트리거된다.
+              - accept="image/*": 갤러리/카메라 모두 선택 가능
+              - display:none 대신 sr-only 스타일: 일부 브라우저의 hidden input
+                click 무시 이슈를 피하면서 화면에는 안 보이게 유지.
+              - 서버(/api/reviews/upload)에서 최종 타입을 다시 검증하므로 안전.
             */}
             <input
+              id="review-photo-input"
               ref={fileInputRef}
               type="file"
               accept="image/*"
               multiple
               onChange={handleFilesSelected}
-              className="hidden"
+              disabled={uploading}
+              style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 }}
             />
           </div>
 
