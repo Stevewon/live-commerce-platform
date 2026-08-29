@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react';
 import { authFetch } from '@/lib/auth/clientFetch';
-import { useIsAppEmbed } from '@/lib/embed/useIsAppEmbed';
 
 interface ReviewFormProps {
   orderId: string;
@@ -15,53 +14,24 @@ interface ReviewFormProps {
 const MAX_IMAGES = 5;
 
 export default function ReviewForm({ orderId, productId, productName, onSuccess, onCancel }: ReviewFormProps) {
-  const isAppEmbed = useIsAppEmbed();
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  // 앱 WebView 에서 파일선택창이 안 뜨는 경우 안내를 노출하기 위한 상태
-  const [pickerHint, setPickerHint] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pickerOpenedAt = useRef<number>(0);
 
-  // ＋사진 버튼 클릭 → 파일 선택창 열기 시도.
-  // 앱 WebView(Flutter)에서 onShowFileChooser/WKUIDelegate 미구현이면
-  // input.click() 을 해도 파일창이 안 뜨고 onChange 도 focus 도 안 온다.
-  // → 일정 시간 내 아무 반응(파일선택 or 창 focus 복귀)이 없으면 안내를 띄운다.
+  // ＋사진 버튼 → 파일 선택창 열기 (가장 단순하게 바로 클릭)
   const openFilePicker = () => {
-    setPickerHint('');
     setError('');
-    pickerOpenedAt.current = Date.now();
-    const input = fileInputRef.current;
-    if (!input) return;
-    input.click();
-
-    if (isAppEmbed) {
-      // 파일 선택창이 뜨면 보통 window blur 가 발생한다.
-      // 1.2초 안에 blur 도 change 도 없으면 "앱에서 사진 첨부가 막혀있다"고 판단.
-      let interacted = false;
-      const onBlur = () => { interacted = true; };
-      window.addEventListener('blur', onBlur, { once: true });
-      setTimeout(() => {
-        window.removeEventListener('blur', onBlur);
-        if (!interacted && images.length === 0) {
-          setPickerHint(
-            '앱에서 사진 첨부가 열리지 않으면 큐알쳇 앱을 최신 버전으로 업데이트해 주세요. (또는 웹 브라우저에서 리뷰를 작성하실 수 있습니다.)'
-          );
-        }
-      }, 1200);
-    }
+    fileInputRef.current?.click();
   };
 
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     // 파일 input 초기화 (같은 파일 다시 선택 가능하게)
     if (fileInputRef.current) fileInputRef.current.value = '';
-    // 파일이 실제로 선택됐다면 앱 안내는 필요 없음
-    setPickerHint('');
     if (files.length === 0) return;
 
     const remaining = MAX_IMAGES - images.length;
@@ -151,19 +121,25 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">리뷰 작성</h2>
-
-        <div className="mb-4">
-          <p className="text-sm text-gray-600">{productName}</p>
+      {/*
+        모달 레이아웃 (핵심):
+        - flex-col + max-h-[90vh] 로 전체 높이 제한
+        - 헤더 = 고정, 본문(폼 내용) = 스크롤(flex-1 overflow-y-auto)
+        - 하단 버튼 = footer 로 항상 하단 고정 → 사진을 몇 장 첨부하든
+          파란 "리뷰 작성" 버튼이 절대 화면 밖으로 밀려나지 않는다.
+      */}
+      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+        {/* 헤더 (고정) */}
+        <div className="px-6 pt-6 pb-3 border-b border-gray-100 shrink-0">
+          <h2 className="text-2xl font-bold">리뷰 작성</h2>
+          <p className="text-sm text-gray-600 mt-1">{productName}</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        {/* 본문 (스크롤) */}
+        <form id="review-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
           {/* 별점 */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              별점
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">별점</label>
             <div className="flex gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -180,21 +156,19 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
 
           {/* 리뷰 내용 */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              리뷰 내용
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">리뷰 내용</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              rows={5}
+              rows={4}
               placeholder="상품에 대한 솔직한 리뷰를 작성해주세요"
               required
             />
           </div>
 
           {/* 사진 첨부 */}
-          <div className="mb-4">
+          <div className="mb-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               사진 첨부 <span className="text-gray-400 font-normal">(선택 · 최대 {MAX_IMAGES}장)</span>
             </label>
@@ -234,18 +208,11 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
               )}
             </div>
 
-            {/* 앱 WebView 파일선택 미지원 안내 */}
-            {pickerHint && (
-              <p className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md p-2">
-                {pickerHint}
-              </p>
-            )}
-
             {/*
               accept 를 image/* 로 넓힘:
-              일부 안드로이드 WebView 는 구체적 MIME 리스트(image/jpeg,...)를
-              제대로 처리하지 못해 갤러리/카메라 선택지가 안 뜨는 경우가 있다.
-              서버(/api/reviews/upload)에서 최종 확장자/타입을 다시 검증하므로 안전.
+              일부 안드로이드 WebView 는 구체적 MIME 리스트를 제대로 처리하지 못해
+              갤러리/카메라 선택지가 안 뜨는 경우가 있다.
+              서버(/api/reviews/upload)에서 최종 타입을 다시 검증하므로 안전.
             */}
             <input
               ref={fileInputRef}
@@ -259,30 +226,31 @@ export default function ReviewForm({ orderId, productId, productName, onSuccess,
 
           {/* 에러 메시지 */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
-
-          {/* 버튼 */}
-          <div className="flex gap-3">
-            <button
-              type="submit"
-              disabled={loading || uploading}
-              className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? '작성 중...' : '리뷰 작성'}
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={loading}
-              className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-colors"
-            >
-              취소
-            </button>
-          </div>
         </form>
+
+        {/* 하단 버튼 (항상 고정) */}
+        <div className="px-6 py-4 border-t border-gray-100 shrink-0 flex gap-3 bg-white">
+          <button
+            type="submit"
+            form="review-form"
+            disabled={loading || uploading}
+            className="flex-1 bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? '작성 중...' : uploading ? '사진 업로드 중...' : '리뷰 작성'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 disabled:opacity-50 transition-colors"
+          >
+            취소
+          </button>
+        </div>
       </div>
     </div>
   );
