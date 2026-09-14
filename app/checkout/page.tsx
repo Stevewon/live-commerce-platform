@@ -258,6 +258,18 @@ export default function CheckoutPage() {
     }
   };
 
+  // 장바구니 "선택 상품만 결제" 모드에서 선택된 productId 목록을 읽는다.
+  // (cart 페이지에서 sessionStorage 'checkout_selectedProductIds' 에 저장)
+  const getSelectedProductIds = (): string[] | null => {
+    try {
+      const raw = sessionStorage.getItem('checkout_selectedProductIds');
+      if (!raw) return null;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length > 0) return arr.map(String);
+    } catch {}
+    return null;
+  };
+
   useEffect(() => {
     if (authLoading) return;
 
@@ -320,11 +332,18 @@ export default function CheckoutPage() {
         const data = await res.json();
         const rawItems = data.data || [];
         // [옵션] 서버 카트 아이템의 variant 를 화면 표시용 라벨로 변환
-        const serverItems = rawItems.map((it: any) => ({
+        let serverItems = rawItems.map((it: any) => ({
           ...it,
           variantId: it.variantId || it.variant?.id || null,
           optionLabel: buildOptionLabel(it.variant?.optionValues),
         }));
+        // 선택 결제 모드: 선택된 상품만 남긴다
+        const selectedIds = getSelectedProductIds();
+        if (selectedIds) {
+          serverItems = serverItems.filter((it: any) =>
+            selectedIds.includes(String(it.productId))
+          );
+        }
         setCartItems(serverItems);
         if (serverItems.length === 0) {
           const guestItems = getGuestCart();
@@ -360,7 +379,7 @@ export default function CheckoutPage() {
 
   const loadGuestCart = () => {
     const guestItems = getGuestCart();
-    const mapped: CartItem[] = guestItems.map((item, idx) => ({
+    let mapped: CartItem[] = guestItems.map((item, idx) => ({
       id: `guest-${idx}`,
       productId: item.productId,
       quantity: item.quantity,
@@ -371,6 +390,11 @@ export default function CheckoutPage() {
         thumbnail: item.product.thumbnail,
       },
     }));
+    // 선택 결제 모드: 선택된 상품만 남긴다
+    const selectedIds = getSelectedProductIds();
+    if (selectedIds) {
+      mapped = mapped.filter((it) => selectedIds.includes(String(it.productId)));
+    }
     setCartItems(mapped);
     setLoading(false);
   };
@@ -577,15 +601,31 @@ export default function CheckoutPage() {
 
       const order = result.data;
 
-      // 회원 장바구니 비우기 (bestselling: 서버 카트 clear 는 주문 생성 시 별도 처리 안 되므로 방어)
+      // 주문한 상품만 장바구니에서 제거
+      // - 선택 결제/바로구매 등으로 cartItems 에 담긴 것 = 실제 주문한 상품이므로
+      //   이 목록만 카트에서 지운다. (전체 clearGuestCart 는 미선택 상품까지 날려버림)
       try {
-        clearGuestCart();
+        const orderedProductIds = cartItems.map((it) => String(it.productId));
+        // 비회원: 주문한 상품만 게스트 카트에서 제거
+        if (!user) {
+          orderedProductIds.forEach((pid) => {
+            try { removeFromGuestCart(pid); } catch {}
+          });
+        } else {
+          // 회원: 주문한 상품만 서버 카트에서 제거
+          for (const pid of orderedProductIds) {
+            try {
+              await authFetch(`/api/cart?productId=${pid}`, { method: 'DELETE' });
+            } catch {}
+          }
+        }
       } catch {}
 
-      // 파트너 스토어 경유 정보 정리
+      // 파트너 스토어 경유 정보 + 선택결제 목록 정리
       try {
         sessionStorage.removeItem('checkout_partnerId');
         sessionStorage.removeItem('checkout_storeSlug');
+        sessionStorage.removeItem('checkout_selectedProductIds');
       } catch {}
 
       // 주문 성공 페이지로 이동 (잔액 결제는 즉시 확정)
