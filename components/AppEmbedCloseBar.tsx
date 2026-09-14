@@ -11,14 +11,18 @@
 //
 // 동작
 //   - 앱 임베드(useIsAppEmbed=true)에서만 렌더. 일반 웹/PC 에서는 아무것도 안 그림.
-//   - X 클릭 시: 알려진 앱 브릿지들을 순서대로 시도 → 없으면 history.back().
+//   - 왼쪽 ‹ (뒤로가기): history.back (그대로 유지)
+//   - 오른쪽 X (닫기): 웹뷰를 닫고 "앱 메인" 으로 나가라는 신호를 앱에 전달.
+//                      (뒤로가기가 아니라, 쇼핑몰을 완전히 벗어나 앱 홈으로!)
 //
-// 앱(Flutter) 연동 안내 (앱 쪽에서 아래 중 하나만 열어주면 즉시 동작):
-//   1) flutter_inappwebview JS handler:  window.flutter_inappwebview.callHandler('closeWebview')
-//   2) Flutter WebView JavascriptChannel: QRChatChannel.postMessage('close')
-//   3) Android addJavascriptInterface:    window.QRChatApp.closeWebview()
-//   4) iOS WKScriptMessageHandler:         window.webkit.messageHandlers.qrchatClose.postMessage('close')
-//   앱이 아직 아무것도 안 열어줘도, 폴백으로 history.back() 이 실행되어 최소한 뒤로는 간다.
+// 앱(Flutter) 연동 안내 — X(닫기)는 "앱 메인으로 이동" 이어야 함.
+//   앱 쪽에서 아래 핸들러 중 하나를 받아서 Navigator 로 앱 메인 화면으로 보내면 됨:
+//   1) flutter_inappwebview:  window.flutter_inappwebview.callHandler('closeWebview', 'main')
+//   2) JavascriptChannel:     QRChatChannel.postMessage('goMain')   // 'close' 도 하위호환 처리 권장
+//   3) Android interface:     window.QRChatApp.goMain()  또는 closeWebview()
+//   4) iOS WKScriptMessage:    window.webkit.messageHandlers.qrchatClose.postMessage('goMain')
+//   ※ 앱이 이 신호를 받으면 반드시 '앱 메인 화면' 으로 보내야 한다(뒤로가기 X).
+//   ※ 웹만으로는 앱 화면을 못 바꾸므로, 신호 전달 후에도 웹은 홈('/')으로 폴백 이동.
 // ============================================================================
 
 import { usePathname } from 'next/navigation';
@@ -31,44 +35,47 @@ export default function AppEmbedCloseBar() {
   // 앱 WebView 가 아니면 렌더하지 않음 (일반 웹/PC 는 기존 헤더 사용)
   if (!isAppEmbed) return null;
 
+  // X(닫기) = "앱 메인으로 나가기"
+  //   웹은 앱 화면을 직접 못 바꾸므로, 알려진 모든 앱 브릿지에 "메인으로" 신호를
+  //   (하위호환 'close' 포함) 전부 쏜 뒤, 웹 자체는 홈('/')으로 폴백 이동한다.
+  //   → 앱이 신호를 받으면 앱 메인으로 이동, 아직 미구현이라도 최소한 쇼핑몰 홈으로.
   const handleClose = () => {
+    let signaled = false;
     try {
       const w = window as any;
 
-      // 1) flutter_inappwebview callHandler
+      // 1) flutter_inappwebview callHandler ('main' 인자로 의도 전달)
       if (w.flutter_inappwebview?.callHandler) {
-        w.flutter_inappwebview.callHandler('closeWebview');
-        return;
+        try { w.flutter_inappwebview.callHandler('closeWebview', 'main'); signaled = true; } catch {}
+        try { w.flutter_inappwebview.callHandler('goMain'); signaled = true; } catch {}
       }
       // 2) Flutter WebView JavascriptChannel (QRChatChannel)
       if (w.QRChatChannel?.postMessage) {
-        w.QRChatChannel.postMessage('close');
-        return;
+        try { w.QRChatChannel.postMessage('goMain'); signaled = true; } catch {}
+        try { w.QRChatChannel.postMessage('close'); signaled = true; } catch {} // 하위호환
       }
       // 3) Android addJavascriptInterface (QRChatApp)
-      if (w.QRChatApp?.closeWebview) {
-        w.QRChatApp.closeWebview();
-        return;
+      if (w.QRChatApp) {
+        try { if (w.QRChatApp.goMain) { w.QRChatApp.goMain(); signaled = true; } } catch {}
+        try { if (w.QRChatApp.closeWebview) { w.QRChatApp.closeWebview(); signaled = true; } } catch {}
       }
       // 4) iOS WKScriptMessageHandler
       if (w.webkit?.messageHandlers?.qrchatClose?.postMessage) {
-        w.webkit.messageHandlers.qrchatClose.postMessage('close');
-        return;
-      }
-
-      // 5) 폴백: 뒤로 갈 데가 있으면 뒤로가기, 없으면 홈으로
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.href = '/';
+        try { w.webkit.messageHandlers.qrchatClose.postMessage('goMain'); signaled = true; } catch {}
       }
     } catch {
-      try {
-        window.history.back();
-      } catch {
-        /* noop */
-      }
+      /* noop */
     }
+
+    // 웹 폴백: 앱 신호와 무관하게 쇼핑몰 최상단(홈)으로 이동.
+    //   (앱이 신호를 받아 앱 메인으로 나가면 이 화면은 어차피 사라진다.
+    //    앱이 아직 미구현이면 최소한 쇼핑몰 첫 화면으로 돌아간다 — 뒤로가기 아님.)
+    try {
+      window.location.href = '/';
+    } catch {
+      /* noop */
+    }
+    void signaled;
   };
 
   const handleBack = () => {
