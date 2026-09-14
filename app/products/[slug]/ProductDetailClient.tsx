@@ -115,6 +115,13 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   const [cartMessage, setCartMessage] = useState('');
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
+  // ===== 공유하기 / 선물하기 =====
+  const [shareMessage, setShareMessage] = useState('');      // 공유 완료 토스트
+  const [showGiftModal, setShowGiftModal] = useState(false); // 선물 모달 표시
+  const [giftName, setGiftName] = useState('');              // 받는 분 이름
+  const [giftPhone, setGiftPhone] = useState('');            // 받는 분 연락처
+  const [giftMessage, setGiftMessage] = useState('');        // 선물 메시지(카드)
+
   // 동적 배송비 설정
   const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
 
@@ -458,6 +465,109 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     router.push('/checkout?mode=buynow');
   };
 
+  // ===== 공유하기 =====
+  //  1) navigator.share 지원(모바일 대부분) → 네이티브 공유 시트
+  //  2) 미지원(데스크톱 등) → URL 클립보드 복사 후 토스트
+  const handleShare = async () => {
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+    const shareData = {
+      title: product.name,
+      text: `${product.name} - 큐라이브`,
+      url: shareUrl,
+    };
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share(shareData);
+        return;
+      }
+    } catch {
+      // 사용자가 공유 시트를 취소한 경우 등 → 조용히 무시
+      return;
+    }
+    // 폴백: 클립보드 복사
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = shareUrl;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setShareMessage('상품 링크가 복사되었습니다!');
+      setTimeout(() => setShareMessage(''), 2500);
+    } catch {
+      setShareMessage('링크 복사에 실패했습니다. 주소창의 URL을 복사해주세요.');
+      setTimeout(() => setShareMessage(''), 3000);
+    }
+  };
+
+  // ===== 선물하기 =====
+  //  받는 분 정보(이름/연락처/메시지)를 입력받아, 바로구매와 동일하게 결제하되
+  //  선물 정보(배송 받는 분)를 sessionStorage 에 담아 checkout 으로 전달한다.
+  const openGiftModal = () => {
+    if (currentStock <= 0) return;
+    if (warnIfOptionNotSelected()) return;
+    setShowGiftModal(true);
+  };
+
+  const submitGift = () => {
+    if (!giftName.trim()) {
+      alert('받는 분의 이름을 입력해주세요.');
+      return;
+    }
+    if (!giftPhone.trim()) {
+      alert('받는 분의 연락처를 입력해주세요.');
+      return;
+    }
+
+    let optionLabel: string | null = null;
+    if (selectedVariant) {
+      try {
+        const ov = JSON.parse(selectedVariant.optionValues);
+        optionLabel = Object.entries(ov)
+          .filter(([, v]) => v != null && String(v).trim() !== '')
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(' / ') || null;
+      } catch { optionLabel = null; }
+    }
+
+    const buyNowItem = {
+      productId: product.id,
+      quantity,
+      variantId: selectedVariant?.id || null,
+      optionLabel,
+      product: {
+        id: product.id,
+        name: product.name,
+        price: currentPrice,
+        thumbnail: product.thumbnail,
+      },
+    };
+
+    const giftInfo = {
+      isGift: true,
+      recipientName: giftName.trim(),
+      recipientPhone: giftPhone.trim(),
+      message: giftMessage.trim(),
+    };
+
+    try {
+      sessionStorage.setItem('buyNowItem', JSON.stringify(buyNowItem));
+      sessionStorage.setItem('checkout_gift', JSON.stringify(giftInfo));
+      if (partnerId) {
+        sessionStorage.setItem('checkout_partnerId', partnerId);
+        if (storeSlug) sessionStorage.setItem('checkout_storeSlug', storeSlug);
+      }
+    } catch {}
+    setShowGiftModal(false);
+    router.push('/checkout?mode=buynow&gift=1');
+  };
+
   const tabs = [
     { id: 'detail' as const, label: '상세정보' },
     { id: 'specs' as const, label: '상품정보' },
@@ -779,6 +889,30 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
               </div>
             )}
 
+            {/* 선물하기 / 공유하기 (쿠팡식) — 모바일·데스크톱 공통 노출 */}
+            <div className="flex gap-3 border-y border-gray-100 py-3">
+              <button
+                onClick={openGiftModal}
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 transition"
+              >
+                <span className="text-lg">🎁</span> 선물하기
+              </button>
+              <div className="w-px bg-gray-200" />
+              <button
+                onClick={handleShare}
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-gray-700 hover:text-blue-600 transition"
+              >
+                <span className="text-lg">🔗</span> 공유하기
+              </button>
+            </div>
+
+            {/* 공유 완료 토스트 */}
+            {shareMessage && (
+              <div className="text-center text-sm font-semibold text-green-600 bg-green-50 border border-green-200 rounded-lg py-2">
+                {shareMessage}
+              </div>
+            )}
+
             {/* Action buttons (데스크톱 전용) */}
             {/* ★★★ 2026-08-15 수정 (구매 버튼 2개 중복 노출 사건):
                 모바일에는 화면 하단 고정 액션바(장바구니/바로구매)가 별도로 있어서,
@@ -1044,6 +1178,105 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
           </button>
         )}
       </div>
+
+      {/* ===== 선물하기 모달 ===== */}
+      {showGiftModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4"
+          onClick={() => setShowGiftModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 헤더 */}
+            <div className="px-6 pt-6 pb-3 border-b border-gray-100 shrink-0 flex items-center justify-between">
+              <h2 className="text-xl font-bold flex items-center gap-2">🎁 선물하기</h2>
+              <button
+                onClick={() => setShowGiftModal(false)}
+                className="text-gray-400 hover:text-gray-700 text-2xl leading-none"
+                aria-label="닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* 본문 */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {/* 상품 요약 */}
+              <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-3">
+                <img
+                  src={thumbUrl(product.thumbnail, 200)}
+                  alt={product.name}
+                  className="w-14 h-14 rounded-lg object-cover bg-gray-100 flex-shrink-0"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 line-clamp-2">{tr(product.name)}</p>
+                  <p className="text-sm text-blue-600 font-bold mt-0.5">
+                    ₩{(currentPrice * quantity).toLocaleString()} <span className="text-gray-400 font-normal">({quantity}개)</span>
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">받는 분 이름 <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={giftName}
+                  onChange={(e) => setGiftName(e.target.value)}
+                  placeholder="선물 받으실 분의 이름"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">받는 분 연락처 <span className="text-red-500">*</span></label>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={giftPhone}
+                  onChange={(e) => setGiftPhone(e.target.value)}
+                  placeholder="010-0000-0000"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">선물 메시지 <span className="text-gray-400 font-normal">(선택)</span></label>
+                <textarea
+                  value={giftMessage}
+                  onChange={(e) => setGiftMessage(e.target.value)}
+                  rows={3}
+                  maxLength={200}
+                  placeholder="마음을 담은 메시지를 적어보세요"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                />
+              </div>
+
+              <p className="text-xs text-gray-400 leading-relaxed">
+                * 다음 결제 단계에서 배송지와 결제 정보를 입력하시면 선물이 받는 분께 전달됩니다.
+              </p>
+            </div>
+
+            {/* 하단 버튼 (고정) */}
+            <div className="px-6 py-4 border-t border-gray-100 shrink-0 flex gap-3 bg-white">
+              <button
+                onClick={submitGift}
+                className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition"
+              >
+                선물 결제하기
+              </button>
+              <button
+                onClick={() => setShowGiftModal(false)}
+                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold text-sm hover:bg-gray-300 transition"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
