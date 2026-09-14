@@ -39,6 +39,8 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  // 쿠팡식 선택결제: 선택된 상품 productId 집합
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { t } = useLanguage();
   const { tr } = useAutoTranslate(
     cartItems.flatMap((it) => [it.product?.name, it.product?.category?.name]).filter(Boolean) as string[]
@@ -117,6 +119,81 @@ export default function CartPage() {
     loadCart();
   }, [loadCart]);
 
+  // 장바구니 목록이 바뀌면 선택 상태를 정리한다.
+  // - 신규 로드 시: 기본적으로 전체 선택
+  // - 이미 선택되어 있던 항목은 유지, 사라진 항목은 제거
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const currentIds = cartItems.map((it) => it.productId);
+      // 최초(비어있던 경우)에는 전체 선택
+      if (prev.size === 0) {
+        return new Set(currentIds);
+      }
+      // 존재하는 항목만 유지
+      const next = new Set<string>();
+      currentIds.forEach((id) => {
+        if (prev.has(id)) next.add(id);
+      });
+      return next;
+    });
+    // cartItems 자체가 바뀔 때만 실행
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems.map((it) => it.productId).join(',')]);
+
+  const isSelected = (productId: string) => selectedIds.has(productId);
+
+  const toggleSelect = (productId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+  };
+
+  const allSelected = cartItems.length > 0 && selectedIds.size === cartItems.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(cartItems.map((it) => it.productId)));
+    }
+  };
+
+  // 선택된 상품 삭제
+  const handleRemoveSelected = async () => {
+    const targets = cartItems.filter((it) => selectedIds.has(it.productId));
+    if (targets.length === 0) return;
+    if (!confirm(`선택한 ${targets.length}개 상품을 삭제할까요?`)) return;
+    for (const item of targets) {
+      try {
+        if (user) {
+          await authFetch(`/api/cart?productId=${item.productId}`, { method: 'DELETE' });
+        } else {
+          removeFromGuestCart(item.productId);
+        }
+      } catch {}
+    }
+    setCartItems((prev) => prev.filter((ci) => !selectedIds.has(ci.productId)));
+    setSelectedIds(new Set());
+  };
+
+  // 선택 상품만 결제
+  const handleCheckoutSelected = () => {
+    const selectedProductIds = cartItems
+      .filter((it) => selectedIds.has(it.productId))
+      .map((it) => it.productId);
+    if (selectedProductIds.length === 0) {
+      alert('구매할 상품을 선택해주세요.');
+      return;
+    }
+    try {
+      sessionStorage.setItem('checkout_selectedProductIds', JSON.stringify(selectedProductIds));
+    } catch {}
+    router.push('/checkout?mode=selected');
+  };
+
   // 비회원 장바구니 변경 이벤트 리스너
   useEffect(() => {
     const handleGuestCartUpdate = () => {
@@ -188,7 +265,10 @@ export default function CartPage() {
     }
   };
 
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  // 선택된 상품만 합계 계산 (쿠팡식 선택결제)
+  const selectedItems = cartItems.filter((item) => selectedIds.has(item.productId));
+  const selectedCount = selectedItems.length;
+  const totalAmount = selectedItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   // [정책] 전 상품 무조건 무료배송 — 가격과 무관하게 배송비 항상 0원
   const shippingFee = 0;
   const finalAmount = totalAmount + shippingFee;
@@ -240,13 +320,46 @@ export default function CartPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* 상품 목록 */}
             <div className="lg:col-span-2 space-y-3">
+              {/* 전체선택 / 선택삭제 바 (쿠팡식) */}
+              <div className="bg-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className="text-sm font-medium text-gray-900">
+                    전체선택 ({selectedCount}/{cartItems.length})
+                  </span>
+                </label>
+                <button
+                  onClick={handleRemoveSelected}
+                  disabled={selectedCount === 0}
+                  className="text-sm text-gray-500 hover:text-red-600 font-medium disabled:opacity-40 disabled:hover:text-gray-500"
+                >
+                  선택삭제
+                </button>
+              </div>
+
               {cartItems.map(item => (
                 <div
                   key={item.id}
-                  className={`bg-white rounded-xl shadow-sm p-4 flex gap-4 transition ${
+                  className={`bg-white rounded-xl shadow-sm p-4 flex gap-3 sm:gap-4 transition ${
                     updatingId === item.id ? 'opacity-50' : ''
                   }`}
                 >
+                  {/* 선택 체크박스 (쿠팡식) */}
+                  <div className="flex items-start pt-1">
+                    <input
+                      type="checkbox"
+                      checked={isSelected(item.productId)}
+                      onChange={() => toggleSelect(item.productId)}
+                      className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      aria-label="상품 선택"
+                    />
+                  </div>
+
                   {/* 썸네일 */}
                   <Link
                     href={`/products/${item.product.slug}`}
@@ -359,10 +472,13 @@ export default function CartPage() {
                 </div>
 
                 <button
-                  onClick={() => router.push('/checkout')}
-                  className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition"
+                  onClick={handleCheckoutSelected}
+                  disabled={selectedCount === 0}
+                  className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t.cart.checkout} ({cartItems.length}{t.common.items})
+                  {selectedCount === 0
+                    ? '구매할 상품을 선택하세요'
+                    : `총 ${selectedCount}개 상품 구매하기`}
                 </button>
 
                 <Link
