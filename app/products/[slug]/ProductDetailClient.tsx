@@ -118,9 +118,12 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   // ===== 공유하기 / 선물하기 =====
   const [shareMessage, setShareMessage] = useState('');      // 공유 완료 토스트
   const [showGiftModal, setShowGiftModal] = useState(false); // 선물 모달 표시
-  const [giftName, setGiftName] = useState('');              // 받는 분 이름
-  const [giftPhone, setGiftPhone] = useState('');            // 받는 분 연락처
   const [giftMessage, setGiftMessage] = useState('');        // 선물 메시지(카드)
+  // 받는 분: 큐라이브/큐알쳇 회원 닉네임 검색 후 선택
+  const [giftQuery, setGiftQuery] = useState('');            // 닉네임 검색어
+  const [giftSearching, setGiftSearching] = useState(false); // 검색 중
+  const [giftResults, setGiftResults] = useState<Array<{ userId: string; nickname: string; maskedName: string; maskedPhone: string; origin: string }>>([]);
+  const [giftRecipient, setGiftRecipient] = useState<{ userId: string; nickname: string; maskedName: string; origin: string } | null>(null); // 선택된 받는 분
 
   // 동적 배송비 설정
   const [shippingConfig, setShippingConfig] = useState({ shippingFee: 3000, freeShippingThreshold: 50000 });
@@ -143,6 +146,21 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
       })
       .catch(() => {});
   }, []);
+
+  // 선물하기: 닉네임 검색어 디바운스(300ms) 후 회원 검색
+  useEffect(() => {
+    if (!showGiftModal) return;
+    const q = giftQuery.trim();
+    if (q.length < 1) {
+      setGiftResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      searchRecipients(q);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giftQuery, showGiftModal]);
 
   useEffect(() => {
     // 서버에서 이미 완전한 상품 데이터를 받았으면 재조회하지 않는다(즉시 표시).
@@ -507,21 +525,51 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   };
 
   // ===== 선물하기 =====
-  //  받는 분 정보(이름/연락처/메시지)를 입력받아, 바로구매와 동일하게 결제하되
-  //  선물 정보(배송 받는 분)를 sessionStorage 에 담아 checkout 으로 전달한다.
+  //  받는 분을 "큐라이브/큐알쳇 회원 닉네임 검색" 으로 선택한 뒤 결제로 이동.
+  //  선물 정보(받는 분 userId/닉네임 + 메시지)를 sessionStorage 로 checkout 에 전달.
   const openGiftModal = () => {
     if (currentStock <= 0) return;
     if (warnIfOptionNotSelected()) return;
+    // 로그인해야 회원 검색이 가능
+    if (!user) {
+      alert('선물하기는 로그인 후 이용하실 수 있습니다.');
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    // 상태 초기화 후 열기
+    setGiftQuery('');
+    setGiftResults([]);
+    setGiftRecipient(null);
+    setGiftMessage('');
     setShowGiftModal(true);
   };
 
-  const submitGift = () => {
-    if (!giftName.trim()) {
-      alert('받는 분의 이름을 입력해주세요.');
+  // 닉네임 검색 (디바운스는 아래 useEffect 에서 처리)
+  const searchRecipients = async (q: string) => {
+    const query = q.trim();
+    if (query.length < 1) {
+      setGiftResults([]);
       return;
     }
-    if (!giftPhone.trim()) {
-      alert('받는 분의 연락처를 입력해주세요.');
+    setGiftSearching(true);
+    try {
+      const res = await authFetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setGiftResults(data.data);
+      } else {
+        setGiftResults([]);
+      }
+    } catch {
+      setGiftResults([]);
+    } finally {
+      setGiftSearching(false);
+    }
+  };
+
+  const submitGift = () => {
+    if (!giftRecipient) {
+      alert('선물 받으실 회원(닉네임)을 검색해서 선택해주세요.');
       return;
     }
 
@@ -551,8 +599,10 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
 
     const giftInfo = {
       isGift: true,
-      recipientName: giftName.trim(),
-      recipientPhone: giftPhone.trim(),
+      recipientUserId: giftRecipient.userId,
+      recipientNickname: giftRecipient.nickname,
+      recipientName: giftRecipient.maskedName,
+      recipientOrigin: giftRecipient.origin,
       message: giftMessage.trim(),
     };
 
@@ -1219,27 +1269,88 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                 </div>
               </div>
 
+              {/* 받는 분: 큐라이브/큐알쳇 회원 닉네임 검색 후 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">받는 분 이름 <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={giftName}
-                  onChange={(e) => setGiftName(e.target.value)}
-                  placeholder="선물 받으실 분의 이름"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-              </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  받는 분 (닉네임 검색) <span className="text-red-500">*</span>
+                </label>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">받는 분 연락처 <span className="text-red-500">*</span></label>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  value={giftPhone}
-                  onChange={(e) => setGiftPhone(e.target.value)}
-                  placeholder="010-0000-0000"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
+                {/* 선택된 받는 분 */}
+                {giftRecipient ? (
+                  <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                        {Array.from(giftRecipient.nickname)[0] || '?'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {giftRecipient.nickname}
+                          <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full align-middle ${giftRecipient.origin === 'QRCHAT' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {giftRecipient.origin === 'QRCHAT' ? '큐알쳇' : '큐라이브'}
+                          </span>
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{giftRecipient.maskedName}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setGiftRecipient(null); setGiftQuery(''); setGiftResults([]); }}
+                      className="text-xs text-gray-500 hover:text-red-600 font-medium flex-shrink-0"
+                    >
+                      변경
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={giftQuery}
+                      onChange={(e) => setGiftQuery(e.target.value)}
+                      placeholder="큐알쳇/큐라이브 닉네임을 입력하세요"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      autoComplete="off"
+                    />
+
+                    {/* 검색 결과 */}
+                    <div className="mt-2">
+                      {giftSearching && (
+                        <p className="text-xs text-gray-400 px-1 py-2">검색 중...</p>
+                      )}
+                      {!giftSearching && giftQuery.trim().length >= 1 && giftResults.length === 0 && (
+                        <p className="text-xs text-gray-400 px-1 py-2">일치하는 회원이 없습니다.</p>
+                      )}
+                      {!giftSearching && giftResults.length > 0 && (
+                        <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-52 overflow-y-auto">
+                          {giftResults.map((r) => (
+                            <li key={r.userId}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGiftRecipient({ userId: r.userId, nickname: r.nickname, maskedName: r.maskedName, origin: r.origin });
+                                  setGiftResults([]);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 text-left transition"
+                              >
+                                <span className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                                  {Array.from(r.nickname)[0] || '?'}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-semibold text-gray-900 truncate">
+                                    {r.nickname}
+                                    <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full align-middle ${r.origin === 'QRCHAT' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                                      {r.origin === 'QRCHAT' ? '큐알쳇' : '큐라이브'}
+                                    </span>
+                                  </p>
+                                  <p className="text-xs text-gray-500 truncate">{r.maskedName} {r.maskedPhone && `· ${r.maskedPhone}`}</p>
+                                </div>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               <div>
@@ -1255,7 +1366,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
               </div>
 
               <p className="text-xs text-gray-400 leading-relaxed">
-                * 다음 결제 단계에서 배송지와 결제 정보를 입력하시면 선물이 받는 분께 전달됩니다.
+                * 받는 분을 닉네임으로 선택하시면, 다음 결제 단계에서 배송지·결제 정보를 입력해 선물을 보낼 수 있습니다.
               </p>
             </div>
 

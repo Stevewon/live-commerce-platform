@@ -80,7 +80,7 @@ export default function CheckoutPage() {
   const [shippingMemo, setShippingMemo] = useState('');
 
   // 선물하기 정보 (상품 상세 '선물하기' → sessionStorage checkout_gift)
-  const [giftInfo, setGiftInfo] = useState<{ recipientName: string; recipientPhone: string; message: string } | null>(null);
+  const [giftInfo, setGiftInfo] = useState<{ recipientNickname: string; recipientName: string; recipientOrigin: string; message: string } | null>(null);
 
   // [해외배송] 배송 국가 (KR=국내 무료 / JP=일본 해외배송)
   const [shippingCountry, setShippingCountry] = useState<'KR' | 'JP'>('KR');
@@ -297,16 +297,17 @@ export default function CheckoutPage() {
           setLoading(false);
           if (!user) setIsGuest(true);
 
-          // 선물하기 정보 처리: 받는 분 이름/연락처를 배송 정보로 자동 채움
-          let gift: { recipientName: string; recipientPhone: string; message: string } | null = null;
+          // 선물하기 정보 처리: 받는 분 닉네임(회원)으로 선물 발송
+          let gift: { recipientNickname: string; recipientName: string; recipientOrigin: string; message: string } | null = null;
           try {
             const giftRaw = sessionStorage.getItem('checkout_gift');
             if (giftRaw) {
               const g = JSON.parse(giftRaw);
               if (g?.isGift) {
                 gift = {
+                  recipientNickname: g.recipientNickname || '',
                   recipientName: g.recipientName || '',
-                  recipientPhone: g.recipientPhone || '',
+                  recipientOrigin: g.recipientOrigin || 'QRLIVE',
                   message: g.message || '',
                 };
               }
@@ -316,8 +317,8 @@ export default function CheckoutPage() {
 
           if (gift) {
             setGiftInfo(gift);
-            setShippingName(gift.recipientName);
-            setShippingPhone(gift.recipientPhone);
+            // 배송 받는 분 이름은 닉네임으로 미리 채우고, 연락처/주소는 보내는 분이 입력
+            setShippingName(gift.recipientNickname);
             if (gift.message) setShippingMemo(`[선물 메시지] ${gift.message}`);
           } else if (user) {
             setShippingName(user.name || '');
@@ -553,9 +554,15 @@ export default function CheckoutPage() {
         ? `${shippingAddress} ${shippingAddressDetail}`
         : shippingAddress;
 
-      const finalMemo = memoPreset !== 'direct'
+      let finalMemo = memoPreset !== 'direct'
         ? (MEMO_PRESETS.find(m => m.key === memoPreset)?.label || shippingMemo)
         : shippingMemo;
+
+      // 선물 주문이면 받는 분 닉네임을 메모 앞에 기록 (주문 내역에서 식별)
+      if (giftInfo) {
+        const giftTag = `[선물 → ${giftInfo.recipientNickname}(${giftInfo.recipientOrigin === 'QRCHAT' ? '큐알쳇' : '큐라이브'})]`;
+        finalMemo = finalMemo ? `${giftTag} ${finalMemo}` : giftTag;
+      }
 
       const orderData: any = {
         items: cartItems.map(item => ({
@@ -782,9 +789,14 @@ export default function CheckoutPage() {
                   <div className="text-sm">
                     <p className="font-bold text-pink-700">선물 주문입니다</p>
                     <p className="text-gray-600 mt-0.5">
-                      받는 분 <span className="font-semibold">{giftInfo.recipientName}</span> ({giftInfo.recipientPhone})님께 배송됩니다.
-                      아래에서 배송지를 입력해주세요.
+                      받는 분{' '}
+                      <span className="font-semibold text-pink-700">{giftInfo.recipientNickname}</span>
+                      <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full align-middle ${giftInfo.recipientOrigin === 'QRCHAT' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {giftInfo.recipientOrigin === 'QRCHAT' ? '큐알쳇' : '큐라이브'}
+                      </span>
+                      {' '}님께 보내는 선물입니다.
                     </p>
+                    <p className="text-gray-500 mt-0.5">아래에 받는 분이 받으실 <b>배송지와 연락처</b>를 입력해주세요.</p>
                     {giftInfo.message && (
                       <p className="text-gray-500 mt-1 italic">"{giftInfo.message}"</p>
                     )}
