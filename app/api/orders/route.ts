@@ -186,6 +186,8 @@ export async function POST(req: NextRequest) {
       // 비회원 전용 필드
       guestEmail,
       guestPhone,
+      // 선물하기: { recipientUserId, recipientNickname, message }
+      gift,
     } = body;
 
     // [v1.0.22] 결제수단 검증 — KRW 잔액 / QKEY 잔액 / SPLIT(쿠키+현금 병행) 만 허용, PG 계열 완전 차단
@@ -1203,6 +1205,60 @@ export async function POST(req: NextRequest) {
     sendOrderNotifications(order, userId || undefined, guestEmail || '', guestPhone || shippingPhone || '').catch(err => {
       console.error('Notification send error:', err);
     });
+
+    // ===== 선물 푸시 알림 (받는 분에게) =====
+    //   선물 주문이면 받는 분(회원)에게 큐알쳇 앱 푸시를 보낸다.
+    //   받는 분이 큐알쳇 uid 를 가진 회원(B회원 또는 지갑연결 A회원)일 때만 발송 가능.
+    if (gift?.recipientUserId) {
+      // 비동기(주문 응답을 막지 않음)로 처리
+      (async () => {
+        try {
+          const { sendGiftPushToQrchat } = await import('@/lib/qrchat-bridge');
+          // 받는 분의 큐알쳇 uid + 닉네임, 보내는 분(구매자) 닉네임 조회
+          const recipient: any = await prisma.user.findUnique({
+            where: { id: String(gift.recipientUserId) },
+            select: { qrchatUid: true, nickname: true },
+          });
+          if (!recipient?.qrchatUid) {
+            console.warn('[GIFT_PUSH] 받는 분에게 큐알쳇 uid 가 없어 푸시 생략:', gift.recipientUserId);
+            return;
+          }
+          let senderNickname = '';
+          try {
+            const sender: any = await prisma.user.findUnique({
+              where: { id: String(userId) },
+              select: { nickname: true, name: true },
+            });
+            senderNickname = sender?.nickname || sender?.name || '';
+          } catch {}
+
+          const firstItem = Array.isArray(order.items) && order.items.length > 0 ? order.items[0] : null;
+          const productName = firstItem?.productName || firstItem?.product?.name || '선물';
+          const totalQty = Array.isArray(order.items)
+            ? order.items.reduce((s: number, it: any) => s + (it.quantity || 0), 0)
+            : 1;
+
+          const result = await sendGiftPushToQrchat({
+            recipientUid: String(recipient.qrchatUid),
+            recipientNickname: recipient.nickname || gift.recipientNickname || '',
+            senderNickname,
+            productName,
+            quantity: totalQty,
+            message: gift.message || '',
+            orderId: order.id,
+            orderNumber: order.orderNumber || '',
+            idemKey: order.id, // 주문당 1회 발송 (Function 측 idempotent 처리 권장)
+          });
+          if (!result.ok) {
+            console.warn('[GIFT_PUSH] 큐알쳇 푸시 실패:', result.error);
+          } else {
+            console.log('[GIFT_PUSH] 큐알쳇 선물 푸시 발송:', order.orderNumber, '→', recipient.qrchatUid);
+          }
+        } catch (giftErr) {
+          console.error('[GIFT_PUSH] 발송 중 오류:', giftErr);
+        }
+      })();
+    }
 
     return NextResponse.json({
       success: true,

@@ -80,7 +80,7 @@ export default function CheckoutPage() {
   const [shippingMemo, setShippingMemo] = useState('');
 
   // 선물하기 정보 (상품 상세 '선물하기' → sessionStorage checkout_gift)
-  const [giftInfo, setGiftInfo] = useState<{ recipientNickname: string; recipientName: string; recipientOrigin: string; message: string } | null>(null);
+  const [giftInfo, setGiftInfo] = useState<{ recipientUserId: string; recipientNickname: string; recipientName: string; recipientOrigin: string; message: string } | null>(null);
 
   // [해외배송] 배송 국가 (KR=국내 무료 / JP=일본 해외배송)
   const [shippingCountry, setShippingCountry] = useState<'KR' | 'JP'>('KR');
@@ -298,13 +298,14 @@ export default function CheckoutPage() {
           if (!user) setIsGuest(true);
 
           // 선물하기 정보 처리: 받는 분 닉네임(회원)으로 선물 발송
-          let gift: { recipientNickname: string; recipientName: string; recipientOrigin: string; message: string } | null = null;
+          let gift: { recipientUserId: string; recipientNickname: string; recipientName: string; recipientOrigin: string; message: string } | null = null;
           try {
             const giftRaw = sessionStorage.getItem('checkout_gift');
             if (giftRaw) {
               const g = JSON.parse(giftRaw);
               if (g?.isGift) {
                 gift = {
+                  recipientUserId: g.recipientUserId || '',
                   recipientNickname: g.recipientNickname || '',
                   recipientName: g.recipientName || '',
                   recipientOrigin: g.recipientOrigin || 'QRLIVE',
@@ -583,6 +584,15 @@ export default function CheckoutPage() {
         shippingCountry,
         shippingPrefecture: shippingCountry === 'JP' ? shippingPrefecture : null,
       };
+
+      // 선물 주문: 받는 분 정보 전달 → 서버가 주문 성공 후 큐알쳇 푸시 발송
+      if (giftInfo) {
+        orderData.gift = {
+          recipientUserId: giftInfo.recipientUserId,
+          recipientNickname: giftInfo.recipientNickname,
+          message: giftInfo.message,
+        };
+      }
 
       // [병행결제] SPLIT_BALANCE: 사용자가 직접 정한 "현금 금액" 을 서버로 보낸다.
       //   서버는 이 현금 금액을 쓰고, 나머지(상품가 - 현금)를 쿠키로 자동 충당한다.

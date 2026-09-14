@@ -364,3 +364,62 @@ export async function resolveCanonicalQrchatIdentity(input: {
 
   return { uid: uid0, wallet: wallet0, nick: nick0, changed: false, source: 'none' };
 }
+
+// ---------------------------------------------------------------------------
+// 7) 선물 푸시 알림 (쇼핑몰 → QRChat) — 받는 분에게 FCM 푸시
+//    ============================================================================
+//    큐라이브에서 회원 A 가 회원 B(받는 분)에게 상품을 "선물하기" 로 주문하면,
+//    받는 분(B)의 큐알쳇 앱으로 "○○님이 선물을 보냈어요" 푸시를 보낸다.
+//    실제 FCM 발송/토큰관리는 QRChat(Firebase) 측 Cloud Function 이 담당하고,
+//    쇼핑몰은 HMAC 서명된 요청으로 "누구에게 / 어떤 내용" 만 전달한다.
+//
+//    sig = HMAC(BRIDGE_SECRET, `${recipientUid}|${orderId}|${idemKey}`)
+//    QRChat Function 예상: sendGiftPushToQrchat
+//      body: { recipientUid, recipientNickname, senderNickname, productName,
+//              quantity, message, orderId, orderNumber, idemKey, sig }
+//    반환: { ok, delivered?, error? }
+//
+//    ⚠️ 받는 분이 B 회원(origin=QRCHAT)이라 uid 를 아는 경우에만 푸시 가능.
+//       A 회원(큐라이브 전용)에게는 별도 앱 알림 인프라가 없으므로 이 함수는
+//       recipientUid 가 있을 때만 호출한다(호출부에서 판단).
+// ---------------------------------------------------------------------------
+export interface GiftPushParams {
+  recipientUid: string;        // 받는 분 QRChat uid (필수)
+  recipientNickname?: string;  // 받는 분 닉네임 (표시용)
+  senderNickname?: string;     // 보내는 분 닉네임 (표시용)
+  productName?: string;        // 선물 상품명
+  quantity?: number;           // 수량
+  message?: string;            // 선물 메시지
+  orderId: string;             // 주문 ID
+  orderNumber?: string;        // 주문번호
+  idemKey: string;             // 중복 푸시 방지 키 (보통 orderId)
+}
+export interface GiftPushResult {
+  ok: boolean;
+  delivered?: boolean;
+  error?: string;
+  status?: number;
+}
+
+export async function sendGiftPushToQrchat(p: GiftPushParams): Promise<GiftPushResult> {
+  const recipientUid = String(p.recipientUid || '').trim();
+  const orderId = String(p.orderId || '').trim();
+  const idemKey = String(p.idemKey || '').trim();
+  if (!recipientUid || !orderId || !idemKey) {
+    return { ok: false, error: 'invalid_params' };
+  }
+  const signMsg = `${recipientUid}|${orderId}|${idemKey}`;
+  const sig = await hmacHex(getBridgeSecret(), signMsg);
+  return postJson('sendGiftPushToQrchat', {
+    recipientUid,
+    recipientNickname: normNick(p.recipientNickname),
+    senderNickname: normNick(p.senderNickname),
+    productName: String(p.productName || '').trim(),
+    quantity: Math.trunc(Number(p.quantity) || 1),
+    message: String(p.message || '').trim(),
+    orderId,
+    orderNumber: String(p.orderNumber || '').trim(),
+    idemKey,
+    sig,
+  });
+}
