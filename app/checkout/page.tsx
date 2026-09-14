@@ -79,6 +79,9 @@ export default function CheckoutPage() {
   const [shippingZipCode, setShippingZipCode] = useState('');
   const [shippingMemo, setShippingMemo] = useState('');
 
+  // 선물하기 정보 (상품 상세 '선물하기' → sessionStorage checkout_gift)
+  const [giftInfo, setGiftInfo] = useState<{ recipientName: string; recipientPhone: string; message: string } | null>(null);
+
   // [해외배송] 배송 국가 (KR=국내 무료 / JP=일본 해외배송)
   const [shippingCountry, setShippingCountry] = useState<'KR' | 'JP'>('KR');
   const [shippingPrefecture, setShippingPrefecture] = useState<string>(''); // 일본 도도부현 코드(01~47)
@@ -293,7 +296,30 @@ export default function CheckoutPage() {
           sessionStorage.removeItem('buyNowItem');
           setLoading(false);
           if (!user) setIsGuest(true);
-          if (user) {
+
+          // 선물하기 정보 처리: 받는 분 이름/연락처를 배송 정보로 자동 채움
+          let gift: { recipientName: string; recipientPhone: string; message: string } | null = null;
+          try {
+            const giftRaw = sessionStorage.getItem('checkout_gift');
+            if (giftRaw) {
+              const g = JSON.parse(giftRaw);
+              if (g?.isGift) {
+                gift = {
+                  recipientName: g.recipientName || '',
+                  recipientPhone: g.recipientPhone || '',
+                  message: g.message || '',
+                };
+              }
+              sessionStorage.removeItem('checkout_gift');
+            }
+          } catch {}
+
+          if (gift) {
+            setGiftInfo(gift);
+            setShippingName(gift.recipientName);
+            setShippingPhone(gift.recipientPhone);
+            if (gift.message) setShippingMemo(`[선물 메시지] ${gift.message}`);
+          } else if (user) {
             setShippingName(user.name || '');
             setShippingPhone(user.phone || '');
           }
@@ -749,10 +775,27 @@ export default function CheckoutPage() {
                 </div>
               )}
 
+              {/* 선물하기 안내 배너 */}
+              {giftInfo && (
+                <div className="bg-pink-50 border border-pink-200 rounded-lg p-4 flex items-start gap-3">
+                  <span className="text-2xl">🎁</span>
+                  <div className="text-sm">
+                    <p className="font-bold text-pink-700">선물 주문입니다</p>
+                    <p className="text-gray-600 mt-0.5">
+                      받는 분 <span className="font-semibold">{giftInfo.recipientName}</span> ({giftInfo.recipientPhone})님께 배송됩니다.
+                      아래에서 배송지를 입력해주세요.
+                    </p>
+                    {giftInfo.message && (
+                      <p className="text-gray-500 mt-1 italic">"{giftInfo.message}"</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* 배송 정보 - 다음 우편번호 API 연동 */}
               <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                  <span>🚚</span> {t.checkout.deliveryInfo}
+                  <span>{giftInfo ? '🎁' : '🚚'}</span> {giftInfo ? '받는 분 배송 정보' : t.checkout.deliveryInfo}
                 </h2>
                 <div className="space-y-4">
                   {/* [배송지 자동완성] 이전 주문 배송지 선택 (쿠팡/카톡처럼) */}
