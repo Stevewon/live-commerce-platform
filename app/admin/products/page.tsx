@@ -556,6 +556,13 @@ function AdminProductsPageInner() {
                           >
                             수정
                           </Link>
+                          {/* 이 상품만 이미지 최적화 */}
+                          <Link
+                            href={`/admin/products/optimize-images?id=${product.id}`}
+                            className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-600 rounded hover:bg-purple-100 transition whitespace-nowrap"
+                          >
+                            최적화
+                          </Link>
                           <button
                             onClick={() => handleDelete(product.id)}
                             className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-600 rounded hover:bg-red-100 transition"

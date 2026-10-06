@@ -41,6 +41,12 @@ export default function OptimizeImagesPage() {
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
   const [runningId, setRunningId] = useState<string | null>(null) // 개별 최적화 중인 상품
+  const [query, setQuery] = useState('') // 상품명 검색
+  const [onlyId, setOnlyId] = useState<string | null>(null) // 상품목록 [최적화] 로 들어온 경우 그 상품만 표시
+
+  useEffect(() => {
+    try { setOnlyId(new URLSearchParams(window.location.search).get('id')) } catch {}
+  }, [])
   const stopRef = useRef(false)
 
   useEffect(() => {
@@ -200,6 +206,12 @@ export default function OptimizeImagesPage() {
   const doneProducts = list.filter(x => x.state === 'done').length
   const totalSaved = list.reduce((s, x) => s + x.savedBytes, 0)
   const fmtKB = (b: number) => `${(b / 1024).toFixed(0)}KB`
+  // 표시 목록: 전체 상품(이미 최적화된 것 포함) — 특정 상품 / 검색어로 좁힘, 최적화 필요한 상품을 위로
+  const q = query.trim().toLowerCase()
+  const visible = list
+    .filter(x => (onlyId ? x.id === onlyId : true))
+    .filter(x => (q ? x.name.toLowerCase().includes(q) : true))
+    .sort((a, b) => (b.total > 0 ? 1 : 0) - (a.total > 0 ? 1 : 0))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -254,15 +266,31 @@ export default function OptimizeImagesPage() {
           </button>
         </div>
 
-        {totalProductsToDo === 0 && !running && (
-          <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 text-sm">
-            ✅ 최적화가 필요한 이미지가 없습니다. (모두 WebP이거나 이미지가 없습니다)
-          </div>
-        )}
+        {/* 상품 검색 (개별 최적화용) */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="상품명으로 검색해서 한 개만 최적화"
+            className="flex-1 min-w-0 basis-full sm:basis-auto px-4 py-2.5 text-base sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          {onlyId && (
+            <button
+              onClick={() => setOnlyId(null)}
+              className="min-h-[40px] px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              전체 상품 보기
+            </button>
+          )}
+        </div>
 
-        {/* 진행 목록 */}
+        {/* 상품 목록 — 상품마다 [최적화] 버튼 */}
         <div className="bg-white rounded-lg shadow divide-y">
-          {list.filter(x => x.total > 0).map(st => (
+          {visible.length === 0 && (
+            <p className="p-6 text-center text-sm text-gray-500">검색 결과가 없습니다.</p>
+          )}
+          {visible.map(st => (
             <div key={st.id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 p-4">
               <div className="flex-1 min-w-0 basis-full sm:basis-auto">
                 <p className="text-sm font-medium text-gray-900 truncate">{st.name}</p>
@@ -274,7 +302,7 @@ export default function OptimizeImagesPage() {
                 </div>
               </div>
               <div className="flex-1 sm:flex-none text-left sm:text-right sm:w-28 min-w-0">
-                <p className="text-xs text-gray-500">{st.done}/{st.total} 이미지</p>
+                <p className="text-xs text-gray-500">{st.total > 0 ? `${st.done}/${st.total} 이미지` : '변환할 이미지 없음'}</p>
                 <p className={`text-xs font-semibold truncate ${
                   st.state === 'done' ? 'text-green-600'
                   : st.state === 'error' ? 'text-red-600'
@@ -284,15 +312,16 @@ export default function OptimizeImagesPage() {
                   {st.state === 'done' ? `완료 (-${fmtKB(st.savedBytes)})`
                     : st.state === 'error' ? (st.message || '오류')
                     : st.state === 'processing' ? '처리중…'
+                    : st.state === 'skipped' ? '✅ 이미 최적화됨'
                     : '대기'}
                 </p>
               </div>
               <button
                 onClick={() => runOne(st.id)}
-                disabled={running}
+                disabled={running || st.total === 0}
                 className="flex-shrink-0 min-h-[40px] px-4 py-2 text-sm font-semibold rounded-lg border border-purple-600 text-purple-600 hover:bg-purple-50 active:bg-purple-100 disabled:border-gray-300 disabled:text-gray-400 disabled:bg-transparent disabled:cursor-not-allowed"
               >
-                {runningId === st.id ? '처리중…' : st.state === 'done' ? '다시' : '최적화'}
+                {runningId === st.id ? '처리중…' : st.total === 0 ? '완료됨' : st.state === 'done' ? '다시' : '이 상품만 최적화'}
               </button>
             </div>
           ))}
