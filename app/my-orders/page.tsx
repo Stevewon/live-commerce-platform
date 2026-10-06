@@ -15,6 +15,8 @@ interface OrderItem {
   price: number;
   productName?: string | null;
   productThumbnail?: string | null;
+  // [상품별 송장]
+  itemTracking?: { trackingCompany: string; trackingNumber: string } | null;
   product: {
     id: string;
     name: string;
@@ -260,26 +262,46 @@ export default function MyOrdersPage() {
                     )}
                   </div>
 
-                  {/* Tracking info */}
-                  {order.trackingCompany && order.trackingNumber && (
-                    <div className="px-4 sm:px-6 py-3 bg-indigo-50 border-t border-indigo-100">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-indigo-600">🚚</span>
-                          <span className="font-medium text-indigo-700">{order.trackingCompany}</span>
-                          <span className="text-indigo-600 font-mono">{order.trackingNumber}</span>
-                        </div>
-                        <a
-                          href={`https://trace.cjlogistics.com/web/detail.jsp?slipno=${order.trackingNumber}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-                        >
-                          배송추적 →
-                        </a>
+                  {/* Tracking info — [상품별 송장] 상품마다 송장이 있으면 상품별로, 없으면 주문 단위 1개 */}
+                  {(() => {
+                    const itemTrackings = (order.items || []).filter(it => it?.itemTracking?.trackingNumber);
+                    const rows = itemTrackings.length > 0
+                      ? itemTrackings.map(it => ({
+                          key: it.id,
+                          name: it.product?.name || it.productName || '주문 상품',
+                          company: it.itemTracking!.trackingCompany,
+                          number: it.itemTracking!.trackingNumber,
+                        }))
+                      : (order.trackingCompany && order.trackingNumber
+                          ? [{ key: 'order', name: '', company: order.trackingCompany, number: order.trackingNumber }]
+                          : []);
+                    if (rows.length === 0) return null;
+                    return (
+                      <div className="px-4 sm:px-6 py-3 bg-indigo-50 border-t border-indigo-100 space-y-2">
+                        {itemTrackings.length > 0 && (
+                          <p className="text-xs text-indigo-700">상품별로 따로 배송됩니다</p>
+                        )}
+                        {rows.map(r => (
+                          <div key={r.key} className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 text-sm">
+                              {r.name && <p className="text-xs text-gray-600 truncate">{r.name}</p>}
+                              <p className="flex flex-wrap items-center gap-x-2">
+                                <span className="text-indigo-600">🚚</span>
+                                <span className="font-medium text-indigo-700">{r.company}</span>
+                                <span className="text-indigo-600 font-mono break-all">{r.number}</span>
+                              </p>
+                            </div>
+                            <Link
+                              href={`/my-orders/${order.id}`}
+                              className="flex-shrink-0 text-xs text-indigo-600 hover:text-indigo-800 font-medium py-2"
+                            >
+                              배송조회 →
+                            </Link>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Order footer */}
                   {/* ★★★ 2026-08-15 수정 (모바일 버튼 최적화):

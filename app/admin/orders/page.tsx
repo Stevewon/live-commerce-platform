@@ -39,6 +39,9 @@ interface Order {
     price: number;
     productName?: string | null;
     productThumbnail?: string | null;
+    optionValues?: string | null;
+    // [상품별 송장] 물류창고별 출고 → 상품마다 다른 송장
+    itemTracking?: { trackingCompany: string; trackingNumber: string } | null;
     product: {
       name: string;
       price: number;
@@ -52,6 +55,9 @@ interface Pagination {
   limit: number;
   totalPages: number;
 }
+
+// 택배사 목록 (상품별 송장 입력용 — 아래 단일 송장 select 와 동일)
+const COURIERS = ['CJ대한통운', '롯데택배', '한진택배', '로젠택배', '우체국택배', '경동택배', '대신택배', 'GS편의점택배', 'EMS'];
 
 const STATUS_LABELS: Record<string, string> = {
   ALL: '전체',
@@ -97,6 +103,25 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [trackingCompany, setTrackingCompany] = useState('');
   const [trackingNumber, setTrackingNumber] = useState('');
+  // [상품별 송장] 주문 상품 id → { 택배사, 운송장 } (물류창고가 달라 송장이 여러 개인 경우)
+  const [itemTrackingInputs, setItemTrackingInputs] = useState<Record<string, { company: string; number: string }>>({});
+  const [savingItemTracking, setSavingItemTracking] = useState(false);
+
+  // 주문 상세를 열 때 기존 송장으로 입력란 채우기 (상품별 → 없으면 주문 단위 송장)
+  useEffect(() => {
+    if (!selectedOrder) return;
+    setTrackingCompany(selectedOrder.trackingCompany || '');
+    setTrackingNumber(selectedOrder.trackingNumber || '');
+    const init: Record<string, { company: string; number: string }> = {};
+    for (const it of selectedOrder.items || []) {
+      init[it.id] = {
+        company: it.itemTracking?.trackingCompany || '',
+        number: it.itemTracking?.trackingNumber || '',
+      };
+    }
+    setItemTrackingInputs(init);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedOrder?.id]);
   const [exporting, setExporting] = useState(false);
   const [cancelProcessing, setCancelProcessing] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -195,6 +220,47 @@ export default function AdminOrdersPage() {
     } catch (error) {
       console.error('Status change error:', error);
       alert('상태 변경에 실패했습니다');
+    }
+  };
+
+  // [상품별 송장] 상품마다 입력한 송장을 저장하고 배송중 처리
+  const handleSaveItemTrackings = async (order: Order) => {
+    const items = order.items || [];
+    const list = items.map((it) => ({
+      orderItemId: it.id,
+      trackingCompany: (itemTrackingInputs[it.id]?.company || '').trim(),
+      trackingNumber: (itemTrackingInputs[it.id]?.number || '').trim(),
+    }));
+    const filled = list.filter((t) => t.trackingNumber);
+    if (filled.length === 0) {
+      alert('송장번호를 1개 이상 입력해주세요.');
+      return;
+    }
+    if (filled.some((t) => !t.trackingCompany)) {
+      alert('송장번호를 입력한 상품은 택배사도 선택해주세요.');
+      return;
+    }
+    const missing = list.length - filled.length;
+    const msg = missing > 0
+      ? `${list.length}개 상품 중 ${missing}개는 송장번호가 비어 있습니다.\n입력한 ${filled.length}개 송장만 저장하고 "배송중"으로 변경할까요?`
+      : `상품별 송장 ${filled.length}개를 저장하고 "배송중"으로 변경할까요?`;
+    if (!confirm(msg)) return;
+
+    setSavingItemTracking(true);
+    try {
+      const res = await authFetch(`/api/admin/orders/${order.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'SHIPPING', itemTrackings: list }),
+      });
+      if (!res.ok) throw new Error('저장 실패');
+      alert('상품별 송장이 저장되었습니다');
+      setSelectedOrder(null);
+      loadOrders();
+    } catch (error) {
+      console.error('Item tracking save error:', error);
+      alert('송장 저장에 실패했습니다');
+    } finally {
+      setSavingItemTracking(false);
     }
   };
 
@@ -1382,6 +1448,76 @@ export default function AdminOrdersPage() {
                   <span className="text-2xl mr-2">🚚</span>
                   배송 추적 정보
                 </h4>
+                {(selectedOrder.items || []).length >= 2 ? (
+                  /* [상품별 송장] 상품이 2개 이상이면 상품마다 택배사/송장 입력 (출고 창고가 다른 경우) */
+                  <div className="space-y-3">
+                    <p className="text-xs text-gray-600">
+                      상품별로 출고 창고가 다르면 상품마다 송장을 입력하세요. 같은 송장이면 첫 줄 입력 후 [모든 상품에 같은 송장]을 누르세요.
+                    </p>
+                    {(selectedOrder.items || []).map((item, idx) => {
+                      let opt = '';
+                      try {
+                        const ov = item.optionValues ? JSON.parse(item.optionValues) : null;
+                        if (ov && typeof ov === 'object') opt = Object.values(ov).join(' / ');
+                      } catch {}
+                      const v = itemTrackingInputs[item.id] || { company: '', number: '' };
+                      const setV = (patch: Partial<{ company: string; number: string }>) =>
+                        setItemTrackingInputs((prev) => ({ ...prev, [item.id]: { ...v, ...patch } }));
+                      return (
+                        <div key={item.id} className="bg-white rounded-xl border-2 border-indigo-100 p-3">
+                          <p className="text-sm font-bold text-gray-900 break-words">
+                            {idx + 1}. {item.product?.name || item.productName || '주문 상품'}
+                            <span className="font-medium text-gray-500"> × {item.quantity}</span>
+                          </p>
+                          {opt && <p className="text-xs text-gray-500 mt-0.5">옵션: {opt}</p>}
+                          <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-2 mt-2">
+                            <select
+                              value={v.company}
+                              onChange={(e) => setV({ company: e.target.value })}
+                              className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg text-sm font-medium focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500"
+                            >
+                              <option value="">택배사 선택</option>
+                              {COURIERS.map((c) => <option key={c} value={c}>{c === 'EMS' ? 'EMS (국제우편)' : c}</option>)}
+                            </select>
+                            <input
+                              type="text"
+
+                              value={v.number}
+                              onChange={(e) => setV({ number: e.target.value })}
+                              placeholder="운송장 번호"
+                              className="w-full px-3 py-2.5 border-2 border-gray-300 rounded-lg text-base sm:text-sm font-medium focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const items = selectedOrder.items || [];
+                        const first = itemTrackingInputs[items[0]?.id] || { company: '', number: '' };
+                        if (!first.company || !first.number) {
+                          alert('첫 번째 상품의 택배사와 송장번호를 먼저 입력해주세요.');
+                          return;
+                        }
+                        const next: Record<string, { company: string; number: string }> = {};
+                        for (const it of items) next[it.id] = { ...first };
+                        setItemTrackingInputs(next);
+                      }}
+                      className="w-full min-h-[44px] px-4 py-2 text-sm font-semibold text-indigo-700 bg-white border-2 border-indigo-200 rounded-xl hover:bg-indigo-50"
+                    >
+                      ⬇ 모든 상품에 같은 송장
+                    </button>
+                    <button
+                      onClick={() => handleSaveItemTrackings(selectedOrder)}
+                      disabled={savingItemTracking}
+                      className="w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl font-bold hover:from-indigo-600 hover:to-indigo-700 transition-all shadow-lg disabled:opacity-50"
+                    >
+                      {savingItemTracking ? '저장 중...' : '🚚 상품별 송장 등록 및 배송중 처리'}
+                    </button>
+                  </div>
+                ) : (
+                <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-gray-700 mb-2">택배사</label>
@@ -1431,6 +1567,8 @@ export default function AdminOrdersPage() {
                 >
                   🚚 운송장 등록 및 배송중 처리
                 </button>
+                </>
+                )}
               </div>
             </div>
 

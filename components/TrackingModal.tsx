@@ -25,6 +25,7 @@ interface TrackingResponse {
 
 interface Props {
   orderId: string;
+  itemId?: string | null; // [상품별 송장] 특정 주문 상품의 송장으로 조회
   onClose: () => void;
 }
 
@@ -45,7 +46,7 @@ function fmtTime(iso: string | null): string {
  * 외부 CJ대한통운 사이트로 나가지 않고 /api/orders/[id]/tracking 결과를
  * 세로 타임라인으로 표시. 미지원/실패 시 외부 링크 버튼으로 폴백.
  */
-export default function TrackingModal({ orderId, onClose }: Props) {
+export default function TrackingModal({ orderId, itemId, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<TrackingResponse | null>(null);
 
@@ -54,7 +55,8 @@ export default function TrackingModal({ orderId, onClose }: Props) {
     (async () => {
       setLoading(true);
       try {
-        const res = await authFetch(`/api/orders/${orderId}/tracking`);
+        const qs = itemId ? `?itemId=${encodeURIComponent(itemId)}` : '';
+        const res = await authFetch(`/api/orders/${orderId}/tracking${qs}`);
         const json = (await res.json().catch(() => null)) as TrackingResponse | null;
         if (alive) setData(json);
       } catch {
@@ -66,7 +68,7 @@ export default function TrackingModal({ orderId, onClose }: Props) {
     return () => {
       alive = false;
     };
-  }, [orderId]);
+  }, [orderId, itemId]);
 
   const events = data?.events ?? [];
   const hasEvents = data?.success && events.length > 0;

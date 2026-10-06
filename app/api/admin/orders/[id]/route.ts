@@ -5,6 +5,8 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 import { newId, getD1, ensureQtaColumn } from '@/lib/balance';
 // [상품 스냅샷] 상품 삭제/변경돼도 주문 상세에 상품명 유지
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
+// [상품별 송장] 주문 상품마다 택배사/운송장 저장
+import { saveItemTrackings } from '@/lib/orderItemTracking';
 // [QRChat 연동] B 회원 QKEY 는 Firebase 실쿠키에서 결제됨 → 취소 시 Firebase 로 되돌림.
 import { refundQkeyForQrlive, normWallet, normNick } from '@/lib/qrchat-bridge';
 // [공용] 취소/환불 핵심 로직 (중복주문 정리와 동일 로직 공유)
@@ -34,7 +36,36 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { status, trackingCompany, trackingNumber, paymentKey: manualPaymentKey, paymentMethod: manualPaymentMethod } = body;
+    const { status, paymentKey: manualPaymentKey, paymentMethod: manualPaymentMethod } = body;
+    let { trackingCompany, trackingNumber } = body;
+
+    // [상품별 송장] itemTrackings: [{ orderItemId, trackingCompany, trackingNumber }]
+    //   물류창고가 달라 상품마다 송장이 다른 경우 상품별로 저장.
+    //   주문 단위 송장(Order.trackingNumber)은 기존 화면/알림 호환용으로 첫 번째 송장을 대표로 채운다.
+    const itemTrackings: any[] | null = Array.isArray(body.itemTrackings) ? body.itemTrackings : null;
+    if (itemTrackings) {
+      const itemRes: any = await (await getD1())
+        .prepare(`SELECT "id" FROM "OrderItem" WHERE "orderId" = ?`)
+        .bind(id)
+        .all();
+      const itemRows: any[] = itemRes?.results || itemRes || [];
+      if (itemRows.length === 0) {
+        return NextResponse.json({ error: '주문 상품을 찾을 수 없습니다' }, { status: 404 });
+      }
+      await saveItemTrackings(id, itemTrackings, itemRows.map((r: any) => r.id));
+      const first = itemTrackings.find((t) => String(t?.trackingNumber || '').trim());
+      if (first && trackingNumber === undefined) {
+        trackingCompany = String(first.trackingCompany || '').trim();
+        trackingNumber = String(first.trackingNumber || '').trim();
+      }
+      // 상태 변경 없이 송장만 저장하는 경우
+      if (!status) {
+        if (trackingNumber !== undefined) {
+          await prisma.order.update({ where: { id }, data: { trackingCompany, trackingNumber } });
+        }
+        return NextResponse.json({ success: true, message: '상품별 송장이 저장되었습니다' });
+      }
+    }
 
     // 결제 정보 수동 등록 (status 없이 paymentKey만 보낼 수 있음)
     if (!status && (manualPaymentKey || manualPaymentMethod)) {

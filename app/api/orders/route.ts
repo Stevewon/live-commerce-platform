@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
 import { getBundleSize, bundlePiecePrice } from '@/lib/utils/bundle';
+import { attachItemTrackings } from '@/lib/orderItemTracking';
 import { orderConfirmationEmail, sendEmail } from '@/lib/email'
 import { orderConfirmationSMS, sendSMS } from '@/lib/sms'
 import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
@@ -1375,7 +1376,7 @@ export async function GET(req: NextRequest) {
       normalizeOrderItems(order);
       return NextResponse.json({
         success: true,
-        data: [order]
+        data: await attachItemTrackings([order as any]) // [상품별 송장]
       });
     }
 
@@ -1411,7 +1412,7 @@ export async function GET(req: NextRequest) {
       normalizeOrderItems(order);
       return NextResponse.json({
         success: true,
-        data: [order]
+        data: await attachItemTrackings([order as any]) // [상품별 송장]
       });
     }
 
@@ -1450,6 +1451,9 @@ export async function GET(req: NextRequest) {
           paidAt: true,
           createdAt: true,
           updatedAt: true,
+          // 배송 추적 (주문 단위 대표 송장 — 상품별 송장은 아래 itemTracking 으로 첨부)
+          trackingCompany: true,
+          trackingNumber: true,
           partner: {
             select: {
               id: true,
@@ -1474,6 +1478,7 @@ export async function GET(req: NextRequest) {
               price: true,
               productName: true,
               productThumbnail: true,
+              optionValues: true,
               product: {
                 select: {
                   id: true,
@@ -1549,10 +1554,13 @@ export async function GET(req: NextRequest) {
         new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
     );
 
+    // [상품별 송장] 각 주문 상품에 itemTracking(택배사/운송장) 첨부
+    const ordersWithTracking = await attachItemTrackings(orders as any[]);
+
     return NextResponse.json({
       success: true,
-      data: orders,
-      orders, // 일부 클라이언트 코드가 data.orders 로 접근 — 호환 키 추가
+      data: ordersWithTracking,
+      orders: ordersWithTracking, // 일부 클라이언트 코드가 data.orders 로 접근 — 호환 키 추가
       pagination: {
         total,
         page,

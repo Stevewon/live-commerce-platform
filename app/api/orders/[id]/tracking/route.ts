@@ -3,6 +3,7 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getPrisma } from '@/lib/prisma';
 import { getCarrierId, getTrackingUrl } from '@/lib/utils/courier';
 import { trackShipment, isInAppTrackingEnabled } from '@/lib/tracking/delivery-tracker';
+import { getItemTrackingMap } from '@/lib/orderItemTracking';
 
 /**
  * GET /api/orders/[id]/tracking — 인앱 배송추적
@@ -63,8 +64,19 @@ export async function GET(
       return NextResponse.json({ success: false, error: '접근 권한이 없습니다' }, { status: 403 });
     }
 
-    const company = order.trackingCompany || '';
-    const trackingNumber = order.trackingNumber || '';
+    let company = order.trackingCompany || '';
+    let trackingNumber = order.trackingNumber || '';
+
+    // [상품별 송장] ?itemId= 가 오면 그 주문 상품의 송장으로 조회 (이 주문에 속한 상품만)
+    const itemId = new URL(req.url).searchParams.get('itemId');
+    if (itemId) {
+      const map = await getItemTrackingMap([order.id]);
+      const t = map[itemId];
+      if (t?.trackingNumber) {
+        company = t.trackingCompany || company;
+        trackingNumber = t.trackingNumber;
+      }
+    }
 
     if (!company || !trackingNumber) {
       return NextResponse.json(

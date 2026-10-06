@@ -18,6 +18,8 @@ interface OrderItem {
   quantity: number;
   price: number;
   optionValues: string | null;
+  // [상품별 송장] 물류창고별로 따로 출고된 경우 상품마다 다른 송장
+  itemTracking?: { trackingCompany: string; trackingNumber: string } | null;
   product: {
     id: string;
     name: string;
@@ -79,6 +81,7 @@ export default function OrderDetailPage() {
   const [reviewTarget, setReviewTarget] = useState<{ productId: string; productName: string } | null>(null);
   // ★ 2026-08-16: 인앱 배송추적 모달 (외부 CJ대한통운 사이트 대신)
   const [trackingOpen, setTrackingOpen] = useState(false);
+  const [trackingItemId, setTrackingItemId] = useState<string | null>(null); // 상품별 송장 조회 대상
 
   // ?review=true 로 진입하면 첫 상품 리뷰폼을 자동으로 연다.
   useEffect(() => {
@@ -163,6 +166,9 @@ export default function OrderDetailPage() {
   // 배송추적은 인앱 모달(TrackingModal)에서 /api/orders/[id]/tracking 로 처리한다.
   // 외부 링크(getTrackingUrl)는 API 응답의 externalUrl 로 폴백된다.
 
+  // [상품별 송장] 상품마다 송장이 따로 있으면 주문 단위 송장 대신 상품 옆에 각각 표시
+  const hasItemTracking = order.items.some(it => it.itemTracking?.trackingNumber);
+
   // Order timeline
   const timeline = [
     { label: '주문접수', date: order.createdAt, done: true },
@@ -227,7 +233,12 @@ export default function OrderDetailPage() {
         </div>
 
         {/* Tracking info */}
-        {order.trackingCompany && order.trackingNumber && (
+        {hasItemTracking && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 mb-4 text-sm text-indigo-900">
+            🚚 상품별로 출고 창고가 달라 <b>따로 배송</b>됩니다. 아래 주문 상품마다 송장번호를 확인해주세요.
+          </div>
+        )}
+        {!hasItemTracking && order.trackingCompany && order.trackingNumber && (
           <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 sm:p-6 mb-4">
             <h3 className="font-bold text-indigo-900 mb-3 flex items-center gap-2">
               <span>🚚</span> 배송 추적 정보
@@ -247,7 +258,7 @@ export default function OrderDetailPage() {
                 (미지원/미설정 택배사는 모달 안에서 외부 링크로 폴백) */}
             <button
               type="button"
-              onClick={() => setTrackingOpen(true)}
+              onClick={() => { setTrackingItemId(null); setTrackingOpen(true); }}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
             >
               🔍 실시간 배송조회
@@ -301,6 +312,22 @@ export default function OrderDetailPage() {
                     <p className="text-sm text-gray-500 mt-1">
                       ₩{item.price.toLocaleString()} x {item.quantity}개
                     </p>
+                    {/* [상품별 송장] 이 상품의 택배사/운송장 + 배송조회 */}
+                    {item.itemTracking?.trackingNumber && (
+                      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                        <span className="text-xs text-indigo-900">
+                          🚚 {item.itemTracking.trackingCompany}{' '}
+                          <span className="font-mono font-medium break-all">{item.itemTracking.trackingNumber}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setTrackingItemId(item.id); setTrackingOpen(true); }}
+                          className="min-h-[32px] px-3 py-1 text-xs font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                        >
+                          배송조회
+                        </button>
+                      </div>
+                    )}
                     {/* ★ 배송완료 상품에 리뷰 작성 버튼 (상품 단위) */}
                     {order.status === 'DELIVERED' && (
                       <button
@@ -445,7 +472,7 @@ export default function OrderDetailPage() {
 
       {/* 인앱 배송추적 모달 */}
       {trackingOpen && (
-        <TrackingModal orderId={order.id} onClose={() => setTrackingOpen(false)} />
+        <TrackingModal orderId={order.id} itemId={trackingItemId} onClose={() => setTrackingOpen(false)} />
       )}
     </div>
   );

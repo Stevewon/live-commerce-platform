@@ -5,6 +5,7 @@ import { getPrisma } from '@/lib/prisma';
 import { QKEY_TO_KRW, newId, getD1, ensureQtaColumn } from '@/lib/balance';
 // [상품 스냅샷] 상품 삭제/변경돼도 주문 상세에 상품명 유지
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
+import { attachItemTrackings } from '@/lib/orderItemTracking';
 // [QRChat 연동] B 회원(origin=QRCHAT) QKEY 는 Firebase 실쿠키에서 결제됨 →
 //   취소 시에도 Firebase 실쿠키로 되돌려줘야 함(로컬 D1 잔액 환불 아님).
 import { refundQkeyForQrlive, normWallet, normNick } from '@/lib/qrchat-bridge';
@@ -82,9 +83,12 @@ export async function GET(
       }
     }
 
+    // [상품별 송장] 각 주문 상품에 itemTracking(택배사/운송장) 첨부
+    const [orderWithTracking] = await attachItemTrackings([order as any]);
+
     return NextResponse.json({
       success: true,
-      order
+      order: orderWithTracking
     })
   } catch (error: any) {
     console.error('Get order detail error:', error)

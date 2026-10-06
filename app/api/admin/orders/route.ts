@@ -3,6 +3,7 @@ import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getD1 } from '@/lib/balance';
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
+import { attachItemTrackings } from '@/lib/orderItemTracking';
 
 
 
@@ -138,6 +139,7 @@ export async function GET(req: NextRequest) {
               productId: true,
               productName: true,
               productThumbnail: true,
+              optionValues: true, // [옵션] 상품별 송장 입력 시 어떤 옵션인지 표시
               product: {
                 select: {
                   name: true,
@@ -187,9 +189,12 @@ export async function GET(req: NextRequest) {
         new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
     );
 
+    // [상품별 송장] 각 주문 상품에 itemTracking(택배사/운송장) 첨부
+    const ordersWithTracking = await attachItemTrackings(orders as any[]);
+
     return NextResponse.json(
       {
-        orders,
+        orders: ordersWithTracking,
         pagination: {
           total,
           page,

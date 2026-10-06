@@ -3,6 +3,7 @@ import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getD1 } from '@/lib/balance';
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
+import { getItemTrackingMap } from '@/lib/orderItemTracking';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: '발송준비',
@@ -218,6 +219,9 @@ export async function GET(req: NextRequest) {
 
     const rows: string[] = [headers.map(escapeCsvCell).join(',')];
 
+    // [상품별 송장] 주문 상품 id → 송장 (있으면 상품 행마다 그 송장을 출력)
+    const itemTrackingMap = await getItemTrackingMap((orders as any[]).map((o) => o.id));
+
     for (const order of orders as any[]) {
       const customerName = order.user?.name || order.user?.nickname || '비회원';
       const customerEmail = order.user?.email || '';
@@ -305,8 +309,12 @@ export async function GET(req: NextRequest) {
             idx === 0 ? (order.paymentMethod || '') : '',
             idx === 0 ? paidDate : '',
             idx === 0 ? (order.partner?.storeName || '') : '',
-            idx === 0 ? (order.trackingCompany || '') : '',
-            idx === 0 ? (order.trackingNumber || '') : '',
+            itemTrackingMap[item.id]
+              ? itemTrackingMap[item.id].trackingCompany
+              : (idx === 0 ? (order.trackingCompany || '') : ''),
+            itemTrackingMap[item.id]
+              ? itemTrackingMap[item.id].trackingNumber
+              : (idx === 0 ? (order.trackingNumber || '') : ''),
             idx === 0 ? shippedDate : '',
             idx === 0 ? deliveredDate : '',
           ].map(escapeCsvCell).join(','));
