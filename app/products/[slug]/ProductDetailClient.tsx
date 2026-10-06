@@ -929,8 +929,11 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                         }`}
                       >
                         <span>{label}</span>
-                        {!isBundle && variant.price && variant.price !== product.price && (
-                          <span className="block text-xs mt-0.5">₩{variant.price.toLocaleString()}</span>
+                        {/* [옵션 추가금액] 기본가 대비 차액을 +/- 로 표시 (예: 더블 +8,500원) */}
+                        {!isBundle && variant.price != null && variant.price !== product.price && (
+                          <span className={`block text-xs mt-0.5 font-semibold ${variant.price > product.price ? 'text-red-500' : 'text-blue-600'}`}>
+                            {variant.price > product.price ? '+' : '-'}{Math.abs(variant.price - product.price).toLocaleString()}원
+                          </span>
                         )}
                         {!isAvailable && <span className="block text-xs">품절</span>}
                       </button>

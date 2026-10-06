@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn, ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
+import { attachVariantSupplyPrices, saveVariantSupplyPrices } from '@/lib/variantSupplyPrice';
 
 // 관리자 상품 상세 조회 (GET)
 export async function GET(
@@ -63,7 +64,8 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: product
+      // [옵션별 공급가] 어드민 수정 화면에 옵션마다 공급가 표시
+      data: await attachVariantSupplyPrices(product)
     });
 
   } catch (error) {
@@ -192,6 +194,10 @@ export async function PATCH(
             isActive: v.isActive !== undefined ? v.isActive : true,
           }))
         });
+      }
+      // [옵션별 공급가] (상품 id + 옵션값) 키로 저장 — 실패해도 상품 수정은 진행
+      try { await saveVariantSupplyPrices(id, hasOptions ? variants : []); } catch (e) {
+        console.warn('[옵션별 공급가] 저장 실패:', e);
       }
     }
 

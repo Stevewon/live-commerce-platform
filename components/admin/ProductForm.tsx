@@ -17,6 +17,9 @@ interface Category {
 interface VariantData {
   id?: string
   optionValues: Record<string, string>
+  // [옵션 추가금액] 기본 판매가 대비 +금액 (예: 더블 +8,500). 저장 시 판매가 = 기본가 + 추가금액
+  addPrice: number | string
+  supplyPrice: number | string // [옵션별 공급가] 비우면 상품 공급가 사용
   price: number | string
   comparePrice: number | string
   stock: number | string
@@ -197,9 +200,13 @@ export default function ProductForm({ mode, initialData }: Props) {
           try {
             const v = (initialData as any).variants
             if (!v || !Array.isArray(v)) return []
+            const basePrice = Number(initialData.price) || 0
             return v.map((vr: any) => ({
               id: vr.id,
               optionValues: typeof vr.optionValues === 'string' ? JSON.parse(vr.optionValues) : vr.optionValues,
+              // 저장된 옵션 판매가 → 추가금액으로 환산 (기본가와 같거나 없으면 빈칸)
+              addPrice: vr.price != null && Number(vr.price) !== basePrice ? Number(vr.price) - basePrice : '',
+              supplyPrice: vr.supplyPrice ?? '',
               price: vr.price ?? '',
               comparePrice: vr.comparePrice ?? '',
               stock: vr.stock ?? 0,
@@ -500,7 +507,11 @@ export default function ProductForm({ mode, initialData }: Props) {
         variants: form.hasOptions ? form.variants.map(v => ({
           id: v.id || undefined,
           optionValues: JSON.stringify(v.optionValues),
-          price: v.price ? Number(v.price) : null,
+          // 판매가 = 기본 판매가 + 추가금액 (추가금액 없으면 null → 기본가 사용)
+          price: v.addPrice !== '' && v.addPrice !== null && Number(v.addPrice) !== 0
+            ? Number(form.price) + Number(v.addPrice)
+            : null,
+          supplyPrice: v.supplyPrice !== '' && v.supplyPrice !== null ? Number(v.supplyPrice) : null,
           comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
           stock: Number(v.stock) || 0,
           sku: v.sku.trim() || null,
@@ -635,6 +646,8 @@ export default function ProductForm({ mode, initialData }: Props) {
       ...prev,
       variants: [...prev.variants, {
         optionValues: emptyValues,
+        addPrice: '',
+        supplyPrice: '',
         price: '',
         comparePrice: '',
         stock: 0,
@@ -704,6 +717,8 @@ export default function ProductForm({ mode, initialData }: Props) {
 
     const newVariants: VariantData[] = combinations.map(combo => ({
       optionValues: combo,
+      addPrice: '',
+      supplyPrice: '',
       price: form.price,
       comparePrice: form.comparePrice,
       stock: 0,
@@ -1580,15 +1595,32 @@ export default function ProductForm({ mode, initialData }: Props) {
                               </div>
 
                               {/* 가격/재고/SKU */}
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                                 <div>
-                                  <label className="block text-[10px] font-medium text-gray-500 mb-1">판매가 (원)</label>
+                                  {/* [옵션 추가금액] 예) 전기매트 싱글 0 / 더블 +8,500 */}
+                                  <label className="block text-[10px] font-medium text-gray-500 mb-1">추가금액 (+원)</label>
                                   <input
                                     type="number"
-                                    value={variant.price}
-                                    onChange={(e) => updateVariant(vi, 'price', e.target.value)}
-                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900"
-                                    placeholder="기본가 사용"
+                                    inputMode="numeric"
+                                    value={variant.addPrice}
+                                    onChange={(e) => updateVariant(vi, 'addPrice', e.target.value)}
+                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-base sm:text-sm text-gray-900"
+                                    placeholder="0 (추가금 없음)"
+                                  />
+                                  <p className="text-[10px] text-blue-600 mt-0.5">
+                                    판매가 ₩{formatPrice((Number(form.price) || 0) + (Number(variant.addPrice) || 0))}
+                                  </p>
+                                </div>
+                                <div>
+                                  {/* [옵션별 공급가] 어드민 전용 — 비우면 상품 공급가 사용 */}
+                                  <label className="block text-[10px] font-medium text-gray-500 mb-1">공급가 (원)</label>
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={variant.supplyPrice}
+                                    onChange={(e) => updateVariant(vi, 'supplyPrice', e.target.value)}
+                                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-base sm:text-sm text-gray-900"
+                                    placeholder={form.supplyPrice ? `상품 공급가 ${formatPrice(Number(form.supplyPrice))}` : '선택'}
                                   />
                                 </div>
                                 <div>

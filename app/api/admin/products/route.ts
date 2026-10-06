@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { verifyAuthToken } from '@/lib/auth/middleware';
 import { ensureSupplyPriceColumn, ensureOverseasBlockedColumn, ensureBottomBannerColumns } from '@/lib/ensureProductColumns';
+import { saveVariantSupplyPrices } from '@/lib/variantSupplyPrice';
 
 // 관리자 상품 조회 (GET)
 export async function GET(req: NextRequest) {
@@ -218,6 +219,13 @@ export async function POST(req: NextRequest) {
         variants: true
       }
     });
+
+    // [옵션별 공급가] (상품 id + 옵션값) 키로 저장 — 실패해도 등록은 완료
+    if (hasOptions && Array.isArray(variants) && variants.length > 0) {
+      try { await saveVariantSupplyPrices(product.id, variants); } catch (e) {
+        console.warn('[옵션별 공급가] 저장 실패:', e);
+      }
+    }
 
     return NextResponse.json({
       success: true,

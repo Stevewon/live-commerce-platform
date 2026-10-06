@@ -4,6 +4,7 @@ import { verifyAuthToken } from '@/lib/auth/middleware';
 import { getD1 } from '@/lib/balance';
 import { backfillOrderItemSnapshots } from '@/lib/orderItemSnapshot';
 import { getItemTrackingMap } from '@/lib/orderItemTracking';
+import { getVariantSupplyMap, optionKey } from '@/lib/variantSupplyPrice';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: '발송준비',
@@ -221,6 +222,13 @@ export async function GET(req: NextRequest) {
 
     // [상품별 송장] 주문 상품 id → 송장 (있으면 상품 행마다 그 송장을 출력)
     const itemTrackingMap = await getItemTrackingMap((orders as any[]).map((o) => o.id));
+    // [옵션별 공급가] 옵션 공급가가 있으면 상품 공급가 대신 사용
+    const variantSupplyMap = await getVariantSupplyMap(
+      (orders as any[]).flatMap((o) => (o.items || []).map((it: any) => it.productId))
+    );
+    const supplyOf = (item: any): number =>
+      (item.optionValues && variantSupplyMap.get(`${item.productId}|${optionKey(item.optionValues)}`)) ??
+      (item.product?.supplyPrice ?? 0);
 
     for (const order of orders as any[]) {
       const customerName = order.user?.name || order.user?.nickname || '비회원';
@@ -300,8 +308,8 @@ export async function GET(req: NextRequest) {
             item.quantity || 0,
             item.price || 0,
             (item.price || 0) * (item.quantity || 0),
-            item.product?.supplyPrice ?? 0,
-            (item.product?.supplyPrice ?? 0) * (item.quantity || 0),
+            supplyOf(item),
+            supplyOf(item) * (item.quantity || 0),
             idx === 0 ? (order.subtotal || 0) : '',
             idx === 0 ? (order.discount || 0) : '',
             idx === 0 ? (order.shippingFee || 0) : '',
