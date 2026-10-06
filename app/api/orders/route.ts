@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuthToken } from '@/lib/auth/middleware'
 import { getPrisma } from '@/lib/prisma';
+import { getBundleSize, bundlePiecePrice } from '@/lib/utils/bundle';
 import { orderConfirmationEmail, sendEmail } from '@/lib/email'
 import { orderConfirmationSMS, sendSMS } from '@/lib/sms'
 import { sendEmailWithPreferences, sendSMSWithPreferences } from '@/lib/notification'
@@ -317,7 +318,11 @@ export async function POST(req: NextRequest) {
       }
 
       // 단가: 옵션(변형)에 별도 가격이 있으면 그 가격, 없으면 상품 기본가
-      const unitPrice = chosenVariant && chosenVariant.price != null ? Number(chosenVariant.price) : product.price;
+      //   [1+1 묶음] 옵션 상품명에 "N+M" → 개별 1개 = 세트가 / 구성개수 (핑크1+블루1 = 1세트 가격)
+      const bundleSize = optionRequired ? getBundleSize(product.name) : 1;
+      const unitPrice = bundleSize > 1
+        ? bundlePiecePrice(product.price, bundleSize)
+        : (chosenVariant && chosenVariant.price != null ? Number(chosenVariant.price) : product.price);
       const itemTotal = unitPrice * item.quantity;
       subtotal += itemTotal;
 
@@ -332,6 +337,29 @@ export async function POST(req: NextRequest) {
         variantId: chosenVariant ? chosenVariant.id : null,
         optionValues: chosenVariant ? (chosenVariant.optionValues || null) : null,
       });
+    }
+
+    // ── [1+1 묶음] 상품별 옵션 선택 개수 합이 세트 구성 개수의 배수여야 함 (예: 1+1 → 2, 4, 6개) ──
+    {
+      const pieceCount = new Map<string, number>();
+      for (const vi of validatedItems) {
+        pieceCount.set(vi.productId, (pieceCount.get(vi.productId) || 0) + vi.quantity);
+      }
+      for (const [pid, count] of pieceCount) {
+        const product: any = products.find(p => p.id === pid);
+        const hasVariants = !!product?.hasOptions && Array.isArray(product?.variants) && product.variants.length > 0;
+        const size = hasVariants ? getBundleSize(product?.name) : 1;
+        if (size > 1 && count % size !== 0) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `${product.name}은(는) ${size}개 단위 묶음 상품입니다. 옵션을 ${size}개 단위로 선택해주세요. (현재 ${count}개)`,
+              code: 'BUNDLE_COUNT',
+            },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // partnerId 결정: 요청에서 전달 or 상품의 파트너 제품에서 자동 매칭

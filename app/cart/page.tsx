@@ -17,6 +17,7 @@ import {
   GuestCartItem,
 } from '@/lib/utils/guestCart';
 import { buildOptionLabel } from '@/lib/utils/optionLabel';
+import { getBundleSize, bundlePiecePrice } from '@/lib/utils/bundle';
 
 interface CartItem {
   id: string;
@@ -85,7 +86,10 @@ export default function CartPage() {
               name: item.product?.name || '상품',
               slug: item.product?.slug || '',
               // [옵션] 옵션 가격/재고가 따로 있으면 그 값을 사용
-              price: item.variant?.price ?? item.product?.price ?? 0,
+              //   [1+1 묶음] 개별 1개 가격 = 세트가 / 구성개수 (서버 주문 금액과 동일)
+              price: item.variant && getBundleSize(item.product?.name) > 1
+                ? bundlePiecePrice(item.product?.price || 0, getBundleSize(item.product?.name))
+                : (item.variant?.price ?? item.product?.price ?? 0),
               comparePrice: item.variant ? null : (item.product?.comparePrice || null),
               stock: item.variant?.stock ?? item.product?.stock ?? 0,
               thumbnail: item.product?.thumbnail || '',
@@ -401,6 +405,11 @@ export default function CartPage() {
                         </Link>
                         {item.optionLabel && (
                           <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">옵션: {item.optionLabel}</p>
+                        )}
+                        {item.optionLabel && getBundleSize(item.product.name) > 1 && (
+                          <p className="text-xs text-blue-600 mt-0.5">
+                            🎁 {getBundleSize(item.product.name)}개 묶음 — 옵션 합계 {getBundleSize(item.product.name)}개 단위로 구매
+                          </p>
                         )}
                       </div>
                       {/* 삭제 버튼 */}

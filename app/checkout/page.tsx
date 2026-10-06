@@ -8,6 +8,7 @@ import Link from 'next/link';
 import ShopNavigation from '@/components/ShopNavigation';
 import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
 import { buildOptionLabel } from '@/lib/utils/optionLabel';
+import { getBundleSize, bundlePiecePrice } from '@/lib/utils/bundle';
 import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
 import { authFetch } from '@/lib/auth/clientFetch';
@@ -368,7 +369,15 @@ export default function CheckoutPage() {
           variantId: it.variantId || it.variant?.id || null,
           optionLabel: buildOptionLabel(it.variant?.optionValues),
           // [옵션] 옵션 가격이 따로 있으면 화면 합계도 그 가격으로 (서버 주문 금액과 일치)
-          product: it.product ? { ...it.product, price: it.variant?.price ?? it.product.price } : it.product,
+          //   [1+1 묶음] 개별 1개 가격 = 세트가 / 구성개수
+          product: it.product
+            ? {
+                ...it.product,
+                price: it.variant && getBundleSize(it.product.name) > 1
+                  ? bundlePiecePrice(it.product.price, getBundleSize(it.product.name))
+                  : (it.variant?.price ?? it.product.price),
+              }
+            : it.product,
         }));
         // 선택 결제 모드: 선택된 행만 남긴다
         serverItems = filterSelected(serverItems);

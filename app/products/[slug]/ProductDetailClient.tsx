@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { addToGuestCart } from '@/lib/utils/guestCart';
 import { buildOptionLabel } from '@/lib/utils/optionLabel';
+import { getBundleSize, bundlePiecePrice } from '@/lib/utils/bundle';
 import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
 import ProductQnA from '@/components/ProductQnA';
@@ -375,16 +376,35 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   //   (기존엔 작은 인라인 메시지라 모바일/앱에서 눈에 안 띄어 '반응 없음'처럼 느껴졌음)
   //   alert 은 앱 WebView에서도 화면 중앙에 확실히 뜨는 네이티브 다이얼로그다.
   //   반환값 true = 옵션 미선택으로 진행을 막아야 함.
+  // [1+1 묶음] 옵션 상품명에 "1+1"/"2+1" → 옵션을 세트 구성 개수만큼 골라도 금액은 1세트 가격
+  const bundleSize = optionRequired ? getBundleSize(product.name) : 1;
+  const isBundle = bundleSize > 1;
+
   // 구매할 행 목록: 옵션 상품은 고른 옵션 행들, 일반 상품은 단일 행
+  //   묶음 상품은 개별 1개 가격 = 세트가 / 구성개수 (서버 주문 금액 계산과 동일)
   const lineItems = optionRequired
     ? optionRows.map(r => ({
         variant: r.variant as ProductVariant | null,
         quantity: r.quantity,
-        price: r.variant.price ?? product.price,
+        price: isBundle ? bundlePiecePrice(product.price, bundleSize) : (r.variant.price ?? product.price),
       }))
     : [{ variant: null as ProductVariant | null, quantity, price: product.price }];
   const totalQuantity = lineItems.reduce((s, li) => s + li.quantity, 0);
-  const totalPrice = lineItems.reduce((s, li) => s + li.price * li.quantity, 0);
+  const bundleSets = isBundle ? Math.ceil(totalQuantity / bundleSize) : 0;
+  const bundleIncomplete = isBundle && totalQuantity % bundleSize !== 0;
+  const totalPrice = isBundle
+    ? bundleSets * product.price
+    : lineItems.reduce((s, li) => s + li.price * li.quantity, 0);
+
+  // 묶음 상품: 세트 구성 개수 단위로 골라야 담기/구매 가능
+  const warnIfBundleIncomplete = (): boolean => {
+    if (!bundleIncomplete) return false;
+    if (typeof window !== 'undefined') {
+      window.alert(`${bundleSize}개 단위 묶음 상품입니다.\n옵션을 ${bundleSize}개 단위로 선택해주세요. (현재 ${totalQuantity}개)`);
+      document.getElementById('product-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return true;
+  };
 
   // 옵션 선택 → 행 추가 (이미 있으면 수량 +1, 재고 한도 내)
   const addOptionRow = (variant: ProductVariant) => {
@@ -437,7 +457,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   const handleAddToCart = async () => {
     if (currentStock <= 0) return;
     // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 담기/구매 가능 → 경고창
-    if (warnIfOptionNotSelected()) return;
+    if (warnIfOptionNotSelected() || warnIfBundleIncomplete()) return;
     setAddingToCart(true);
     setCartMessage('');
 
@@ -507,7 +527,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
 
   const handleBuyNow = async () => {
     // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 구매 가능 → 경고창
-    if (warnIfOptionNotSelected()) return;
+    if (warnIfOptionNotSelected() || warnIfBundleIncomplete()) return;
     // 바로구매: 장바구니에 넣지 않고 sessionStorage에 바로구매 행들(옵션별)만 저장 후 checkout으로 이동
     try {
       sessionStorage.setItem('buyNowItems', JSON.stringify(buildBuyNowItems()));
@@ -569,7 +589,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   //  선물 정보(받는 분 userId/닉네임 + 메시지)를 sessionStorage 로 checkout 에 전달.
   const openGiftModal = () => {
     if (currentStock <= 0) return;
-    if (warnIfOptionNotSelected()) return;
+    if (warnIfOptionNotSelected() || warnIfBundleIncomplete()) return;
     // 로그인해야 회원 검색이 가능
     if (!user) {
       alert('선물하기는 로그인 후 이용하실 수 있습니다.');
@@ -826,8 +846,11 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                   <span className="text-2xl font-bold text-red-500">{discountPercent}%</span>
                 )}
                 <span className="text-2xl sm:text-3xl font-bold text-gray-900">
-                  ₩{currentPrice.toLocaleString()}
+                  ₩{(isBundle ? product.price : currentPrice).toLocaleString()}
                 </span>
+                {isBundle && (
+                  <span className="text-sm font-medium text-blue-600">{bundleSize}개 1세트</span>
+                )}
               </div>
               {/* [qkey 표시] 1 쿠키 = 10원 + QTA 적립 안내(현금결제 5%) */}
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -906,7 +929,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                         }`}
                       >
                         <span>{label}</span>
-                        {variant.price && variant.price !== product.price && (
+                        {!isBundle && variant.price && variant.price !== product.price && (
                           <span className="block text-xs mt-0.5">₩{variant.price.toLocaleString()}</span>
                         )}
                         {!isAvailable && <span className="block text-xs">품절</span>}
@@ -914,6 +937,22 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                     );
                   })}
                 </div>
+
+                {/* [1+1 묶음] 안내: 세트 구성 개수만큼 고르면 추가금액 없음 */}
+                {isBundle && (
+                  <div className={`text-sm rounded-lg px-3 py-2.5 border ${
+                    bundleIncomplete ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-blue-50 border-blue-200 text-blue-800'
+                  }`}>
+                    <p className="font-semibold">🎁 {bundleSize}개 묶음 상품 — 옵션 {bundleSize}개를 골라주세요 (추가금액 없음)</p>
+                    <p className="text-xs mt-0.5">
+                      {totalQuantity === 0
+                        ? `예) 핑크 1개 + 블루 1개 = 1세트 가격`
+                        : bundleIncomplete
+                          ? `${totalQuantity}개 선택됨 · ${bundleSize - (totalQuantity % bundleSize)}개 더 골라주세요`
+                          : `${totalQuantity}개 선택됨 = ${bundleSets}세트`}
+                    </p>
+                  </div>
+                )}
 
                 {/* 선택한 옵션 행 (옵션마다 수량 따로) */}
                 {optionRows.length > 0 && (
@@ -956,7 +995,11 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                                 +
                               </button>
                             </div>
-                            <span className="text-sm font-bold text-gray-900">₩{(rowPrice * r.quantity).toLocaleString()}</span>
+                            {isBundle ? (
+                              <span className="text-xs text-gray-500">{r.quantity}개</span>
+                            ) : (
+                              <span className="text-sm font-bold text-gray-900">₩{(rowPrice * r.quantity).toLocaleString()}</span>
+                            )}
                           </div>
                         </li>
                       );
