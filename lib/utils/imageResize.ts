@@ -49,7 +49,9 @@ export async function resizeImageToWebP(file: File, options: ResizeOptions = {})
 
   const opts = { ...DEFAULTS, ...options };
   const maxW = opts.maxWidth;
-  const maxH = options.maxHeight ?? opts.maxWidth;
+  // 세로 제한은 명시한 경우에만 적용 — 세로로 긴 상세페이지 이미지(예: 860x8000)를
+  // 800x800 안에 맞추면 86x800 으로 쪼그라들어 화면에서 깨져 보이므로 기본은 가로 기준만 축소
+  const maxH = options.maxHeight ?? Infinity;
 
   try {
     const dataUrl = await readFileAsDataURL(file);
@@ -63,6 +65,10 @@ export async function resizeImageToWebP(file: File, options: ResizeOptions = {})
     const targetW = Math.max(1, Math.round(width * scale));
     const targetH = Math.max(1, Math.round(height * scale));
 
+    // 브라우저 캔버스 한계(세로 32767px / iOS 사파리 약 1,670만 픽셀)를 넘으면 그리기가 실패하거나
+    // 빈 이미지가 나오므로 변환하지 않고 원본 업로드
+    if (targetH > 32767 || targetW * targetH > 16_000_000) return file;
+
     const canvas = document.createElement('canvas');
     canvas.width = targetW;
     canvas.height = targetH;
@@ -73,6 +79,10 @@ export async function resizeImageToWebP(file: File, options: ResizeOptions = {})
     // 출력 형식 결정 (WebP 미지원 시 JPEG 폴백; PNG 투명 유지가 필요하면 PNG)
     let outType = opts.mimeType;
     if (outType === 'image/webp' && !supportsWebP()) {
+      outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    }
+    // WebP 는 한 변 최대 16383px — 넘으면 인코딩 실패/손상되므로 JPEG(PNG 는 PNG) 로 저장
+    if (outType === 'image/webp' && (targetW > 16383 || targetH > 16383)) {
       outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
     }
 
