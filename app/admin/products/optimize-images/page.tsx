@@ -40,6 +40,7 @@ export default function OptimizeImagesPage() {
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [finished, setFinished] = useState(false)
+  const [runningId, setRunningId] = useState<string | null>(null) // 개별 최적화 중인 상품
   const stopRef = useRef(false)
 
   useEffect(() => {
@@ -99,6 +100,62 @@ export default function OptimizeImagesPage() {
     return { url: newUrl, saved: Math.max(0, originalSize - resized.size) }
   }
 
+  // 상품 1개 최적화 (썸네일 → 갤러리 → 상세 → PATCH 저장)
+  // 중지 시에도 이미지 목록이 잘리지 않도록 남은 이미지는 원본 URL 그대로 유지
+  const optimizeProduct = async (p: ProductImages) => {
+    setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], state: 'processing', done: 0, message: undefined } }))
+
+    try {
+      let saved = 0
+      let done = 0
+      const bump = () => {
+        done++
+        setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], done, savedBytes: saved } }))
+      }
+
+      // 썸네일
+      let newThumb = p.thumbnail
+      if (needsOptimize(p.thumbnail)) {
+        const r = await optimizeOne(p.thumbnail, true)
+        if (r) { newThumb = r.url; saved += r.saved }
+        bump()
+      }
+
+      // 갤러리 / 상세 이미지
+      const optimizeList = async (list: string[]) => {
+        const out: string[] = []
+        for (const img of list) {
+          if (!stopRef.current && needsOptimize(img)) {
+            const r = await optimizeOne(img, false)
+            out.push(r ? r.url : img)
+            if (r) saved += r.saved
+            bump()
+          } else {
+            out.push(img)
+          }
+        }
+        return out
+      }
+      const newImages = await optimizeList(p.images)
+      const newDetail = await optimizeList(p.detailImages)
+
+      // 상품 저장 (PATCH)
+      const patchBody: any = { thumbnail: newThumb, images: newImages }
+      if (p.detailImages.length > 0) patchBody.detailImages = newDetail
+      await authFetch(`/api/admin/products/${p.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody),
+      })
+
+      // 같은 화면에서 다시 눌러도 바뀐 URL 기준으로 동작하도록 로컬 데이터 갱신
+      setProducts(prev => prev.map(x => x.id === p.id ? { ...x, thumbnail: newThumb, images: newImages, detailImages: newDetail } : x))
+      setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], state: 'done', done: prev[p.id].total, savedBytes: saved } }))
+    } catch (e: any) {
+      setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], state: 'error', message: e?.message || '실패' } }))
+    }
+  }
+
   const runAll = async () => {
     setRunning(true)
     setFinished(false)
@@ -108,69 +165,23 @@ export default function OptimizeImagesPage() {
       if (stopRef.current) break
       const st = statuses[p.id]
       if (!st || st.total === 0) continue
-
-      setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], state: 'processing' } }))
-
-      try {
-        let saved = 0
-        let done = 0
-
-        // 썸네일
-        let newThumb = p.thumbnail
-        if (needsOptimize(p.thumbnail)) {
-          const r = await optimizeOne(p.thumbnail, true)
-          if (r) { newThumb = r.url; saved += r.saved }
-          done++
-          setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], done, savedBytes: saved } }))
-        }
-
-        // 갤러리
-        const newImages: string[] = []
-        for (const img of p.images) {
-          if (stopRef.current) break
-          if (needsOptimize(img)) {
-            const r = await optimizeOne(img, false)
-            newImages.push(r ? r.url : img)
-            if (r) saved += r.saved
-            done++
-            setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], done, savedBytes: saved } }))
-          } else {
-            newImages.push(img)
-          }
-        }
-
-        // 상세 이미지
-        const newDetail: string[] = []
-        for (const img of p.detailImages) {
-          if (stopRef.current) break
-          if (needsOptimize(img)) {
-            const r = await optimizeOne(img, false)
-            newDetail.push(r ? r.url : img)
-            if (r) saved += r.saved
-            done++
-            setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], done, savedBytes: saved } }))
-          } else {
-            newDetail.push(img)
-          }
-        }
-
-        // 상품 저장 (PATCH)
-        const patchBody: any = { thumbnail: newThumb, images: newImages }
-        if (p.detailImages.length > 0) patchBody.detailImages = newDetail
-        await authFetch(`/api/admin/products/${p.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patchBody),
-        })
-
-        setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], state: 'done', done: prev[p.id].total, savedBytes: saved } }))
-      } catch (e: any) {
-        setStatuses(prev => ({ ...prev, [p.id]: { ...prev[p.id], state: 'error', message: e?.message || '실패' } }))
-      }
+      await optimizeProduct(p)
     }
 
     setRunning(false)
     setFinished(true)
+  }
+
+  // 개별 상품만 최적화
+  const runOne = async (id: string) => {
+    const p = products.find(x => x.id === id)
+    if (!p) return
+    setRunning(true)
+    setRunningId(id)
+    stopRef.current = false
+    await optimizeProduct(p)
+    setRunningId(null)
+    setRunning(false)
   }
 
   const stop = () => { stopRef.current = true }
@@ -224,17 +235,17 @@ export default function OptimizeImagesPage() {
         </div>
 
         {/* 컨트롤 */}
-        <div className="flex gap-3 mb-6">
+        <div className="flex flex-wrap gap-3 mb-6">
           {!running ? (
             <button
               onClick={runAll}
               disabled={totalProductsToDo === 0}
               className="px-5 py-2.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
-              {finished ? '다시 실행' : '최적화 시작'}
+              {finished ? '전체 다시 실행' : '전체 최적화'}
             </button>
           ) : (
-            <button onClick={stop} className="px-5 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700">
+            <button onClick={stop} disabled={!!runningId} className="px-5 py-2.5 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700">
               중지
             </button>
           )}
@@ -252,8 +263,8 @@ export default function OptimizeImagesPage() {
         {/* 진행 목록 */}
         <div className="bg-white rounded-lg shadow divide-y">
           {list.filter(x => x.total > 0).map(st => (
-            <div key={st.id} className="flex items-center gap-3 p-4">
-              <div className="flex-1 min-w-0">
+            <div key={st.id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 p-4">
+              <div className="flex-1 min-w-0 basis-full sm:basis-auto">
                 <p className="text-sm font-medium text-gray-900 truncate">{st.name}</p>
                 <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                   <div
@@ -262,9 +273,9 @@ export default function OptimizeImagesPage() {
                   />
                 </div>
               </div>
-              <div className="text-right flex-shrink-0 w-28">
+              <div className="flex-1 sm:flex-none text-left sm:text-right sm:w-28 min-w-0">
                 <p className="text-xs text-gray-500">{st.done}/{st.total} 이미지</p>
-                <p className={`text-xs font-semibold ${
+                <p className={`text-xs font-semibold truncate ${
                   st.state === 'done' ? 'text-green-600'
                   : st.state === 'error' ? 'text-red-600'
                   : st.state === 'processing' ? 'text-purple-600'
@@ -276,6 +287,13 @@ export default function OptimizeImagesPage() {
                     : '대기'}
                 </p>
               </div>
+              <button
+                onClick={() => runOne(st.id)}
+                disabled={running}
+                className="flex-shrink-0 min-h-[40px] px-4 py-2 text-sm font-semibold rounded-lg border border-purple-600 text-purple-600 hover:bg-purple-50 active:bg-purple-100 disabled:border-gray-300 disabled:text-gray-400 disabled:bg-transparent disabled:cursor-not-allowed"
+              >
+                {runningId === st.id ? '처리중…' : st.state === 'done' ? '다시' : '최적화'}
+              </button>
             </div>
           ))}
         </div>
