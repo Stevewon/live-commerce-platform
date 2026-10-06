@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
             },
           },
           variant: {
-            select: { id: true, optionValues: true, price: true },
+            select: { id: true, optionValues: true, price: true, stock: true },
           },
         },
         orderBy: {
@@ -168,14 +168,12 @@ export async function DELETE(request: NextRequest) {
       const userId = req.user!.userId;
       const { searchParams } = new URL(req.url);
       const productId = searchParams.get('productId');
-      
-      if (productId) {
-        // 특정 상품 삭제
+      // itemId(장바구니 행 id) 가 오면 그 행만 삭제 — 같은 상품의 다른 옵션 행은 유지
+      const itemId = searchParams.get('itemId');
+
+      if (itemId || productId) {
         await prisma.cartItem.deleteMany({
-          where: {
-            userId,
-            productId,
-          },
+          where: itemId ? { userId, id: itemId } : { userId, productId: productId! },
         });
         
         return NextResponse.json({
@@ -215,9 +213,11 @@ export async function PATCH(request: NextRequest) {
     try {
       const userId = req.user!.userId;
       const body = await req.json();
-      const { productId, quantity } = body;
-      
-      if (!productId || quantity === undefined) {
+      const { productId, itemId, quantity } = body;
+      // itemId(장바구니 행 id) 가 오면 그 행만 변경 — 옵션별 행이 서로 덮어쓰지 않도록
+      const where = itemId ? { userId, id: String(itemId) } : { userId, productId };
+
+      if ((!productId && !itemId) || quantity === undefined) {
         return NextResponse.json(
           {
             success: false,
@@ -229,24 +229,16 @@ export async function PATCH(request: NextRequest) {
       
       if (quantity <= 0) {
         // 수량이 0 이하면 삭제
-        await prisma.cartItem.deleteMany({
-          where: {
-            userId,
-            productId,
-          },
-        });
-        
+        await prisma.cartItem.deleteMany({ where });
+
         return NextResponse.json({
           success: true,
           message: 'Item removed from cart',
         });
       }
-      
+
       const cartItem = await prisma.cartItem.updateMany({
-        where: {
-          userId,
-          productId,
-        },
+        where,
         data: {
           quantity,
         },

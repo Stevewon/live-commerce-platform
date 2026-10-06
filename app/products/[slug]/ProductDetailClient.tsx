@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { authFetch } from '@/lib/auth/clientFetch';
 import { addToGuestCart } from '@/lib/utils/guestCart';
+import { buildOptionLabel } from '@/lib/utils/optionLabel';
 import ShopNavigation from '@/components/ShopNavigation';
 import ProductReviews from '@/components/ProductReviews';
 import ProductQnA from '@/components/ProductQnA';
@@ -113,7 +114,10 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   };
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartMessage, setCartMessage] = useState('');
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null); // 마지막으로 고른 옵션(가격 표시용)
+  // [옵션 여러 개 담기] 쿠팡식: 옵션을 고를 때마다 행이 추가되고 행마다 수량 조절
+  //   예) 핑크/M 1개 + 블루/L 1개를 한 번에 장바구니·바로구매·선물
+  const [optionRows, setOptionRows] = useState<Array<{ variant: ProductVariant; quantity: number }>>([]);
 
   // ===== 공유하기 / 선물하기 =====
   const [shareMessage, setShareMessage] = useState('');      // 공유 완료 토스트
@@ -371,8 +375,56 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   //   (기존엔 작은 인라인 메시지라 모바일/앱에서 눈에 안 띄어 '반응 없음'처럼 느껴졌음)
   //   alert 은 앱 WebView에서도 화면 중앙에 확실히 뜨는 네이티브 다이얼로그다.
   //   반환값 true = 옵션 미선택으로 진행을 막아야 함.
+  // 구매할 행 목록: 옵션 상품은 고른 옵션 행들, 일반 상품은 단일 행
+  const lineItems = optionRequired
+    ? optionRows.map(r => ({
+        variant: r.variant as ProductVariant | null,
+        quantity: r.quantity,
+        price: r.variant.price ?? product.price,
+      }))
+    : [{ variant: null as ProductVariant | null, quantity, price: product.price }];
+  const totalQuantity = lineItems.reduce((s, li) => s + li.quantity, 0);
+  const totalPrice = lineItems.reduce((s, li) => s + li.price * li.quantity, 0);
+
+  // 옵션 선택 → 행 추가 (이미 있으면 수량 +1, 재고 한도 내)
+  const addOptionRow = (variant: ProductVariant) => {
+    setSelectedVariant(variant);
+    setOptionRows(prev => {
+      const idx = prev.findIndex(r => r.variant.id === variant.id);
+      if (idx < 0) return [...prev, { variant, quantity: 1 }];
+      const next = [...prev];
+      next[idx] = { ...next[idx], quantity: Math.min(variant.stock, next[idx].quantity + 1) };
+      return next;
+    });
+  };
+  const changeOptionRowQty = (variantId: string, delta: number) => {
+    setOptionRows(prev => prev.map(r =>
+      r.variant.id === variantId
+        ? { ...r, quantity: Math.max(1, Math.min(r.variant.stock, r.quantity + delta)) }
+        : r
+    ));
+  };
+  const removeOptionRow = (variantId: string) => {
+    setOptionRows(prev => prev.filter(r => r.variant.id !== variantId));
+  };
+
+  // 바로구매/선물하기로 checkout 에 넘길 행들
+  const buildBuyNowItems = () =>
+    lineItems.map(li => ({
+      productId: product.id,
+      quantity: li.quantity,
+      variantId: li.variant?.id || null,
+      optionLabel: li.variant ? buildOptionLabel(li.variant.optionValues) : null,
+      product: {
+        id: product.id,
+        name: product.name,
+        price: li.price,
+        thumbnail: product.thumbnail,
+      },
+    }));
+
   const warnIfOptionNotSelected = (): boolean => {
-    if (optionRequired && !selectedVariant) {
+    if (optionRequired && optionRows.length === 0) {
       if (typeof window !== 'undefined') {
         window.alert('옵션을 선택해주세요.');
         document.getElementById('product-options')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -391,15 +443,20 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
 
     try {
       if (user) {
-        const res = await authFetch('/api/cart', {
-          method: 'POST',
-          body: JSON.stringify({
-            productId: product.id,
-            variantId: selectedVariant?.id || null,
-            quantity,
-          }),
-        });
-        if (res.ok) {
+        // 옵션 행마다 담기 — 서버는 productId+variantId 별로 별도 행으로 저장
+        let allOk = true;
+        for (const li of lineItems) {
+          const res = await authFetch('/api/cart', {
+            method: 'POST',
+            body: JSON.stringify({
+              productId: product.id,
+              variantId: li.variant?.id || null,
+              quantity: li.quantity,
+            }),
+          });
+          if (!res.ok) allOk = false;
+        }
+        if (allOk) {
           // 파트너 스토어 경유 시 partnerId를 sessionStorage에 저장
           if (partnerId) {
             sessionStorage.setItem('checkout_partnerId', partnerId);
@@ -412,21 +469,25 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
           setCartMessage('장바구니 추가에 실패했습니다.');
         }
       } else {
-        addToGuestCart({
-          productId: product.id,
-          quantity,
-          product: {
-            id: product.id,
-            name: product.name,
-            slug: product.slug,
-            price: currentPrice,
-            comparePrice: currentComparePrice,
-            stock: currentStock,
-            thumbnail: product.thumbnail,
-            category: product.category,
-          },
-          addedAt: new Date().toISOString(),
-        });
+        for (const li of lineItems) {
+          addToGuestCart({
+            productId: product.id,
+            variantId: li.variant?.id || null,
+            optionLabel: li.variant ? buildOptionLabel(li.variant.optionValues) : null,
+            quantity: li.quantity,
+            product: {
+              id: product.id,
+              name: product.name,
+              slug: product.slug,
+              price: li.price,
+              comparePrice: li.variant ? null : product.comparePrice,
+              stock: li.variant ? li.variant.stock : product.stock,
+              thumbnail: product.thumbnail,
+              category: product.category,
+            },
+            addedAt: new Date().toISOString(),
+          });
+        }
         // 파트너 스토어 경유 시 partnerId를 sessionStorage에 저장
         if (partnerId) {
           sessionStorage.setItem('checkout_partnerId', partnerId);
@@ -447,31 +508,10 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
   const handleBuyNow = async () => {
     // [옵션 필수] 옵션이 있는 상품은 반드시 옵션을 선택해야 구매 가능 → 경고창
     if (warnIfOptionNotSelected()) return;
-    // 바로구매: 장바구니에 넣지 않고 sessionStorage에 바로구매 상품만 저장 후 checkout으로 이동
-    let optionLabel: string | null = null;
-    if (selectedVariant) {
-      try {
-        const ov = JSON.parse(selectedVariant.optionValues);
-        optionLabel = Object.entries(ov)
-          .filter(([, v]) => v != null && String(v).trim() !== '')
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(' / ') || null;
-      } catch { optionLabel = null; }
-    }
-    const buyNowItem = {
-      productId: product.id,
-      quantity,
-      variantId: selectedVariant?.id || null,
-      optionLabel,
-      product: {
-        id: product.id,
-        name: product.name,
-        price: currentPrice,
-        thumbnail: product.thumbnail,
-      },
-    };
+    // 바로구매: 장바구니에 넣지 않고 sessionStorage에 바로구매 행들(옵션별)만 저장 후 checkout으로 이동
     try {
-      sessionStorage.setItem('buyNowItem', JSON.stringify(buyNowItem));
+      sessionStorage.setItem('buyNowItems', JSON.stringify(buildBuyNowItems()));
+      sessionStorage.removeItem('buyNowItem');
       // 파트너 스토어 경유 시 partnerId를 sessionStorage에 저장
       if (partnerId) {
         sessionStorage.setItem('checkout_partnerId', partnerId);
@@ -573,30 +613,6 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
       return;
     }
 
-    let optionLabel: string | null = null;
-    if (selectedVariant) {
-      try {
-        const ov = JSON.parse(selectedVariant.optionValues);
-        optionLabel = Object.entries(ov)
-          .filter(([, v]) => v != null && String(v).trim() !== '')
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(' / ') || null;
-      } catch { optionLabel = null; }
-    }
-
-    const buyNowItem = {
-      productId: product.id,
-      quantity,
-      variantId: selectedVariant?.id || null,
-      optionLabel,
-      product: {
-        id: product.id,
-        name: product.name,
-        price: currentPrice,
-        thumbnail: product.thumbnail,
-      },
-    };
-
     const giftInfo = {
       isGift: true,
       recipientUserId: giftRecipient.userId,
@@ -607,7 +623,8 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
     };
 
     try {
-      sessionStorage.setItem('buyNowItem', JSON.stringify(buyNowItem));
+      sessionStorage.setItem('buyNowItems', JSON.stringify(buildBuyNowItems()));
+      sessionStorage.removeItem('buyNowItem');
       sessionStorage.setItem('checkout_gift', JSON.stringify(giftInfo));
       if (partnerId) {
         sessionStorage.setItem('checkout_partnerId', partnerId);
@@ -860,8 +877,11 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
               <div id="product-options" className="space-y-3 scroll-mt-20">
                 <h3 className="text-sm font-semibold text-gray-700">
                   옵션 선택 <span className="text-red-500">*</span>
-                  {optionRequired && !selectedVariant && (
+                  {optionRequired && optionRows.length === 0 && (
                     <span className="ml-2 text-xs font-normal text-red-500">옵션을 선택해주세요</span>
+                  )}
+                  {optionRows.length > 0 && (
+                    <span className="ml-2 text-xs font-normal text-gray-500">다른 옵션을 눌러 함께 담을 수 있어요</span>
                   )}
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -869,15 +889,15 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                     let optVals: Record<string, string> = {};
                     try { optVals = JSON.parse(variant.optionValues); } catch {}
                     const label = Object.values(optVals).join(' / ');
-                    const isSelected = selectedVariant?.id === variant.id;
+                    const isSelected = optionRows.some(r => r.variant.id === variant.id);
                     const isAvailable = variant.stock > 0;
 
                     return (
                       <button
                         key={variant.id}
-                        onClick={() => setSelectedVariant(isSelected ? null : variant)}
+                        onClick={() => addOptionRow(variant)}
                         disabled={!isAvailable}
-                        className={`px-3 py-2 text-sm rounded-lg border text-left transition ${
+                        className={`min-h-[44px] px-3 py-2 text-sm rounded-lg border text-left transition ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
                             : isAvailable
@@ -894,10 +914,60 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                     );
                   })}
                 </div>
+
+                {/* 선택한 옵션 행 (옵션마다 수량 따로) */}
+                {optionRows.length > 0 && (
+                  <ul className="space-y-2">
+                    {optionRows.map(r => {
+                      const rowPrice = r.variant.price ?? product.price;
+                      return (
+                        <li key={r.variant.id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm text-gray-800 break-words min-w-0">
+                              {buildOptionLabel(r.variant.optionValues) || '옵션'}
+                            </p>
+                            <button
+                              onClick={() => removeOptionRow(r.variant.id)}
+                              className="flex-shrink-0 -m-2 p-2 text-gray-400 hover:text-red-500"
+                              aria-label="옵션 삭제"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
+                              <button
+                                onClick={() => changeOptionRowQty(r.variant.id, -1)}
+                                disabled={r.quantity <= 1}
+                                className="w-10 h-9 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+                                aria-label="수량 감소"
+                              >
+                                -
+                              </button>
+                              <span className="w-10 text-center text-sm font-medium text-gray-900">{r.quantity}</span>
+                              <button
+                                onClick={() => changeOptionRowQty(r.variant.id, 1)}
+                                disabled={r.quantity >= r.variant.stock}
+                                className="w-10 h-9 text-gray-500 hover:bg-gray-100 disabled:opacity-30"
+                                aria-label="수량 증가"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <span className="text-sm font-bold text-gray-900">₩{(rowPrice * r.quantity).toLocaleString()}</span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             )}
 
-            {/* Quantity */}
+            {/* Quantity (옵션 없는 상품만 — 옵션 상품은 위 옵션 행마다 수량 조절) */}
+            {!optionRequired && (
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium text-gray-700">수량</span>
               <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
@@ -919,14 +989,17 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                 {currentStock > 0 ? `재고 ${currentStock}개` : ''}
               </span>
             </div>
+            )}
 
             {/* Total */}
             <div className="flex justify-between items-center py-3 border-t border-b border-gray-200">
-              <span className="text-sm font-medium text-gray-700">총 상품 금액</span>
+              <span className="text-sm font-medium text-gray-700">
+                총 상품 금액{totalQuantity > 0 && <span className="text-gray-400 font-normal"> ({totalQuantity}개)</span>}
+              </span>
               <div className="text-right">
-                <span className="text-xl font-bold text-blue-600">₩{(currentPrice * quantity).toLocaleString()}</span>
+                <span className="text-xl font-bold text-blue-600">₩{totalPrice.toLocaleString()}</span>
                 {/* [qkey 표시] 1 쿠키 = 10원 */}
-                <p className="text-xs font-semibold text-purple-600 mt-0.5">🍪 {krwToQkeyDisplay(currentPrice * quantity).toLocaleString()} 쿠키</p>
+                <p className="text-xs font-semibold text-purple-600 mt-0.5">🍪 {krwToQkeyDisplay(totalPrice).toLocaleString()} 쿠키</p>
               </div>
             </div>
 
@@ -1219,7 +1292,7 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
               onClick={handleBuyNow}
               className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm"
             >
-              ₩{(currentPrice * quantity).toLocaleString()} 구매
+              {totalPrice > 0 ? `₩${totalPrice.toLocaleString()} 구매` : '바로 구매'}
             </button>
           </>
         ) : (
@@ -1264,8 +1337,13 @@ export default function ProductDetailClient({ initialProduct = null }: { initial
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900 line-clamp-2">{tr(product.name)}</p>
                   <p className="text-sm text-blue-600 font-bold mt-0.5">
-                    ₩{(currentPrice * quantity).toLocaleString()} <span className="text-gray-400 font-normal">({quantity}개)</span>
+                    ₩{totalPrice.toLocaleString()} <span className="text-gray-400 font-normal">({totalQuantity}개)</span>
                   </p>
+                  {optionRows.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                      {optionRows.map(r => `${buildOptionLabel(r.variant.optionValues) || '옵션'} ×${r.quantity}`).join(', ')}
+                    </p>
+                  )}
                 </div>
               </div>
 

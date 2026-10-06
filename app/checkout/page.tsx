@@ -7,6 +7,7 @@ import Link from 'next/link';
 // [v1.0.22] KISPG PG 중단 → KRW/QKEY 잔액 결제로 전환
 import ShopNavigation from '@/components/ShopNavigation';
 import { getGuestCart, clearGuestCart, removeFromGuestCart, GuestCartItem } from '@/lib/utils/guestCart';
+import { buildOptionLabel } from '@/lib/utils/optionLabel';
 import AddressSearch from '@/components/AddressSearch';
 import CouponInput from '@/components/CouponInput';
 import { authFetch } from '@/lib/auth/clientFetch';
@@ -40,22 +41,6 @@ interface CouponData {
   discountAmount: number;
 }
 
-// [옵션] 변형 optionValues JSON 을 "색상: 빨강 / 사이즈: L" 라벨로 변환
-function buildOptionLabel(raw: any): string | null {
-  if (!raw) return null;
-  try {
-    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-      const parts = Object.entries(obj)
-        .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
-        .map(([k, v]) => `${k}: ${v}`);
-      return parts.length ? parts.join(' / ') : null;
-    }
-    return String(obj) || null;
-  } catch {
-    return typeof raw === 'string' ? raw : null;
-  }
-}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -261,16 +246,24 @@ export default function CheckoutPage() {
     }
   };
 
-  // 장바구니 "선택 상품만 결제" 모드에서 선택된 productId 목록을 읽는다.
-  // (cart 페이지에서 sessionStorage 'checkout_selectedProductIds' 에 저장)
-  const getSelectedProductIds = (): string[] | null => {
+  // 장바구니 "선택 상품만 결제" 모드의 선택 목록을 읽어 필터를 만든다.
+  // - 신규: 'checkout_selectedItemIds' (장바구니 행 id — 옵션별로 구분)
+  // - 구버전: 'checkout_selectedProductIds' (productId)
+  const readIdList = (key: string): string[] | null => {
     try {
-      const raw = sessionStorage.getItem('checkout_selectedProductIds');
+      const raw = sessionStorage.getItem(key);
       if (!raw) return null;
       const arr = JSON.parse(raw);
       if (Array.isArray(arr) && arr.length > 0) return arr.map(String);
     } catch {}
     return null;
+  };
+  const filterSelected = <T extends { id: string; productId: string }>(items: T[]): T[] => {
+    const itemIds = readIdList('checkout_selectedItemIds');
+    if (itemIds) return items.filter((it) => itemIds.includes(String(it.id)));
+    const productIds = readIdList('checkout_selectedProductIds');
+    if (productIds) return items.filter((it) => productIds.includes(String(it.productId)));
+    return items;
   };
 
   useEffect(() => {
@@ -282,17 +275,27 @@ export default function CheckoutPage() {
 
     if (isBuyNow) {
       try {
+        // 바로구매: 옵션별 여러 행(buyNowItems 배열) — 예) 핑크 1개 + 블루 1개
+        //   구버전 단일 객체(buyNowItem)도 호환
+        const buyNowListRaw = sessionStorage.getItem('buyNowItems');
         const buyNowRaw = sessionStorage.getItem('buyNowItem');
-        if (buyNowRaw) {
-          const buyNowItem = JSON.parse(buyNowRaw);
-          setCartItems([{
-            id: 'buynow-0',
-            productId: buyNowItem.productId,
-            quantity: buyNowItem.quantity,
-            variantId: buyNowItem.variantId || null,
-            optionLabel: buyNowItem.optionLabel || null,
-            product: buyNowItem.product,
-          }]);
+        let buyNowList: any[] = [];
+        if (buyNowListRaw) {
+          const arr = JSON.parse(buyNowListRaw);
+          if (Array.isArray(arr)) buyNowList = arr;
+        } else if (buyNowRaw) {
+          buyNowList = [JSON.parse(buyNowRaw)];
+        }
+        if (buyNowList.length > 0) {
+          setCartItems(buyNowList.map((b, i) => ({
+            id: `buynow-${i}`,
+            productId: b.productId,
+            quantity: b.quantity,
+            variantId: b.variantId || null,
+            optionLabel: b.optionLabel || null,
+            product: b.product,
+          })));
+          sessionStorage.removeItem('buyNowItems');
           sessionStorage.removeItem('buyNowItem');
           setLoading(false);
           if (!user) setIsGuest(true);
@@ -364,31 +367,15 @@ export default function CheckoutPage() {
           ...it,
           variantId: it.variantId || it.variant?.id || null,
           optionLabel: buildOptionLabel(it.variant?.optionValues),
+          // [옵션] 옵션 가격이 따로 있으면 화면 합계도 그 가격으로 (서버 주문 금액과 일치)
+          product: it.product ? { ...it.product, price: it.variant?.price ?? it.product.price } : it.product,
         }));
-        // 선택 결제 모드: 선택된 상품만 남긴다
-        const selectedIds = getSelectedProductIds();
-        if (selectedIds) {
-          serverItems = serverItems.filter((it: any) =>
-            selectedIds.includes(String(it.productId))
-          );
-        }
+        // 선택 결제 모드: 선택된 행만 남긴다
+        serverItems = filterSelected(serverItems);
         setCartItems(serverItems);
         if (serverItems.length === 0) {
-          const guestItems = getGuestCart();
-          if (guestItems.length > 0) {
-            const mapped: CartItem[] = guestItems.map((item, idx) => ({
-              id: `guest-${idx}`,
-              productId: item.productId,
-              quantity: item.quantity,
-              product: {
-                id: item.product.id,
-                name: item.product.name,
-                price: item.product.price,
-                thumbnail: item.product.thumbnail,
-              },
-            }));
-            setCartItems(mapped);
-          }
+          const mapped = mapGuestItems();
+          if (mapped.length > 0) setCartItems(mapped);
         }
         if (user) {
           setShippingName(user.name || '');
@@ -405,12 +392,14 @@ export default function CheckoutPage() {
     }
   };
 
-  const loadGuestCart = () => {
-    const guestItems = getGuestCart();
-    let mapped: CartItem[] = guestItems.map((item, idx) => ({
-      id: `guest-${idx}`,
+  // 게스트 장바구니 → 결제 행 (id 는 cart 페이지와 동일 규칙: 선택 목록 매칭용)
+  const mapGuestItems = (): CartItem[] =>
+    getGuestCart().map((item) => ({
+      id: `guest-${item.productId}-${item.variantId || 'none'}`,
       productId: item.productId,
       quantity: item.quantity,
+      variantId: item.variantId || null,
+      optionLabel: item.optionLabel || null,
       product: {
         id: item.product.id,
         name: item.product.name,
@@ -418,12 +407,10 @@ export default function CheckoutPage() {
         thumbnail: item.product.thumbnail,
       },
     }));
-    // 선택 결제 모드: 선택된 상품만 남긴다
-    const selectedIds = getSelectedProductIds();
-    if (selectedIds) {
-      mapped = mapped.filter((it) => selectedIds.includes(String(it.productId)));
-    }
-    setCartItems(mapped);
+
+  const loadGuestCart = () => {
+    // 선택 결제 모드: 선택된 행만 남긴다
+    setCartItems(filterSelected(mapGuestItems()));
     setLoading(false);
   };
 
@@ -647,20 +634,18 @@ export default function CheckoutPage() {
       // 주문한 상품만 장바구니에서 제거
       // - 선택 결제/바로구매 등으로 cartItems 에 담긴 것 = 실제 주문한 상품이므로
       //   이 목록만 카트에서 지운다. (전체 clearGuestCart 는 미선택 상품까지 날려버림)
+      //   주문한 "행"(옵션 단위)만 지운다 — 같은 상품의 다른 옵션은 장바구니에 유지.
+      //   바로구매(buynow-*) 행은 장바구니에서 온 게 아니므로 장바구니를 건드리지 않는다.
       try {
-        const orderedProductIds = cartItems.map((it) => String(it.productId));
-        // 비회원: 주문한 상품만 게스트 카트에서 제거
-        if (!user) {
-          orderedProductIds.forEach((pid) => {
-            try { removeFromGuestCart(pid); } catch {}
-          });
-        } else {
-          // 회원: 주문한 상품만 서버 카트에서 제거
-          for (const pid of orderedProductIds) {
-            try {
-              await authFetch(`/api/cart?productId=${pid}`, { method: 'DELETE' });
-            } catch {}
-          }
+        for (const it of cartItems) {
+          if (it.id.startsWith('buynow-')) continue;
+          try {
+            if (it.id.startsWith('guest-') || !user) {
+              removeFromGuestCart(String(it.productId), it.variantId || null);
+            } else {
+              await authFetch(`/api/cart?itemId=${encodeURIComponent(it.id)}`, { method: 'DELETE' });
+            }
+          } catch {}
         }
       } catch {}
 
@@ -669,6 +654,7 @@ export default function CheckoutPage() {
         sessionStorage.removeItem('checkout_partnerId');
         sessionStorage.removeItem('checkout_storeSlug');
         sessionStorage.removeItem('checkout_selectedProductIds');
+        sessionStorage.removeItem('checkout_selectedItemIds');
       } catch {}
 
       // 주문 성공 페이지로 이동 (잔액 결제는 즉시 확정)
@@ -1097,12 +1083,12 @@ export default function CheckoutPage() {
                             onClick={async () => {
                               if (user && !item.id.startsWith('guest-') && !item.id.startsWith('buynow-')) {
                                 try {
-                                  await authFetch(`/api/cart?productId=${item.productId}`, {
+                                  await authFetch(`/api/cart?itemId=${encodeURIComponent(item.id)}`, {
                                     method: 'DELETE',
                                   });
                                 } catch {}
-                              } else if (!user) {
-                                removeFromGuestCart(item.productId);
+                              } else if (!user && !item.id.startsWith('buynow-')) {
+                                removeFromGuestCart(item.productId, item.variantId || null);
                               }
                               setCartItems(prev => prev.filter(ci => ci.id !== item.id));
                             }}

@@ -16,10 +16,13 @@ import {
   clearGuestCart,
   GuestCartItem,
 } from '@/lib/utils/guestCart';
+import { buildOptionLabel } from '@/lib/utils/optionLabel';
 
 interface CartItem {
   id: string;
   productId: string;
+  variantId?: string | null;    // [옵션] 같은 상품이라도 옵션별로 별도 행
+  optionLabel?: string | null;  // [옵션] "색상: 핑크 / 사이즈: M"
   quantity: number;
   product: {
     id: string;
@@ -74,14 +77,17 @@ export default function CartPage() {
           const serverItems = (data.data || []).map((item: any) => ({
             id: item.id,
             productId: item.productId,
+            variantId: item.variantId || item.variant?.id || null,
+            optionLabel: buildOptionLabel(item.variant?.optionValues),
             quantity: item.quantity,
             product: {
               id: item.product?.id || item.productId,
               name: item.product?.name || '상품',
               slug: item.product?.slug || '',
-              price: item.product?.price || 0,
-              comparePrice: item.product?.comparePrice || null,
-              stock: item.product?.stock ?? 0,
+              // [옵션] 옵션 가격/재고가 따로 있으면 그 값을 사용
+              price: item.variant?.price ?? item.product?.price ?? 0,
+              comparePrice: item.variant ? null : (item.product?.comparePrice || null),
+              stock: item.variant?.stock ?? item.product?.stock ?? 0,
               thumbnail: item.product?.thumbnail || '',
               category: item.product?.category || null,
             },
@@ -91,9 +97,11 @@ export default function CartPage() {
       } else {
         // 비회원: localStorage 장바구니
         const guestItems = getGuestCart();
-        const mapped: CartItem[] = guestItems.map((item, idx) => ({
-          id: `guest-${idx}-${item.productId}`,
+        const mapped: CartItem[] = guestItems.map((item) => ({
+          id: `guest-${item.productId}-${item.variantId || 'none'}`,
           productId: item.productId,
+          variantId: item.variantId || null,
+          optionLabel: item.optionLabel || null,
           quantity: item.quantity,
           product: {
             id: item.product.id,
@@ -124,7 +132,7 @@ export default function CartPage() {
   // - 이미 선택되어 있던 항목은 유지, 사라진 항목은 제거
   useEffect(() => {
     setSelectedIds((prev) => {
-      const currentIds = cartItems.map((it) => it.productId);
+      const currentIds = cartItems.map((it) => it.id);
       // 최초(비어있던 경우)에는 전체 선택
       if (prev.size === 0) {
         return new Set(currentIds);
@@ -138,17 +146,27 @@ export default function CartPage() {
     });
     // cartItems 자체가 바뀔 때만 실행
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems.map((it) => it.productId).join(',')]);
+  }, [cartItems.map((it) => it.id).join(',')]);
 
-  const isSelected = (productId: string) => selectedIds.has(productId);
+  // 선택은 장바구니 "행"(item.id) 단위 — 같은 상품의 핑크/블루 옵션을 각각 선택 가능
+  const isSelected = (itemId: string) => selectedIds.has(itemId);
 
-  const toggleSelect = (productId: string) => {
+  const toggleSelect = (itemId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
       return next;
     });
+  };
+
+  // 서버/게스트 장바구니에서 이 행만 삭제
+  const deleteRow = async (item: CartItem) => {
+    if (user) {
+      return authFetch(`/api/cart?itemId=${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+    }
+    removeFromGuestCart(item.productId, item.variantId || null);
+    return null;
   };
 
   const allSelected = cartItems.length > 0 && selectedIds.size === cartItems.length;
@@ -157,39 +175,34 @@ export default function CartPage() {
     if (allSelected) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(cartItems.map((it) => it.productId)));
+      setSelectedIds(new Set(cartItems.map((it) => it.id)));
     }
   };
 
   // 선택된 상품 삭제
   const handleRemoveSelected = async () => {
-    const targets = cartItems.filter((it) => selectedIds.has(it.productId));
+    const targets = cartItems.filter((it) => selectedIds.has(it.id));
     if (targets.length === 0) return;
     if (!confirm(`선택한 ${targets.length}개 상품을 삭제할까요?`)) return;
     for (const item of targets) {
-      try {
-        if (user) {
-          await authFetch(`/api/cart?productId=${item.productId}`, { method: 'DELETE' });
-        } else {
-          removeFromGuestCart(item.productId);
-        }
-      } catch {}
+      try { await deleteRow(item); } catch {}
     }
-    setCartItems((prev) => prev.filter((ci) => !selectedIds.has(ci.productId)));
+    setCartItems((prev) => prev.filter((ci) => !selectedIds.has(ci.id)));
     setSelectedIds(new Set());
   };
 
-  // 선택 상품만 결제
+  // 선택 상품만 결제 — 행 id 로 넘겨야 같은 상품의 옵션 중 선택한 것만 결제됨
   const handleCheckoutSelected = () => {
-    const selectedProductIds = cartItems
-      .filter((it) => selectedIds.has(it.productId))
-      .map((it) => it.productId);
-    if (selectedProductIds.length === 0) {
+    const selectedItemIds = cartItems
+      .filter((it) => selectedIds.has(it.id))
+      .map((it) => it.id);
+    if (selectedItemIds.length === 0) {
       alert('구매할 상품을 선택해주세요.');
       return;
     }
     try {
-      sessionStorage.setItem('checkout_selectedProductIds', JSON.stringify(selectedProductIds));
+      sessionStorage.setItem('checkout_selectedItemIds', JSON.stringify(selectedItemIds));
+      sessionStorage.removeItem('checkout_selectedProductIds');
     } catch {}
     router.push('/checkout?mode=selected');
   };
@@ -210,7 +223,7 @@ export default function CartPage() {
       if (user) {
         const res = await authFetch('/api/cart', {
           method: 'PATCH',
-          body: JSON.stringify({ productId: item.productId, quantity: newQuantity }),
+          body: JSON.stringify({ itemId: item.id, productId: item.productId, quantity: newQuantity }),
         });
         if (res.ok) {
           setCartItems(prev =>
@@ -218,7 +231,7 @@ export default function CartPage() {
           );
         }
       } else {
-        updateGuestCartQuantity(item.productId, newQuantity);
+        updateGuestCartQuantity(item.productId, newQuantity, item.variantId || null);
         setCartItems(prev =>
           prev.map(ci => (ci.id === item.id ? { ...ci, quantity: newQuantity } : ci))
         );
@@ -233,15 +246,8 @@ export default function CartPage() {
   const handleRemoveItem = async (item: CartItem) => {
     setUpdatingId(item.id);
     try {
-      if (user) {
-        const res = await authFetch(`/api/cart?productId=${item.productId}`, {
-          method: 'DELETE',
-        });
-        if (res.ok) {
-          setCartItems(prev => prev.filter(ci => ci.id !== item.id));
-        }
-      } else {
-        removeFromGuestCart(item.productId);
+      const res = await deleteRow(item);
+      if (!res || res.ok) {
         setCartItems(prev => prev.filter(ci => ci.id !== item.id));
       }
     } catch (error) {
@@ -266,7 +272,7 @@ export default function CartPage() {
   };
 
   // 선택된 상품만 합계 계산 (쿠팡식 선택결제)
-  const selectedItems = cartItems.filter((item) => selectedIds.has(item.productId));
+  const selectedItems = cartItems.filter((item) => selectedIds.has(item.id));
   const selectedCount = selectedItems.length;
   const totalAmount = selectedItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   // [정책] 전 상품 무조건 무료배송 — 가격과 무관하게 배송비 항상 0원
@@ -353,8 +359,8 @@ export default function CartPage() {
                   <div className="flex items-start pt-1">
                     <input
                       type="checkbox"
-                      checked={isSelected(item.productId)}
-                      onChange={() => toggleSelect(item.productId)}
+                      checked={isSelected(item.id)}
+                      onChange={() => toggleSelect(item.id)}
                       className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       aria-label="상품 선택"
                     />
@@ -393,6 +399,9 @@ export default function CartPage() {
                         >
                           {tr(item.product.name)}
                         </Link>
+                        {item.optionLabel && (
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">옵션: {item.optionLabel}</p>
+                        )}
                       </div>
                       {/* 삭제 버튼 */}
                       <button
